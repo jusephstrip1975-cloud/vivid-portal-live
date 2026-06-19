@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
+import { LiveMedia } from "@/components/LiveMedia";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -59,11 +60,10 @@ function HomePage() {
           params={{ id: hero.id }}
           className="group relative block aspect-[4/5] overflow-hidden rounded-[32px] outline outline-1 -outline-offset-1 outline-white/10"
         >
-          <img
-            src={hero.src}
+          <LiveMedia
+            src={hero.video}
+            poster={hero.src}
             alt={hero.title}
-            width={768}
-            height={1344}
             className="size-full object-cover transition duration-[1500ms] group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-space-black via-space-black/30 to-transparent" />
