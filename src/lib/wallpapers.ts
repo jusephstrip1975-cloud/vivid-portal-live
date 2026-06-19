@@ -8,6 +8,11 @@ import lightning from "@/assets/wp-lightning.jpg";
 import mountain from "@/assets/wp-mountain.jpg";
 import aquarium from "@/assets/wp-aquarium.jpg";
 import lava from "@/assets/wp-lava.jpg";
+import planets from "@/assets/wp-planets.jpg";
+import galaxy from "@/assets/wp-galaxy.jpg";
+import snow from "@/assets/wp-snow.jpg";
+import waves from "@/assets/wp-waves.jpg";
+import shark from "@/assets/wp-shark.jpg";
 
 import blackholeVid from "@/assets/wp-blackhole.mp4.asset.json";
 import jellyfishVid from "@/assets/wp-jellyfish.mp4.asset.json";
@@ -19,6 +24,11 @@ import lightningVid from "@/assets/wp-lightning.mp4.asset.json";
 import mountainVid from "@/assets/wp-mountain.mp4.asset.json";
 import aquariumVid from "@/assets/wp-aquarium.mp4.asset.json";
 import lavaVid from "@/assets/wp-lava.mp4.asset.json";
+import planetsVid from "@/assets/wp-planets.mp4.asset.json";
+import galaxyVid from "@/assets/wp-galaxy.mp4.asset.json";
+import snowVid from "@/assets/wp-snow.mp4.asset.json";
+import wavesVid from "@/assets/wp-waves.mp4.asset.json";
+import sharkVid from "@/assets/wp-shark.mp4.asset.json";
 
 export type Category =
   | "universo"
@@ -193,6 +203,76 @@ export const WALLPAPERS: Wallpaper[] = [
     premium: true,
     sound: true,
     accent: "rgba(249, 115, 22, 0.4)",
+  },
+  {
+    id: "ringed-giant",
+    title: "Gigante Anillado",
+    subtitle: "Planeta gaseoso orbitado por dos lunas",
+    category: "universo",
+    src: planets,
+    video: planetsVid.url,
+    resolution: "4K",
+    sizeMb: 17.4,
+    fps: 60,
+    premium: true,
+    sound: false,
+    accent: "rgba(168, 85, 247, 0.45)",
+  },
+  {
+    id: "spiral-core",
+    title: "Núcleo Espiral",
+    subtitle: "Galaxia girando en magenta y azul",
+    category: "universo",
+    src: galaxy,
+    video: galaxyVid.url,
+    resolution: "8K",
+    sizeMb: 22.9,
+    fps: 60,
+    premium: true,
+    sound: false,
+    accent: "rgba(236, 72, 153, 0.4)",
+  },
+  {
+    id: "moonlit-snow",
+    title: "Nieve a la Luna",
+    subtitle: "Copos cayendo en bosque silencioso",
+    category: "clima",
+    src: snow,
+    video: snowVid.url,
+    resolution: "4K",
+    sizeMb: 10.3,
+    fps: 30,
+    premium: false,
+    sound: true,
+    accent: "rgba(186, 230, 253, 0.4)",
+  },
+  {
+    id: "barrel-wave",
+    title: "Tubo Esmeralda",
+    subtitle: "Ola perfecta envolviendo el horizonte",
+    category: "oceano",
+    src: waves,
+    video: wavesVid.url,
+    resolution: "4K",
+    sizeMb: 13.7,
+    fps: 60,
+    premium: false,
+    sound: true,
+    accent: "rgba(45, 212, 191, 0.45)",
+  },
+  {
+    id: "apex-predator",
+    title: "Gran Blanco",
+    subtitle: "Tiburón emergiendo de la penumbra azul",
+    category: "oceano",
+    src: shark,
+    video: sharkVid.url,
+    resolution: "4K",
+    sizeMb: 16.0,
+    fps: 30,
+    premium: true,
+    sound: true,
+    accent: "rgba(30, 64, 175, 0.5)",
   },
 ];
 
