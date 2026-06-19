@@ -63,6 +63,25 @@ function WallpaperDetail() {
     setDeviceWallpaper(wp.src, "both").catch(() => {});
   }
 
+  async function handleDownload() {
+    try {
+      const res = await fetch(wp.src, { mode: "cors" });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `aetherx-${wp.id}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      // Fallback: open in a new tab so the user can long-press to save.
+      window.open(wp.src, "_blank", "noopener,noreferrer");
+    }
+  }
+
+
 
   return (
     <div className="relative min-h-screen pb-32">
@@ -158,11 +177,13 @@ function WallpaperDetail() {
             </button>
             <button
               type="button"
+              onClick={handleDownload}
               className="flex items-center justify-center rounded-2xl border border-white/12 bg-white/5 px-5 text-white hover:bg-white/10"
               aria-label="Descargar"
             >
               <Download className="size-5" />
             </button>
+
           </div>
 
           {wp.sound && (
@@ -175,9 +196,11 @@ function WallpaperDetail() {
 
         {/* Note about web limitation */}
         <p className="mt-4 px-2 text-center text-[10px] leading-relaxed text-white/35">
-          Al aplicar, este fondo permanece activo en AetherX hasta que lo quites
-          desde tu Perfil o elimines la app.
+          Toca <span className="text-electric-blue">Descargar</span> para guardar el fondo en tu móvil.
+          Luego ábrelo desde Fotos / Galería y mantén pulsado → <strong>"Usar como fondo de pantalla"</strong>.
+          Por seguridad, iOS y los navegadores no permiten cambiar el fondo automáticamente.
         </p>
+
 
         {justApplied && (
           <div className="glass-nav fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full px-5 py-3 text-xs font-bold uppercase tracking-[0.2em] text-electric-blue shadow-2xl">
