@@ -16,10 +16,17 @@ export const Route = createFileRoute("/premium")({
   component: PremiumPage,
 });
 
-const PLANS = [
+type Plan = {
+  id: string;
+  label: string;
+  price: string;
+  note: string;
+  best?: boolean;
+};
+const PLANS: Plan[] = [
   { id: "monthly", label: "Mensual", price: "4,99 €", note: "facturación mensual" },
   { id: "yearly", label: "Anual", price: "29,99 €", note: "ahorras 50%", best: true },
-] as const;
+];
 
 const BENEFITS = [
   "Acceso completo a la biblioteca 4K y 8K",
