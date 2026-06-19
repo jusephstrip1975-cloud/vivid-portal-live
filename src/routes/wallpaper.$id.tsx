@@ -54,11 +54,15 @@ function WallpaperDetail() {
   const isApplied = appliedId === wp.id;
   const fav = isFavorite(wp.id);
 
-  function handleApply() {
+  async function handleApply() {
     apply(wp.id);
     setJustApplied(true);
     setTimeout(() => setJustApplied(false), 2200);
+    // If running inside the Capacitor Android build, also push to system wallpaper.
+    const { setDeviceWallpaper } = await import("@/lib/native-wallpaper");
+    setDeviceWallpaper(wp.src, "both").catch(() => {});
   }
+
 
   return (
     <div className="relative min-h-screen pb-32">
