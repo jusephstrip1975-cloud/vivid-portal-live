@@ -73,14 +73,6 @@ function WallpaperDetail() {
       if (!res.ok) throw new Error("No se pudo descargar el vídeo");
       const blob = await res.blob();
 
-      const file = new File([blob], fileName, { type: blob.type || "video/mp4" });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: wp.title });
-        setDownloadState("done");
-        setTimeout(() => setDownloadState("idle"), 1800);
-        return;
-      }
-
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
