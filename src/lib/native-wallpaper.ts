@@ -41,7 +41,7 @@ export async function setDeviceWallpaper(
       // Dynamically import the community plugin so the web build does not fail.
       // Install in your local clone:  npm i capacitor-wallpaper
       // @ts-expect-error — optional native plugin, only present in mobile build
-      const mod = await import("capacitor-wallpaper");
+      const mod = await import(/* @vite-ignore */ "capacitor-wallpaper" as string);
       const Wallpaper = mod.Wallpaper ?? mod.default;
       await Wallpaper.setImage({ url, display: target });
       return { ok: true };
@@ -51,7 +51,7 @@ export async function setDeviceWallpaper(
       // iOS restriction: no API to set system wallpaper. Save to Photos so
       // the user can apply it manually from the iOS share sheet.
       // @ts-expect-error — optional native plugin
-      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+      const { Filesystem, Directory } = await import(/* @vite-ignore */ "@capacitor/filesystem" as string);
       const res = await fetch(url);
       const blob = await res.blob();
       const base64 = await blobToBase64(blob);
