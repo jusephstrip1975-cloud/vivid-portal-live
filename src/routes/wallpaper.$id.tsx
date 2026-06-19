@@ -63,6 +63,25 @@ function WallpaperDetail() {
     setDeviceWallpaper(wp.src, "both").catch(() => {});
   }
 
+  async function handleDownload() {
+    try {
+      const res = await fetch(wp.src, { mode: "cors" });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `aetherx-${wp.id}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      // Fallback: open in a new tab so the user can long-press to save.
+      window.open(wp.src, "_blank", "noopener,noreferrer");
+    }
+  }
+
+
 
   return (
     <div className="relative min-h-screen pb-32">
@@ -158,11 +177,13 @@ function WallpaperDetail() {
             </button>
             <button
               type="button"
+              onClick={handleDownload}
               className="flex items-center justify-center rounded-2xl border border-white/12 bg-white/5 px-5 text-white hover:bg-white/10"
               aria-label="Descargar"
             >
               <Download className="size-5" />
             </button>
+
           </div>
 
           {wp.sound && (
