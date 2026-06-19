@@ -49,8 +49,7 @@ export async function setDeviceWallpaper(
     if (platform === "ios") {
       // iOS restriction: no API to set system wallpaper. Save to Photos so
       // the user can apply it manually from the iOS share sheet.
-      // @ts-expect-error — optional native plugin
-      const { Filesystem, Directory } = await import(/* @vite-ignore */ "@capacitor/filesystem" as string);
+      const { Filesystem, Directory }: any = await import(/* @vite-ignore */ "@capacitor/filesystem" as string);
       const res = await fetch(url);
       const blob = await res.blob();
       const base64 = await blobToBase64(blob);
