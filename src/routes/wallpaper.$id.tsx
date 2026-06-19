@@ -166,7 +166,34 @@ function WallpaperDetail() {
             <Stat label="Audio" value={wp.sound ? "Espacial" : "Silencio"} />
           </dl>
 
-          <div className="mt-5 grid grid-cols-[1fr_auto] gap-3">
+          {/* Target picker: Home / Lock / Both */}
+          <div className="mt-5">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.25em] text-white/45">
+              Aplicar en
+            </p>
+            <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/5 p-1">
+              {([
+                { id: "home", label: "Inicio" },
+                { id: "lock", label: "Bloqueo" },
+                { id: "both", label: "Ambas" },
+              ] as const).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTarget(t.id)}
+                  className={`rounded-xl py-2 text-[11px] font-bold uppercase tracking-[0.15em] transition ${
+                    target === t.id
+                      ? "bg-electric-blue text-space-black"
+                      : "text-white/70 hover:text-white"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-[1fr_auto] gap-3">
             <button
               type="button"
               onClick={handleApply}
@@ -206,11 +233,18 @@ function WallpaperDetail() {
         </div>
 
         {/* Note about web limitation */}
-        <p className="mt-4 px-2 text-center text-[10px] leading-relaxed text-white/35">
-          Toca <span className="text-electric-blue">Descargar</span> para guardar el archivo <strong>MP4 animado</strong> en tu móvil.
-          Luego ábrelo desde Fotos / Galería y elige <strong>"Usar como fondo de pantalla"</strong> si tu móvil admite fondos animados.
-          Por seguridad, iOS y los navegadores no permiten cambiar el fondo automáticamente.
-        </p>
+        <div className="mt-4 space-y-2 px-2 text-left text-[10px] leading-relaxed text-white/45">
+          <p className="text-center text-white/55">
+            Cómo aplicar el fondo <strong className="text-electric-blue">en Inicio y en Bloqueo</strong>:
+          </p>
+          <p>
+            <strong className="text-white/70">Android:</strong> pulsa <span className="text-electric-blue">Descargar</span>, abre el MP4 desde Galería → menú <strong>···</strong> → <strong>Establecer como fondo</strong> → elige <strong>"Pantalla de inicio y de bloqueo"</strong>. Si tu Galería solo te deja la pantalla de bloqueo, usa una app de fondos animados (Video Live Wallpaper) y selecciona <strong>"Ambas pantallas"</strong>.
+          </p>
+          <p>
+            <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos animados como <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de inicio se aplica el póster estático automáticamente (es una restricción del sistema, no de la app).
+          </p>
+        </div>
+
 
 
         {justApplied && (
