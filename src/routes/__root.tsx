@@ -11,22 +11,27 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AppStateProvider } from "@/lib/app-state";
+import { BottomNav } from "@/components/BottomNav";
+import { AppliedHalo } from "@/components/AppliedHalo";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+    <div className="flex min-h-screen items-center justify-center px-6 ambient-glow">
+      <div className="max-w-sm text-center">
+        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-electric-blue">
+          Señal perdida
+        </p>
+        <h1 className="mt-3 text-6xl font-bold text-display text-ice-white">404</h1>
+        <p className="mt-3 text-sm text-white/60">
+          Esa órbita no existe. Vuelve al universo principal.
         </p>
         <div className="mt-6">
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-full bg-ice-white px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] text-space-black hover:bg-electric-blue hover:text-white transition"
           >
-            Go home
+            Volver al inicio
           </Link>
         </div>
       </div>
@@ -42,13 +47,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+    <div className="flex min-h-screen items-center justify-center px-6 ambient-glow">
+      <div className="glass-card max-w-sm rounded-3xl p-8 text-center">
+        <h1 className="text-xl font-bold text-display">Algo se distorsionó</h1>
+        <p className="mt-2 text-sm text-white/60">
+          La señal cinematográfica se interrumpió. Vuelve a intentarlo.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -56,15 +59,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="rounded-full bg-electric-blue px-5 py-2.5 text-xs font-bold uppercase tracking-[0.2em] text-space-black hover:bg-ocean-cyan transition"
           >
-            Try again
+            Reintentar
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="rounded-full border border-white/15 px-5 py-2.5 text-xs font-bold uppercase tracking-[0.2em] text-white hover:bg-white/5 transition"
           >
-            Go home
+            Inicio
           </a>
         </div>
       </div>
@@ -76,20 +79,39 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      {
+        name: "viewport",
+        content:
+          "width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1",
+      },
+      { name: "theme-color", content: "#02040a" },
+      { title: "AetherX — Fondos animados premium en 4K" },
+      {
+        name: "description",
+        content:
+          "AetherX: fondos de pantalla animados ultra realistas en movimiento. Universo, océano, cyberpunk y más, en 4K cinematográfico.",
+      },
+      { name: "author", content: "AetherX" },
+      { property: "og:title", content: "AetherX — Fondos animados premium" },
+      {
+        property: "og:description",
+        content:
+          "Convierte tu pantalla en una ventana viva: universo, océano, ballenas, tormentas y ciudades cyberpunk en 4K.",
+      },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
+      },
       {
         rel: "stylesheet",
-        href: appCss,
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap",
       },
     ],
   }),
@@ -101,7 +123,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="es">
       <head>
         <HeadContent />
       </head>
@@ -118,8 +140,15 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <AppStateProvider>
+        <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-space-black">
+          <AppliedHalo />
+          <main className="flex-1 pb-32">
+            <Outlet />
+          </main>
+          <BottomNav />
+        </div>
+      </AppStateProvider>
     </QueryClientProvider>
   );
 }
