@@ -50,6 +50,7 @@ function WallpaperDetail() {
   const router = useRouter();
   const { isFavorite, toggleFavorite, apply, appliedId } = useAppState();
   const [justApplied, setJustApplied] = useState(false);
+  const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
 
   const isApplied = appliedId === wp.id;
   const fav = isFavorite(wp.id);
@@ -64,20 +65,35 @@ function WallpaperDetail() {
   }
 
   async function handleDownload() {
+    const fileName = `aetherx-${wp.id}-animado.mp4`;
+
     try {
-      const res = await fetch(wp.src, { mode: "cors" });
+      setDownloadState("downloading");
+      const res = await fetch(wp.video, { mode: "cors" });
+      if (!res.ok) throw new Error("No se pudo descargar el vídeo");
       const blob = await res.blob();
+
+      const file = new File([blob], fileName, { type: blob.type || "video/mp4" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: wp.title });
+        setDownloadState("done");
+        setTimeout(() => setDownloadState("idle"), 1800);
+        return;
+      }
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `aetherx-${wp.id}.jpg`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setDownloadState("done");
+      setTimeout(() => setDownloadState("idle"), 1800);
     } catch {
-      // Fallback: open in a new tab so the user can long-press to save.
-      window.open(wp.src, "_blank", "noopener,noreferrer");
+      window.open(wp.video, "_blank", "noopener,noreferrer");
+      setDownloadState("idle");
     }
   }
 
@@ -178,10 +194,11 @@ function WallpaperDetail() {
             <button
               type="button"
               onClick={handleDownload}
-              className="flex items-center justify-center rounded-2xl border border-white/12 bg-white/5 px-5 text-white hover:bg-white/10"
-              aria-label="Descargar"
+              disabled={downloadState === "downloading"}
+              className="flex min-w-14 items-center justify-center rounded-2xl border border-white/12 bg-white/5 px-5 text-white transition hover:bg-white/10 disabled:opacity-60"
+              aria-label="Descargar vídeo animado"
             >
-              <Download className="size-5" />
+              {downloadState === "done" ? <Check className="size-5" /> : <Download className="size-5" />}
             </button>
 
           </div>
@@ -196,8 +213,8 @@ function WallpaperDetail() {
 
         {/* Note about web limitation */}
         <p className="mt-4 px-2 text-center text-[10px] leading-relaxed text-white/35">
-          Toca <span className="text-electric-blue">Descargar</span> para guardar el fondo en tu móvil.
-          Luego ábrelo desde Fotos / Galería y mantén pulsado → <strong>"Usar como fondo de pantalla"</strong>.
+          Toca <span className="text-electric-blue">Descargar</span> para guardar el vídeo animado en tu móvil.
+          Luego ábrelo desde Fotos / Galería y elige <strong>"Usar como fondo de pantalla"</strong> si tu móvil admite fondos animados.
           Por seguridad, iOS y los navegadores no permiten cambiar el fondo automáticamente.
         </p>
 
