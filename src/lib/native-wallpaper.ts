@@ -40,8 +40,7 @@ export async function setDeviceWallpaper(
     if (platform === "android") {
       // Dynamically import the community plugin so the web build does not fail.
       // Install in your local clone:  npm i capacitor-wallpaper
-      // @ts-expect-error — optional native plugin, only present in mobile build
-      const mod = await import(/* @vite-ignore */ "capacitor-wallpaper" as string);
+      const mod: any = await import(/* @vite-ignore */ "capacitor-wallpaper" as string);
       const Wallpaper = mod.Wallpaper ?? mod.default;
       await Wallpaper.setImage({ url, display: target });
       return { ok: true };
