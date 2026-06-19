@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Download, Heart, Share2, Volume2 } from "lucide-react
 import { useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
+import { LiveMedia } from "@/components/LiveMedia";
 
 export const Route = createFileRoute("/wallpaper/$id")({
   loader: ({ params }) => {
@@ -63,11 +64,10 @@ function WallpaperDetail() {
     <div className="relative min-h-screen pb-32">
       {/* Full-bleed preview */}
       <div className="relative h-[68vh] min-h-[520px] overflow-hidden">
-        <img
-          src={wp.src}
+        <LiveMedia
+          src={wp.video}
+          poster={wp.src}
           alt={wp.title}
-          width={768}
-          height={1344}
           className="size-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-space-black/40 via-transparent to-space-black" />

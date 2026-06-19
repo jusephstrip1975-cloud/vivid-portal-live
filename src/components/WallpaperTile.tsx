@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
 import type { Wallpaper } from "@/lib/wallpapers";
+import { LiveMedia } from "@/components/LiveMedia";
 
 interface Props {
   wp: Wallpaper;
@@ -16,15 +17,14 @@ export function WallpaperTile({ wp, className = "", index = 0 }: Props) {
       className={`group relative block aspect-[9/16] overflow-hidden rounded-2xl outline outline-1 -outline-offset-1 outline-white/10 ${className}`}
       style={{ animationDelay: `${index * 60}ms` }}
     >
-      <img
-        src={wp.src}
+      <LiveMedia
+        src={wp.video}
+        poster={wp.src}
         alt={wp.title}
-        loading="lazy"
-        width={768}
-        height={1344}
         className="size-full object-cover transition duration-[1200ms] group-hover:scale-105"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-space-black/85 via-space-black/10 to-transparent" />
+
 
       {/* Live indicator */}
       <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-space-black/60 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.18em] text-electric-blue backdrop-blur-md">
