@@ -51,6 +51,7 @@ function WallpaperDetail() {
   const { isFavorite, toggleFavorite, apply, appliedId } = useAppState();
   const [justApplied, setJustApplied] = useState(false);
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
+  const [target, setTarget] = useState<"home" | "lock" | "both">("both");
 
   const isApplied = appliedId === wp.id;
   const fav = isFavorite(wp.id);
@@ -61,7 +62,7 @@ function WallpaperDetail() {
     setTimeout(() => setJustApplied(false), 2200);
     // If running inside the Capacitor Android build, use the animated file instead of the static poster.
     const { setDeviceWallpaper } = await import("@/lib/native-wallpaper");
-    setDeviceWallpaper(wp.video, "both").catch(() => {});
+    setDeviceWallpaper(wp.video, target).catch(() => {});
   }
 
   async function handleDownload() {
