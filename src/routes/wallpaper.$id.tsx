@@ -59,9 +59,9 @@ function WallpaperDetail() {
     apply(wp.id);
     setJustApplied(true);
     setTimeout(() => setJustApplied(false), 2200);
-    // If running inside the Capacitor Android build, also push to system wallpaper.
+    // If running inside the Capacitor Android build, use the animated file instead of the static poster.
     const { setDeviceWallpaper } = await import("@/lib/native-wallpaper");
-    setDeviceWallpaper(wp.src, "both").catch(() => {});
+    setDeviceWallpaper(wp.video, "both").catch(() => {});
   }
 
   async function handleDownload() {
@@ -85,6 +85,7 @@ function WallpaperDetail() {
       const a = document.createElement("a");
       a.href = url;
       a.download = fileName;
+      a.type = "video/mp4";
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -213,7 +214,7 @@ function WallpaperDetail() {
 
         {/* Note about web limitation */}
         <p className="mt-4 px-2 text-center text-[10px] leading-relaxed text-white/35">
-          Toca <span className="text-electric-blue">Descargar</span> para guardar el vídeo animado en tu móvil.
+          Toca <span className="text-electric-blue">Descargar</span> para guardar el archivo <strong>MP4 animado</strong> en tu móvil.
           Luego ábrelo desde Fotos / Galería y elige <strong>"Usar como fondo de pantalla"</strong> si tu móvil admite fondos animados.
           Por seguridad, iOS y los navegadores no permiten cambiar el fondo automáticamente.
         </p>
