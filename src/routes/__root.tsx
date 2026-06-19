@@ -96,7 +96,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "AetherX: fondos de pantalla animados ultra realistas en movimiento. Universo, océano, cyberpunk y más, en 4K cinematográfico.",
       },
       { name: "author", content: "AetherX" },
-      { property: "og:title", content: "AetherX — Fondos animados premium" },
+      { property: "og:title", content: "AetherX — Fondos animados premium en 4K" },
       {
         property: "og:description",
         content:
@@ -104,6 +104,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "AetherX — Fondos animados premium en 4K" },
+      { name: "description", content: "Lovable Generated Project" },
+      { property: "og:description", content: "Lovable Generated Project" },
+      { name: "twitter:description", content: "Lovable Generated Project" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ac492e86-ad5b-4c95-9360-54ee34149006/id-preview-94602ddc--86067037-aec8-403d-b7be-5af9e39ce44c.lovable.app-1781900710226.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ac492e86-ad5b-4c95-9360-54ee34149006/id-preview-94602ddc--86067037-aec8-403d-b7be-5af9e39ce44c.lovable.app-1781900710226.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
