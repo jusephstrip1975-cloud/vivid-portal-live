@@ -29,9 +29,7 @@ export const Route = createFileRoute("/wallpaper/$id")({
         <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-electric-blue">
           Sin señal
         </p>
-        <h1 className="mt-2 text-2xl font-bold text-display">
-          Fondo no encontrado
-        </h1>
+        <h1 className="mt-2 text-2xl font-bold text-display">Fondo no encontrado</h1>
         <Link
           to="/explore"
           search={{ cat: "todos" }}
@@ -91,8 +89,6 @@ function WallpaperDetail() {
     }
   }
 
-
-
   return (
     <div className="relative min-h-screen pb-32">
       {/* Full-bleed preview */}
@@ -150,9 +146,7 @@ function WallpaperDetail() {
         <div className="glass-card rounded-[28px] p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold leading-tight text-display">
-                {wp.title}
-              </h1>
+              <h1 className="text-2xl font-bold leading-tight text-display">{wp.title}</h1>
               <p className="mt-1 text-sm text-white/55">{wp.subtitle}</p>
             </div>
             <span className="shrink-0 rounded-full border border-electric-blue/40 bg-electric-blue/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-electric-blue">
