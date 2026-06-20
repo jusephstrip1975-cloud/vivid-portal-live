@@ -2,9 +2,15 @@ package com.aetherx.livewallpaper;
 
 import android.app.WallpaperInfo;
 import android.app.WallpaperManager;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.media.MediaScannerConnection;
+import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Base64;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -12,8 +18,10 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -28,6 +36,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             call.reject("missing-video-url");
             return;
         }
+        String fileName = normalizeFileName(call.getString("fileName"));
 
         execute(() -> {
             HttpURLConnection connection = null;
@@ -54,7 +63,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     }
                 }
 
-                resolveSaved(call, file, total);
+                String galleryUri = saveToGallery(file, fileName);
+                resolveSaved(call, file, total, galleryUri);
             } catch (Exception e) {
                 call.reject("video-download-save-failed", e);
             } finally {
@@ -78,7 +88,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 output.write(bytes);
             }
 
-            resolveSaved(call, file, bytes.length);
+            String galleryUri = saveToGallery(file, normalizeFileName(call.getString("fileName")));
+            resolveSaved(call, file, bytes.length, galleryUri);
         } catch (Exception e) {
             call.reject("video-save-failed", e);
         }
@@ -148,10 +159,72 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         call.resolve(result);
     }
 
-    private void resolveSaved(PluginCall call, File file, int bytes) {
+    private void resolveSaved(PluginCall call, File file, int bytes, String galleryUri) {
         JSObject result = new JSObject();
         result.put("path", file.getAbsolutePath());
         result.put("bytes", bytes);
+        result.put("galleryUri", galleryUri);
         call.resolve(result);
+    }
+
+    private String normalizeFileName(String fileName) {
+        String name = fileName == null ? "" : fileName.trim();
+        if (name.length() == 0) name = "aetherx-live-wallpaper.mp4";
+        name = name.replaceAll("[\\\\/:*?\"<>|]", "-");
+        if (!name.toLowerCase().endsWith(".mp4")) name = name + ".mp4";
+        return name;
+    }
+
+    private String saveToGallery(File source, String fileName) throws Exception {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentResolver resolver = getContext().getContentResolver();
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Video.Media.DISPLAY_NAME, fileName);
+            values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+            values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AetherX");
+            values.put(MediaStore.Video.Media.IS_PENDING, 1);
+
+            Uri uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) throw new IllegalStateException("gallery-insert-failed");
+
+            try (OutputStream output = resolver.openOutputStream(uri)) {
+                if (output == null) throw new IllegalStateException("gallery-output-failed");
+                copyFile(source, output);
+            } catch (Exception e) {
+                resolver.delete(uri, null, null);
+                throw e;
+            }
+
+            values.clear();
+            values.put(MediaStore.Video.Media.IS_PENDING, 0);
+            resolver.update(uri, values, null, null);
+            return uri.toString();
+        }
+
+        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "AetherX");
+        if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("gallery-directory-failed");
+
+        File destination = new File(dir, fileName);
+        try (FileOutputStream output = new FileOutputStream(destination, false)) {
+            copyFile(source, output);
+        }
+
+        MediaScannerConnection.scanFile(
+            getContext(),
+            new String[] { destination.getAbsolutePath() },
+            new String[] { "video/mp4" },
+            null
+        );
+        return Uri.fromFile(destination).toString();
+    }
+
+    private void copyFile(File source, OutputStream output) throws Exception {
+        byte[] buffer = new byte[8192];
+        try (FileInputStream input = new FileInputStream(source)) {
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+        }
     }
 }

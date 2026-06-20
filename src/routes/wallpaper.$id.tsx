@@ -79,7 +79,7 @@ function WallpaperDetail() {
 
       apply(wp.id);
       setDownloadState("done");
-      setToast("✓ Selecciona Inicio y pulsa Aplicar");
+      setToast("✓ MP4 guardado en Galería. Selecciona Inicio");
       setTimeout(() => setToast(null), 2600);
       setTimeout(() => setDownloadState("idle"), 1800);
     } catch (err) {
@@ -201,7 +201,8 @@ function WallpaperDetail() {
           </p>
           <ol className="space-y-1.5 list-decimal pl-5 text-white/65">
             <li>Pulsa <strong className="text-white">Aplicar en Inicio</strong>.</li>
-            <li>Se abre <strong className="text-white">AetherX Live Wallpaper</strong>, no Fotos ni Galería.</li>
+            <li>El video MP4 también queda guardado en <strong className="text-white">Galería/Fotos</strong>.</li>
+            <li>Se abre <strong className="text-white">AetherX Live Wallpaper</strong> para aplicarlo animado.</li>
             <li>
               En la pantalla de Android pulsa <strong className="text-white">Aplicar</strong> y elige <strong className="text-white">Pantalla de inicio</strong>.
             </li>
