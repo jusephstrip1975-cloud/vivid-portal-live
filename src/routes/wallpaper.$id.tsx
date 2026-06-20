@@ -246,8 +246,8 @@ function WallpaperDetail() {
           </p>
           <p>
             <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos animados como{" "}
-            <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de inicio se aplica
-            el póster estático automáticamente (es una restricción del sistema, no de la app).
+            <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de inicio se aplica el
+            póster estático automáticamente (es una restricción del sistema, no de la app).
           </p>
         </div>
 
@@ -264,12 +264,8 @@ function WallpaperDetail() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40">
-        {label}
-      </dt>
-      <dd className="mt-1 text-sm font-semibold text-ice-white text-display">
-        {value}
-      </dd>
+      <dt className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40">{label}</dt>
+      <dd className="mt-1 text-sm font-semibold text-ice-white text-display">{value}</dd>
     </div>
   );
 }
