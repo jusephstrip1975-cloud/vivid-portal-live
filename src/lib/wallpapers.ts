@@ -244,6 +244,10 @@ export type Category =
   | "gym"
   | "mma"
   | "playa"
+  | "aurora"
+  | "noche"
+  | "tropical"
+  | "urbano"
   | "3d-abstracto"
   | "3d-geometrico"
   | "3d-liquido"
@@ -278,12 +282,17 @@ export const CATEGORIES: { id: Category | "todos"; label: string }[] = [
   { id: "gym", label: "Gym" },
   { id: "mma", label: "MMA" },
   { id: "playa", label: "Playa" },
+  { id: "aurora", label: "Aurora" },
+  { id: "noche", label: "Noche" },
+  { id: "tropical", label: "Tropical" },
+  { id: "urbano", label: "Urbano" },
   { id: "3d-abstracto", label: "3D Abstracto" },
   { id: "3d-geometrico", label: "3D Geométrico" },
   { id: "3d-liquido", label: "3D Líquido" },
   { id: "3d-fractal", label: "3D Fractal" },
   { id: "3d-particulas", label: "3D Partículas" },
 ];
+
 
 const PURPLE = "rgba(168, 85, 247, 0.45)";
 const CYAN = "rgba(34, 211, 238, 0.4)";
