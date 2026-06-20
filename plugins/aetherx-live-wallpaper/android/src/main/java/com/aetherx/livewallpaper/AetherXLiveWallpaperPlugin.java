@@ -1,6 +1,7 @@
 package com.aetherx.livewallpaper;
 
 import android.app.WallpaperManager;
+import android.app.WallpaperInfo;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -186,6 +187,44 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             call.resolve(result);
         } catch (Exception e) {
             call.reject("live-wallpaper-picker-failed", e);
+        }
+    }
+
+    @PluginMethod
+    public void applyHome(PluginCall call) {
+        try {
+            File file = new File(getContext().getFilesDir(), VIDEO_FILE);
+            if (!file.exists() || file.length() == 0) {
+                call.reject("missing-saved-video");
+                return;
+            }
+
+            WallpaperManager manager = WallpaperManager.getInstance(getContext());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!manager.isWallpaperSupported()) {
+                    call.reject("wallpaper-not-supported");
+                    return;
+                }
+                if (!manager.isSetWallpaperAllowed()) {
+                    call.reject("set-wallpaper-not-allowed");
+                    return;
+                }
+            }
+
+            ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
+            manager.setWallpaperComponent(service);
+
+            WallpaperInfo info = manager.getWallpaperInfo();
+            boolean verified = info != null
+                && getContext().getPackageName().equals(info.getPackageName())
+                && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
+
+            JSObject result = new JSObject();
+            result.put("applied", true);
+            result.put("verified", verified);
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("live-wallpaper-home-apply-failed", e);
         }
     }
 

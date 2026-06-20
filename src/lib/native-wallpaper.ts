@@ -25,6 +25,7 @@ interface LiveWallpaperPlugin {
     base64: string;
     fileName?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
+  applyHome(): Promise<{ applied: boolean; verified: boolean }>;
   openPicker(options?: { target?: Target }): Promise<{ opened: boolean }>;
   openGalleryVideo(): Promise<{ opened: boolean }>;
   isAvailable(): Promise<{ available: boolean; hasVideo: boolean }>;
@@ -68,13 +69,20 @@ export async function setDeviceWallpaper(
         url,
         `aetherx-${Date.now()}.mp4`,
       );
-      await LiveWallpaper.openPicker({ target });
+
+      if (target === "home" || target === "both") {
+        await LiveWallpaper.applyHome();
+      }
+
+      if (target === "lock" || target === "both") {
+        await LiveWallpaper.openPicker({ target });
+      }
 
       return {
         ok: true,
         reason: saved.galleryUri
-          ? "android-video-saved-to-gallery-and-picker-opened"
-          : "android-live-wallpaper-picker-opened",
+          ? "android-home-applied-video-saved-and-picker-opened"
+          : "android-home-applied",
       };
     }
 
