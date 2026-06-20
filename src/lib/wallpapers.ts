@@ -210,6 +210,28 @@ import beachReefVid from "@/assets/wp-beach-reef.mp4.asset.json";
 import beachHammockVid from "@/assets/wp-beach-hammock.mp4.asset.json";
 import beachLagoonVid from "@/assets/wp-beach-lagoon.mp4.asset.json";
 
+// 3D base pool (cycled across 5 new 3D categories, 40 entries each = 200 total)
+import threeDChrome from "@/assets/wp-3d-chrome.jpg";
+import threeDCrystal from "@/assets/wp-3d-crystal.jpg";
+import threeDFractal from "@/assets/wp-3d-fractal.jpg";
+import threeDParticles from "@/assets/wp-3d-particles.jpg";
+import threeDLiquid from "@/assets/wp-3d-liquid.jpg";
+import threeDTorus from "@/assets/wp-3d-torus.jpg";
+import threeDGlass from "@/assets/wp-3d-glass.jpg";
+import threeDVoronoi from "@/assets/wp-3d-voronoi.jpg";
+import threeDRibbon from "@/assets/wp-3d-ribbon.jpg";
+import threeDPlasma from "@/assets/wp-3d-plasma.jpg";
+import threeDChromeVid from "@/assets/wp-3d-chrome.mp4.asset.json";
+import threeDCrystalVid from "@/assets/wp-3d-crystal.mp4.asset.json";
+import threeDFractalVid from "@/assets/wp-3d-fractal.mp4.asset.json";
+import threeDParticlesVid from "@/assets/wp-3d-particles.mp4.asset.json";
+import threeDLiquidVid from "@/assets/wp-3d-liquid.mp4.asset.json";
+import threeDTorusVid from "@/assets/wp-3d-torus.mp4.asset.json";
+import threeDGlassVid from "@/assets/wp-3d-glass.mp4.asset.json";
+import threeDVoronoiVid from "@/assets/wp-3d-voronoi.mp4.asset.json";
+import threeDRibbonVid from "@/assets/wp-3d-ribbon.mp4.asset.json";
+import threeDPlasmaVid from "@/assets/wp-3d-plasma.mp4.asset.json";
+
 export type Category =
   | "universo"
   | "oceano"
@@ -221,7 +243,12 @@ export type Category =
   | "coches"
   | "gym"
   | "mma"
-  | "playa";
+  | "playa"
+  | "3d-abstracto"
+  | "3d-geometrico"
+  | "3d-liquido"
+  | "3d-fractal"
+  | "3d-particulas";
 
 export interface Wallpaper {
   id: string;
@@ -251,6 +278,11 @@ export const CATEGORIES: { id: Category | "todos"; label: string }[] = [
   { id: "gym", label: "Gym" },
   { id: "mma", label: "MMA" },
   { id: "playa", label: "Playa" },
+  { id: "3d-abstracto", label: "3D Abstracto" },
+  { id: "3d-geometrico", label: "3D Geométrico" },
+  { id: "3d-liquido", label: "3D Líquido" },
+  { id: "3d-fractal", label: "3D Fractal" },
+  { id: "3d-particulas", label: "3D Partículas" },
 ];
 
 const PURPLE = "rgba(168, 85, 247, 0.45)";
@@ -386,6 +418,87 @@ export const WALLPAPERS: Wallpaper[] = [
   { id: "beach-hammock", title: "Hamaca Paraíso", subtitle: "Hamaca entre dos palmeras al sol", category: "playa", src: beachHammock, video: beachHammockVid.url, resolution: "4K", sizeMb: 13.1, fps: 30, premium: true, sound: true, accent: TEAL },
   { id: "beach-lagoon", title: "Laguna Oculta", subtitle: "Agua turquesa entre acantilados verdes", category: "playa", src: beachLagoon, video: beachLagoonVid.url, resolution: "4K", sizeMb: 14.2, fps: 30, premium: true, sound: true, accent: TEAL },
 ];
+
+const POOL_3D = [
+  { src: threeDChrome, video: threeDChromeVid.url, accent: PINK },
+  { src: threeDCrystal, video: threeDCrystalVid.url, accent: PURPLE },
+  { src: threeDFractal, video: threeDFractalVid.url, accent: ORANGE },
+  { src: threeDParticles, video: threeDParticlesVid.url, accent: BLUE },
+  { src: threeDLiquid, video: threeDLiquidVid.url, accent: PURPLE },
+  { src: threeDTorus, video: threeDTorusVid.url, accent: PINK },
+  { src: threeDGlass, video: threeDGlassVid.url, accent: WHITE },
+  { src: threeDVoronoi, video: threeDVoronoiVid.url, accent: CYAN },
+  { src: threeDRibbon, video: threeDRibbonVid.url, accent: ORANGE },
+  { src: threeDPlasma, video: threeDPlasmaVid.url, accent: "rgba(239, 68, 68, 0.5)" },
+];
+
+const THREE_D_CATS: { id: Category; slug: string; label: string; titles: string[]; subtitle: string }[] = [
+  {
+    id: "3d-abstracto",
+    slug: "abs",
+    label: "Abstracto",
+    subtitle: "Render 3D abstracto en movimiento cinematográfico",
+    titles: ["Cromo Líquido", "Holograma Iridiscente", "Flujo Onírico", "Aurora Sintética", "Eco Metálico", "Niebla Neón", "Sueño Volumétrico", "Pulso Etéreo", "Eclipse Digital", "Reverberación", "Mirage Cromado", "Brisa Cuántica", "Espectro Plata", "Sombra Líquida", "Susurro Neón", "Resonancia", "Vértigo Pastel", "Iridis", "Refractio", "Aurum Flux", "Velo Holográfico", "Eter Brillante", "Halo Vapor", "Tinta Líquida", "Spectra Drift", "Lumen Soft", "Glaze", "Onda Lumínica", "Nebula Soft", "Cromo Onírico", "Vapor Iridis", "Sigma Drift", "Pearl Glow", "Cromo Pastel", "Glow Reflejo", "Aura Espejo", "Vértice Suave", "Memoria RGB", "Fade Cromático", "Eco Lumen"],
+  },
+  {
+    id: "3d-geometrico",
+    slug: "geo",
+    label: "Geométrico",
+    subtitle: "Sólidos 3D rotando con luz neón cinematográfica",
+    titles: ["Cubos Neón", "Tetraedros Glass", "Octaedro Cyan", "Dodecaedro Rosa", "Pirámides Cristal", "Prisma Espectral", "Esferas Geo", "Toroide Sintético", "Hexaedro Aurora", "Tessera Neón", "Vector Cube", "Mónada Cromo", "Polígono RGB", "Vértice Glass", "Cubos Holográficos", "Geometría Líquida", "Sólido Eclipse", "Cube Stack", "Crystal Tower", "Glass Grid", "Prisma Aurora", "Cubo Pulsar", "Esfera Refract", "Glass Pyramid", "Vector Pulse", "Octa Neón", "Tetra Pastel", "Cube Holo", "Diamante Cyan", "Bloque Cromo", "Plano Espejo", "Cápsula RGB", "Cubo Mirage", "Esfera Pearl", "Dodeca Cromo", "Cube Drift", "Geometría Lumen", "Espiral Cubo", "Mosaico Cristal", "Prisma Pearl"],
+  },
+  {
+    id: "3d-liquido",
+    slug: "liq",
+    label: "Líquido",
+    subtitle: "Fluido holográfico ondulando en cámara lenta",
+    titles: ["Onda Iridiscente", "Mercurio Vivo", "Ola Pastel", "Marea Cromo", "Río Holográfico", "Goteo Líquido", "Vértice Líquido", "Marea Neón", "Cromo Fluido", "Lava Pastel", "Onda Aurora", "Río Eclipse", "Cascada Plata", "Pulpa Cromo", "Crema Iridis", "Pintura Líquida", "Marea Espectral", "Flujo Pearl", "Aceite Neón", "Tinta Cyan", "Mar Cromado", "Brisa Líquida", "Ola Lumen", "Aguas Vapor", "Cascada Glass", "Río Pastel", "Marea Pearl", "Holo Stream", "Cromo Spill", "Glaze Flow", "Ribbon Líquido", "Refract Wave", "Glass Flow", "Espejo Líquido", "Marea Mirage", "Crema Aurora", "Lava Pearl", "Onda Eclipse", "Flujo RGB", "Brisa Cromo"],
+  },
+  {
+    id: "3d-fractal",
+    slug: "fra",
+    label: "Fractal",
+    subtitle: "Geometría fractal infinita con zoom hipnótico",
+    titles: ["Mandelbulb", "Julia Set", "Fractal Aurora", "Espiral Áurea", "Caleidoscopio", "Recursión Cyan", "Infinito Fractal", "Mandala Cromo", "Zoom Eterno", "Fractal Pulse", "Patrón Lumen", "Espiral RGB", "Recurso Pastel", "Eco Mandala", "Fractal Pearl", "Bulb Aurora", "Recursión Lumen", "Espiral Cromo", "Iris Fractal", "Caleido Neón", "Mandala Pearl", "Bulb Iridis", "Zoom Pastel", "Recursivo Glass", "Fractal Drift", "Holo Mandala", "Espiral Pearl", "Cyan Recursion", "Aurora Fractal", "Pulse Mandala", "Eco Fractal", "Bulb Pastel", "Iris Cromo", "Caleidos Glass", "Mandala Eclipse", "Recursión Pearl", "Fractal Holo", "Bulb RGB", "Espejo Fractal", "Pulse Iris"],
+  },
+  {
+    id: "3d-particulas",
+    slug: "par",
+    label: "Partículas",
+    subtitle: "Partículas brillantes flotando con profundidad de campo",
+    titles: ["Polvo Estelar", "Chispas Cromo", "Bokeh Neón", "Aurora Partículas", "Confeti Cyan", "Estrellas Pearl", "Lluvia Plata", "Polvo Iridis", "Chispas Pastel", "Polen Lumen", "Constelación", "Cosmos Soft", "Polvo Holo", "Bokeh Pearl", "Niebla Cromo", "Lluvia RGB", "Estela Aurora", "Chispas Glass", "Polvo Eclipse", "Estrellas Lumen", "Confeti Pearl", "Bokeh Aurora", "Polen Cromo", "Niebla Iridis", "Brisa Cyan", "Chispas Drift", "Polvo Pastel", "Lluvia Pearl", "Bokeh Lumen", "Estrellas Glass", "Confeti Pastel", "Polen Pearl", "Chispas Aurora", "Polvo Lumen", "Niebla Pastel", "Estrellas Holo", "Lluvia Aurora", "Brisa Iridis", "Polvo Drift", "Confeti Lumen"],
+  },
+];
+
+function generate3DWallpapers(): Wallpaper[] {
+  const result: Wallpaper[] = [];
+  for (const cat of THREE_D_CATS) {
+    for (let i = 0; i < cat.titles.length; i++) {
+      const pool = POOL_3D[i % POOL_3D.length];
+      const isPremium = i % 3 !== 0;
+      const fps: 30 | 60 = i % 2 === 0 ? 60 : 30;
+      const resolution: "4K" | "8K" = i % 5 === 0 ? "8K" : "4K";
+      const sizeMb = Math.round((10 + (i % 12) + ((i * 7) % 10) * 0.4) * 10) / 10;
+      result.push({
+        id: `3d-${cat.slug}-${String(i + 1).padStart(2, "0")}`,
+        title: cat.titles[i],
+        subtitle: cat.subtitle,
+        category: cat.id,
+        src: pool.src,
+        video: pool.video,
+        resolution,
+        sizeMb,
+        fps,
+        premium: isPremium,
+        sound: false,
+        accent: pool.accent,
+      });
+    }
+  }
+  return result;
+}
+
+WALLPAPERS.push(...generate3DWallpapers());
 
 export function getWallpaper(id: string): Wallpaper | undefined {
   return WALLPAPERS.find((w) => w.id === id);
