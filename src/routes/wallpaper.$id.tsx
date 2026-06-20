@@ -234,17 +234,22 @@ function WallpaperDetail() {
         {/* Note about web limitation */}
         <div className="mt-4 space-y-2 px-2 text-left text-[10px] leading-relaxed text-white/45">
           <p className="text-center text-white/55">
-            Cómo aplicar el fondo <strong className="text-electric-blue">en Inicio y en Bloqueo</strong>:
+            Cómo aplicar el fondo{" "}
+            <strong className="text-electric-blue">en Inicio y en Bloqueo</strong>:
           </p>
           <p>
-            <strong className="text-white/70">Android:</strong> pulsa <span className="text-electric-blue">Aplicar ahora</span> y se abrirá el selector de <strong>fondo animado AetherX</strong>; ahí elige <strong>"Pantalla de inicio"</strong> o <strong>"Pantalla de inicio y de bloqueo"</strong>. La Galería solo guarda fotos estáticas, por eso ya no se usa para aplicar el movimiento.
+            <strong className="text-white/70">Android:</strong> pulsa{" "}
+            <span className="text-electric-blue">Aplicar ahora</span> y se abrirá el selector de{" "}
+            <strong>fondo animado AetherX</strong>; ahí elige <strong>"Pantalla de inicio"</strong> o{" "}
+            <strong>"Pantalla de inicio y de bloqueo"</strong>. La Galería solo guarda fotos estáticas,
+            por eso ya no se usa para aplicar el movimiento.
           </p>
           <p>
-            <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos animados como <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de inicio se aplica el póster estático automáticamente (es una restricción del sistema, no de la app).
+            <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos animados como{" "}
+            <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de inicio se aplica
+            el póster estático automáticamente (es una restricción del sistema, no de la app).
           </p>
         </div>
-
-
 
         {justApplied && (
           <div className="glass-nav fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full px-5 py-3 text-xs font-bold uppercase tracking-[0.2em] text-electric-blue shadow-2xl">
