@@ -32,13 +32,6 @@ export async function isNative(): Promise<boolean> {
   }
 }
 
-async function fetchAsBase64(url: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("video-download-failed");
-  const blob = await res.blob();
-  return blobToBase64(blob);
-}
-
 export async function setDeviceWallpaper(
   url: string,
   target: Target = "both",
@@ -54,9 +47,8 @@ export async function setDeviceWallpaper(
     if (platform === "android") {
       const { registerPlugin } = await import("@capacitor/core");
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-      const base64 = await fetchAsBase64(url);
 
-      await LiveWallpaper.saveVideo({ base64, fileName: `aetherx-${Date.now()}.mp4` });
+      await LiveWallpaper.saveVideoFromUrl({ url, fileName: `aetherx-${Date.now()}.mp4` });
       await LiveWallpaper.openPicker({ target });
 
       return { ok: true, reason: "android-live-wallpaper-picker-opened" };
