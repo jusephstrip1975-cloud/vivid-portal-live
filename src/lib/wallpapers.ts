@@ -376,7 +376,6 @@ export const WALLPAPERS: Wallpaper[] = [
   { id: "temple", title: "Templo de Sakura", subtitle: "Cerezos rodeando templo japonés", category: "zen", src: temple, video: templeVid.url, resolution: "4K", sizeMb: 11.7, fps: 30, premium: true, sound: true, accent: PINK },
   { id: "zen-mountain", title: "Montaña Bruma", subtitle: "Picos asomando entre niebla del alba", category: "zen", src: zenMountain, video: zenMountainVid.url, resolution: "4K", sizeMb: 9.6, fps: 30, premium: false, sound: false, accent: WHITE },
   { id: "tea-ceremony", title: "Ceremonia de Té", subtitle: "Vapor de matcha elevándose suave", category: "zen", src: tea, video: teaVid.url, resolution: "4K", sizeMb: 10.0, fps: 30, premium: false, sound: false, accent: TEAL },
-  { id: "tea-ceremony", title: "Ceremonia de Té", subtitle: "Vapor de matcha elevándose suave", category: "zen", src: tea, video: teaVid.url, resolution: "4K", sizeMb: 10.0, fps: 30, premium: false, sound: false, accent: TEAL },
 
   // MANGA (8)
   { id: "manga-tokyo", title: "Tokio Neón", subtitle: "Calle japonesa lluviosa con luces neón", category: "manga", src: mangaTokyo, video: mangaTokyoVid.url, resolution: "4K", sizeMb: 16.5, fps: 60, premium: true, sound: true, accent: PINK },
