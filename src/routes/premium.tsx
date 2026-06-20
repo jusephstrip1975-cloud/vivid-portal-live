@@ -51,8 +51,6 @@ const CATEGORIES = [
 ];
 
 function PremiumPage() {
-  const [plan, setPlan] = useState<string>("yearly");
-
   return (
     <div className="relative px-6 pt-6 pb-10">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] -z-0 ambient-glow" />
