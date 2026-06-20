@@ -20,12 +20,13 @@ interface LiveWallpaperPlugin {
   saveVideoFromUrl(options: {
     url: string;
     fileName?: string;
-  }): Promise<{ path: string; bytes: number }>;
+  }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
   saveVideo(options: {
     base64: string;
     fileName?: string;
-  }): Promise<{ path: string; bytes: number }>;
+  }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
   openPicker(options?: { target?: Target }): Promise<{ opened: boolean }>;
+  openGalleryVideo(): Promise<{ opened: boolean }>;
   isAvailable(): Promise<{ available: boolean; hasVideo: boolean }>;
 }
 
@@ -67,13 +68,18 @@ export async function setDeviceWallpaper(
         typeof window === "undefined" ? undefined : window.location.origin,
       ).toString();
 
-      await LiveWallpaper.saveVideoFromUrl({
+      const saved = await LiveWallpaper.saveVideoFromUrl({
         url: absoluteUrl,
         fileName: `aetherx-${Date.now()}.mp4`,
       });
       await LiveWallpaper.openPicker({ target });
 
-      return { ok: true, reason: "android-live-wallpaper-picker-opened" };
+      return {
+        ok: true,
+        reason: saved.galleryUri
+          ? "android-video-saved-to-gallery-and-picker-opened"
+          : "android-live-wallpaper-picker-opened",
+      };
     }
 
     if (platform === "ios") {
