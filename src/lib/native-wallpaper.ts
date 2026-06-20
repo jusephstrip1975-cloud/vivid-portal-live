@@ -17,6 +17,7 @@ interface WallpaperResult {
 }
 
 interface LiveWallpaperPlugin {
+  saveVideoFromUrl(options: { url: string; fileName?: string }): Promise<{ path: string; bytes: number }>;
   saveVideo(options: { base64: string; fileName?: string }): Promise<{ path: string; bytes: number }>;
   openPicker(options?: { target?: Target }): Promise<{ opened: boolean }>;
   isAvailable(): Promise<{ available: boolean; hasVideo: boolean }>;
