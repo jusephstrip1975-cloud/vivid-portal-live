@@ -79,7 +79,7 @@ function WallpaperDetail() {
 
       apply(wp.id);
       setDownloadState("done");
-      setToast("✓ Fondo animado aplicado");
+      setToast("✓ Selecciona Inicio y pulsa Aplicar");
       setTimeout(() => setToast(null), 2600);
       setTimeout(() => setDownloadState("idle"), 1800);
     } catch (err) {
@@ -181,7 +181,7 @@ function WallpaperDetail() {
             ) : (
               <>
                 <Download className="size-4" />
-                Usar fondo animado
+                Aplicar en Inicio
               </>
             )}
           </button>
@@ -200,10 +200,10 @@ function WallpaperDetail() {
             Cómo ponerlo de fondo
           </p>
           <ol className="space-y-1.5 list-decimal pl-5 text-white/65">
-            <li>Pulsa <strong className="text-white">Usar fondo animado</strong>.</li>
-            <li>La app guarda el <strong className="text-white">video MP4</strong>, no una foto.</li>
+            <li>Pulsa <strong className="text-white">Aplicar en Inicio</strong>.</li>
+            <li>Se abre <strong className="text-white">AetherX Live Wallpaper</strong>, no Fotos ni Galería.</li>
             <li>
-              Si Android pide confirmar, elige <strong className="text-white">AetherX Live Wallpaper</strong> y pulsa Aplicar.
+              En la pantalla de Android pulsa <strong className="text-white">Aplicar</strong> y elige <strong className="text-white">Pantalla de inicio</strong>.
             </li>
           </ol>
         </div>
