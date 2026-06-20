@@ -17,10 +17,29 @@ interface WallpaperResult {
 }
 
 interface LiveWallpaperPlugin {
-  saveVideoFromUrl(options: { url: string; fileName?: string }): Promise<{ path: string; bytes: number }>;
-  saveVideo(options: { base64: string; fileName?: string }): Promise<{ path: string; bytes: number }>;
+  saveVideoFromUrl(options: {
+    url: string;
+    fileName?: string;
+  }): Promise<{ path: string; bytes: number }>;
+  saveVideo(options: {
+    base64: string;
+    fileName?: string;
+  }): Promise<{ path: string; bytes: number }>;
   openPicker(options?: { target?: Target }): Promise<{ opened: boolean }>;
   isAvailable(): Promise<{ available: boolean; hasVideo: boolean }>;
+}
+
+interface FilesystemModule {
+  Filesystem: {
+    writeFile(options: {
+      path: string;
+      data: string;
+      directory: unknown;
+    }): Promise<unknown>;
+  };
+  Directory: {
+    Cache: unknown;
+  };
 }
 
 export async function isNative(): Promise<boolean> {
@@ -55,9 +74,9 @@ export async function setDeviceWallpaper(
     }
 
     if (platform === "ios") {
-      const { Filesystem, Directory }: any = await import(
+      const { Filesystem, Directory } = (await import(
         /* @vite-ignore */ "@capacitor/filesystem" as string
-      );
+      )) as FilesystemModule;
       const res = await fetch(url);
       const blob = await res.blob();
       const base64 = await blobToBase64(blob);
