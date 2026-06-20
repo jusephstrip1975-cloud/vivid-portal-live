@@ -68,6 +68,14 @@ function WallpaperDetail() {
 
     try {
       setDownloadState("downloading");
+      const { saveVideoToDeviceGallery } = await import("@/lib/native-wallpaper");
+      const nativeSave = await saveVideoToDeviceGallery(wp.video, fileName);
+      if (nativeSave.ok) {
+        setDownloadState("done");
+        setTimeout(() => setDownloadState("idle"), 1800);
+        return;
+      }
+
       const res = await fetch(wp.video, { mode: "cors" });
       if (!res.ok) throw new Error("No se pudo descargar el vídeo");
       const blob = await res.blob();
@@ -239,10 +247,10 @@ function WallpaperDetail() {
           </p>
           <p>
             <strong className="text-white/70">Android:</strong> pulsa{" "}
-            <span className="text-electric-blue">Aplicar ahora</span> y se abrirá el selector de{" "}
-            <strong>fondo animado AetherX</strong>; ahí elige <strong>"Pantalla de inicio"</strong>{" "}
-            o <strong>"Pantalla de inicio y de bloqueo"</strong>. La Galería solo guarda fotos
-            estáticas, por eso ya no se usa para aplicar el movimiento.
+            <span className="text-electric-blue">Aplicar ahora</span>; el MP4 se guarda como vídeo en{" "}
+            <strong>Movies/AetherX</strong> para que aparezca en la sección <strong>Vídeos</strong> de
+            la galería, y se abrirá el selector de <strong>fondo animado AetherX</strong> para
+            aplicarlo en inicio o bloqueo.
           </p>
           <p>
             <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos
