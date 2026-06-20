@@ -6,6 +6,10 @@ interface SaveResult {
 }
 
 interface LiveWallpaperPlugin {
+  saveVideoFromUrl(options: {
+    url: string;
+    fileName?: string;
+  }): Promise<{ path: string; bytes: number }>;
   saveVideo(options: {
     base64: string;
     fileName?: string;
@@ -13,6 +17,8 @@ interface LiveWallpaperPlugin {
   applyHome(): Promise<{ applied: boolean; verified?: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
 }
+
+const PUBLISHED_ASSET_ORIGIN = "https://vivid-portal-live.lovable.app";
 
 export async function isNative(): Promise<boolean> {
   try {
@@ -37,18 +43,9 @@ export async function saveWallpaperToDevice(
 
     if (platform === "android") {
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-      const res = await fetch(videoUrl);
-      if (!res.ok) throw new Error("video-fetch-failed");
-      const blob = await res.blob();
-      const base64 = await blobToBase64(blob);
-      await LiveWallpaper.saveVideo({ base64, fileName });
-      try {
-        await LiveWallpaper.applyHome();
-        return { ok: true, reason: "android-live-wallpaper-applied" };
-      } catch {
-        await LiveWallpaper.openPicker();
-        return { ok: true, reason: "android-live-picker-opened" };
-      }
+      await LiveWallpaper.saveVideoFromUrl({ url: resolveDownloadUrl(videoUrl), fileName });
+      await LiveWallpaper.openPicker();
+      return { ok: true, reason: "android-live-picker-opened" };
     }
 
     if (platform === "ios") {
@@ -76,6 +73,16 @@ export async function saveWallpaperToDevice(
     console.error("saveWallpaperToDevice failed", err);
     return { ok: false, reason: String(err) };
   }
+}
+
+function resolveDownloadUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+
+  const browserOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = /^https?:\/\//i.test(browserOrigin) ? browserOrigin : PUBLISHED_ASSET_ORIGIN;
+
+  if (url.startsWith("/")) return `${origin}${url}`;
+  return `${origin}/${url}`;
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
