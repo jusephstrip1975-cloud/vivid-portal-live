@@ -243,7 +243,12 @@ export type Category =
   | "coches"
   | "gym"
   | "mma"
-  | "playa";
+  | "playa"
+  | "3d-abstracto"
+  | "3d-geometrico"
+  | "3d-liquido"
+  | "3d-fractal"
+  | "3d-particulas";
 
 export interface Wallpaper {
   id: string;
@@ -273,6 +278,11 @@ export const CATEGORIES: { id: Category | "todos"; label: string }[] = [
   { id: "gym", label: "Gym" },
   { id: "mma", label: "MMA" },
   { id: "playa", label: "Playa" },
+  { id: "3d-abstracto", label: "3D Abstracto" },
+  { id: "3d-geometrico", label: "3D Geométrico" },
+  { id: "3d-liquido", label: "3D Líquido" },
+  { id: "3d-fractal", label: "3D Fractal" },
+  { id: "3d-particulas", label: "3D Partículas" },
 ];
 
 const PURPLE = "rgba(168, 85, 247, 0.45)";
