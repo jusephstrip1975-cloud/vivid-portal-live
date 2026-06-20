@@ -29,9 +29,7 @@ export const Route = createFileRoute("/wallpaper/$id")({
         <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-electric-blue">
           Sin señal
         </p>
-        <h1 className="mt-2 text-2xl font-bold text-display">
-          Fondo no encontrado
-        </h1>
+        <h1 className="mt-2 text-2xl font-bold text-display">Fondo no encontrado</h1>
         <Link
           to="/explore"
           search={{ cat: "todos" }}
@@ -91,8 +89,6 @@ function WallpaperDetail() {
     }
   }
 
-
-
   return (
     <div className="relative min-h-screen pb-32">
       {/* Full-bleed preview */}
@@ -150,9 +146,7 @@ function WallpaperDetail() {
         <div className="glass-card rounded-[28px] p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold leading-tight text-display">
-                {wp.title}
-              </h1>
+              <h1 className="text-2xl font-bold leading-tight text-display">{wp.title}</h1>
               <p className="mt-1 text-sm text-white/55">{wp.subtitle}</p>
             </div>
             <span className="shrink-0 rounded-full border border-electric-blue/40 bg-electric-blue/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-electric-blue">
@@ -172,11 +166,13 @@ function WallpaperDetail() {
               Aplicar en
             </p>
             <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/5 p-1">
-              {([
-                { id: "home", label: "Inicio" },
-                { id: "lock", label: "Bloqueo" },
-                { id: "both", label: "Ambas" },
-              ] as const).map((t) => (
+              {(
+                [
+                  { id: "home", label: "Inicio" },
+                  { id: "lock", label: "Bloqueo" },
+                  { id: "both", label: "Ambas" },
+                ] as const
+              ).map((t) => (
                 <button
                   key={t.id}
                   type="button"
@@ -219,9 +215,12 @@ function WallpaperDetail() {
               className="flex min-w-14 items-center justify-center rounded-2xl border border-white/12 bg-white/5 px-5 text-white transition hover:bg-white/10 disabled:opacity-60"
               aria-label="Descargar vídeo animado"
             >
-              {downloadState === "done" ? <Check className="size-5" /> : <Download className="size-5" />}
+              {downloadState === "done" ? (
+                <Check className="size-5" />
+              ) : (
+                <Download className="size-5" />
+              )}
             </button>
-
           </div>
 
           {wp.sound && (
@@ -235,17 +234,23 @@ function WallpaperDetail() {
         {/* Note about web limitation */}
         <div className="mt-4 space-y-2 px-2 text-left text-[10px] leading-relaxed text-white/45">
           <p className="text-center text-white/55">
-            Cómo aplicar el fondo <strong className="text-electric-blue">en Inicio y en Bloqueo</strong>:
+            Cómo aplicar el fondo{" "}
+            <strong className="text-electric-blue">en Inicio y en Bloqueo</strong>:
           </p>
           <p>
-            <strong className="text-white/70">Android:</strong> pulsa <span className="text-electric-blue">Descargar</span>, abre el MP4 desde Galería → menú <strong>···</strong> → <strong>Establecer como fondo</strong> → elige <strong>"Pantalla de inicio y de bloqueo"</strong>. Si tu Galería solo te deja la pantalla de bloqueo, usa una app de fondos animados (Video Live Wallpaper) y selecciona <strong>"Ambas pantallas"</strong>.
+            <strong className="text-white/70">Android:</strong> pulsa{" "}
+            <span className="text-electric-blue">Aplicar ahora</span> y se abrirá el selector de{" "}
+            <strong>fondo animado AetherX</strong>; ahí elige <strong>"Pantalla de inicio"</strong>{" "}
+            o <strong>"Pantalla de inicio y de bloqueo"</strong>. La Galería solo guarda fotos
+            estáticas, por eso ya no se usa para aplicar el movimiento.
           </p>
           <p>
-            <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos animados como <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de inicio se aplica el póster estático automáticamente (es una restricción del sistema, no de la app).
+            <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos
+            animados como <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de
+            inicio se aplica el póster estático automáticamente (es una restricción del sistema, no
+            de la app).
           </p>
         </div>
-
-
 
         {justApplied && (
           <div className="glass-nav fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full px-5 py-3 text-xs font-bold uppercase tracking-[0.2em] text-electric-blue shadow-2xl">
@@ -260,12 +265,8 @@ function WallpaperDetail() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40">
-        {label}
-      </dt>
-      <dd className="mt-1 text-sm font-semibold text-ice-white text-display">
-        {value}
-      </dd>
+      <dt className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40">{label}</dt>
+      <dd className="mt-1 text-sm font-semibold text-ice-white text-display">{value}</dd>
     </div>
   );
 }
