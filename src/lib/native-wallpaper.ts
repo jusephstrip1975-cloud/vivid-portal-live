@@ -2,11 +2,9 @@
  * Native wallpaper bridge.
  *
  * On web: no-op (resolves false) — used only for UI feedback.
- * On Android (Capacitor): downloads the asset to local storage and calls the
- *   `capacitor-wallpaper` community plugin. Tries multiple call shapes /
- *   argument keys because the home-screen vs lock-screen flags differ
- *   between plugin versions and Android OEMs (MIUI, OneUI, ColorOS often
- *   silently ignore FLAG_SYSTEM unless the image is a local file).
+ * On Android (Capacitor): saves the MP4 and opens AetherX's native Android
+ *   live wallpaper service. This keeps motion on the home screen; Android
+ *   does not allow a normal gallery image setter to apply MP4 motion.
  * On iOS: Apple does NOT allow apps to programmatically change the system
  *   wallpaper. We save to Photos so the user can apply manually.
  */
@@ -18,6 +16,12 @@ interface WallpaperResult {
   reason?: string;
 }
 
+interface LiveWallpaperPlugin {
+  saveVideo(options: { base64: string; fileName?: string }): Promise<{ path: string; bytes: number }>;
+  openPicker(options?: { target?: Target }): Promise<{ opened: boolean }>;
+  isAvailable(): Promise<{ available: boolean; hasVideo: boolean }>;
+}
+
 export async function isNative(): Promise<boolean> {
   try {
     const { Capacitor } = await import("@capacitor/core");
@@ -27,53 +31,11 @@ export async function isNative(): Promise<boolean> {
   }
 }
 
-/**
- * Download a remote URL into the app's cache directory and return a local
- * file:// URI. Many Android wallpaper plugins refuse remote URLs.
- */
-async function downloadToLocal(url: string): Promise<{ path: string; base64: string }> {
-  const { Filesystem, Directory }: any = await import(
-    /* @vite-ignore */ "@capacitor/filesystem" as string
-  );
+async function fetchAsBase64(url: string): Promise<string> {
   const res = await fetch(url);
+  if (!res.ok) throw new Error("video-download-failed");
   const blob = await res.blob();
-  const base64 = await blobToBase64(blob);
-  const filename = `wp-${Date.now()}.jpg`;
-  const written = await Filesystem.writeFile({
-    path: filename,
-    data: base64,
-    directory: Directory.Cache,
-  });
-  return { path: written.uri as string, base64 };
-}
-
-/**
- * Try every known call signature for a given Android wallpaper flag.
- * Returns true on first success, false if all attempts threw.
- */
-async function trySetAndroid(
-  Wallpaper: any,
-  localUri: string,
-  base64: string,
-  flag: 1 | 2,
-): Promise<boolean> {
-  const displayWord = flag === 1 ? "home" : "lock";
-  const attempts: Array<Record<string, unknown>> = [
-    { url: localUri, display: displayWord, which: displayWord, flag },
-    { path: localUri, display: displayWord, flag },
-    { url: localUri, flag },
-    { base64, display: displayWord, flag },
-    { url: localUri }, // last resort — plugin default (usually both/home)
-  ];
-  for (const args of attempts) {
-    try {
-      await Wallpaper.setImage(args);
-      return true;
-    } catch (e) {
-      console.warn(`Wallpaper.setImage failed (${displayWord})`, args, e);
-    }
-  }
-  return false;
+  return blobToBase64(blob);
 }
 
 export async function setDeviceWallpaper(
@@ -89,33 +51,14 @@ export async function setDeviceWallpaper(
     const platform = Capacitor.getPlatform();
 
     if (platform === "android") {
-      const mod: any = await import(/* @vite-ignore */ "capacitor-wallpaper" as string);
-      const Wallpaper = mod.Wallpaper ?? mod.default;
+      const { registerPlugin } = await import("@capacitor/core");
+      const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      const base64 = await fetchAsBase64(url);
 
-      // Always materialize the image locally first — fixes silent failures
-      // when the plugin only accepts file:// URIs.
-      const { path: localUri, base64 } = await downloadToLocal(url);
+      await LiveWallpaper.saveVideo({ base64, fileName: `aetherx-${Date.now()}.mp4` });
+      await LiveWallpaper.openPicker({ target });
 
-      let homeOk = true;
-      let lockOk = true;
-
-      if (target === "home" || target === "both") {
-        homeOk = await trySetAndroid(Wallpaper, localUri, base64, 1);
-      }
-      if (target === "lock" || target === "both") {
-        lockOk = await trySetAndroid(Wallpaper, localUri, base64, 2);
-      }
-
-      if (!homeOk && !lockOk) {
-        return { ok: false, reason: "android-plugin-rejected-all-signatures" };
-      }
-      if (target === "both" && (!homeOk || !lockOk)) {
-        return {
-          ok: true,
-          reason: !homeOk ? "lock-only-home-failed" : "home-only-lock-failed",
-        };
-      }
-      return { ok: true };
+      return { ok: true, reason: "android-live-wallpaper-picker-opened" };
     }
 
     if (platform === "ios") {
