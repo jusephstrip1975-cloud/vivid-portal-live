@@ -166,11 +166,13 @@ function WallpaperDetail() {
               Aplicar en
             </p>
             <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/5 p-1">
-              {([
-                { id: "home", label: "Inicio" },
-                { id: "lock", label: "Bloqueo" },
-                { id: "both", label: "Ambas" },
-              ] as const).map((t) => (
+              {(
+                [
+                  { id: "home", label: "Inicio" },
+                  { id: "lock", label: "Bloqueo" },
+                  { id: "both", label: "Ambas" },
+                ] as const
+              ).map((t) => (
                 <button
                   key={t.id}
                   type="button"
@@ -213,9 +215,12 @@ function WallpaperDetail() {
               className="flex min-w-14 items-center justify-center rounded-2xl border border-white/12 bg-white/5 px-5 text-white transition hover:bg-white/10 disabled:opacity-60"
               aria-label="Descargar vídeo animado"
             >
-              {downloadState === "done" ? <Check className="size-5" /> : <Download className="size-5" />}
+              {downloadState === "done" ? (
+                <Check className="size-5" />
+              ) : (
+                <Download className="size-5" />
+              )}
             </button>
-
           </div>
 
           {wp.sound && (
