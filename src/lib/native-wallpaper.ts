@@ -10,6 +10,7 @@ interface LiveWallpaperPlugin {
     url: string;
     fileName?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
+  applyHome(): Promise<{ applied: boolean; verified?: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
 }
 
@@ -41,8 +42,13 @@ export async function saveWallpaperToDevice(
         typeof window === "undefined" ? undefined : window.location.origin,
       ).toString();
       await LiveWallpaper.saveVideoFromUrl({ url: absoluteUrl, fileName });
-      await LiveWallpaper.openPicker();
-      return { ok: true, reason: "android-live-picker-opened" };
+      try {
+        await LiveWallpaper.applyHome();
+        return { ok: true, reason: "android-live-wallpaper-applied" };
+      } catch {
+        await LiveWallpaper.openPicker();
+        return { ok: true, reason: "android-live-picker-opened" };
+      }
     }
 
     if (platform === "ios") {
