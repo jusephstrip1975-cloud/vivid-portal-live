@@ -62,6 +62,11 @@ function WallpaperDetail() {
       if (await isNative()) {
         const result = await saveWallpaperToDevice(wp.video, fileName);
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
+        setToast(
+          result.needsPicker
+            ? "✓ Pulsa Aplicar y elige Pantalla de inicio"
+            : "✓ Fondo animado aplicado en Inicio",
+        );
       } else {
         // Navegador: descarga clásica del video
         const res = await fetch(resolveDownloadUrl(wp.video), { mode: "cors" });
@@ -75,11 +80,11 @@ function WallpaperDetail() {
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setToast("✓ MP4 descargado");
       }
 
       apply(wp.id);
       setDownloadState("done");
-      setToast("✓ MP4 guardado en Galería. Selecciona Inicio");
       setTimeout(() => setToast(null), 2600);
       setTimeout(() => setDownloadState("idle"), 1800);
     } catch (err) {
