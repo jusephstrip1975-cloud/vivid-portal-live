@@ -12,10 +12,55 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 @CapacitorPlugin(name = "AetherXLiveWallpaper")
 public class AetherXLiveWallpaperPlugin extends Plugin {
     static final String VIDEO_FILE = "aetherx-live-wallpaper.mp4";
+
+    @PluginMethod
+    public void saveVideoFromUrl(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null || url.length() == 0) {
+            call.reject("missing-video-url");
+            return;
+        }
+
+        execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(url).openConnection();
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(30000);
+                connection.connect();
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode < 200 || responseCode >= 300) {
+                    call.reject("video-download-failed-" + responseCode);
+                    return;
+                }
+
+                File file = new File(getContext().getFilesDir(), VIDEO_FILE);
+                int total = 0;
+                byte[] buffer = new byte[8192];
+                try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(file, false)) {
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, read);
+                        total += read;
+                    }
+                }
+
+                resolveSaved(call, file, total);
+            } catch (Exception e) {
+                call.reject("video-download-save-failed", e);
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        });
+    }
 
     @PluginMethod
     public void saveVideo(PluginCall call) {
@@ -32,13 +77,17 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 output.write(bytes);
             }
 
-            JSObject result = new JSObject();
-            result.put("path", file.getAbsolutePath());
-            result.put("bytes", bytes.length);
-            call.resolve(result);
+            resolveSaved(call, file, bytes.length);
         } catch (Exception e) {
             call.reject("video-save-failed", e);
         }
+    }
+
+    private void resolveSaved(PluginCall call, File file, int bytes) {
+        JSObject result = new JSObject();
+        result.put("path", file.getAbsolutePath());
+        result.put("bytes", bytes);
+        call.resolve(result);
     }
 
     @PluginMethod
