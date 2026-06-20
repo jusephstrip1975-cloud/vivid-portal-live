@@ -48,6 +48,7 @@ function WallpaperDetail() {
   const router = useRouter();
   const { isFavorite, toggleFavorite, apply, appliedId } = useAppState();
   const [justApplied, setJustApplied] = useState(false);
+  const [applyState, setApplyState] = useState<"idle" | "applying">("idle");
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
   const [target, setTarget] = useState<"home" | "lock" | "both">("both");
 
@@ -55,12 +56,17 @@ function WallpaperDetail() {
   const fav = isFavorite(wp.id);
 
   async function handleApply() {
-    apply(wp.id);
-    setJustApplied(true);
-    setTimeout(() => setJustApplied(false), 2200);
-    // If running inside the Capacitor Android build, use the animated file instead of the static poster.
-    const { setDeviceWallpaper } = await import("@/lib/native-wallpaper");
-    setDeviceWallpaper(wp.video, target).catch(() => {});
+    try {
+      setApplyState("applying");
+      // If running inside the Capacitor Android build, use the animated file instead of the static poster.
+      const { setDeviceWallpaper } = await import("@/lib/native-wallpaper");
+      await setDeviceWallpaper(wp.video, target);
+      apply(wp.id);
+      setJustApplied(true);
+      setTimeout(() => setJustApplied(false), 2200);
+    } finally {
+      setApplyState("idle");
+    }
   }
 
   async function handleDownload() {
@@ -201,13 +207,16 @@ function WallpaperDetail() {
             <button
               type="button"
               onClick={handleApply}
+              disabled={applyState === "applying"}
               className={`relative flex items-center justify-center gap-2 rounded-2xl py-4 text-sm font-bold uppercase tracking-[0.18em] transition ${
                 isApplied
                   ? "bg-electric-blue/15 text-electric-blue ring-1 ring-electric-blue/40"
                   : "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
-              }`}
+              } disabled:opacity-70`}
             >
-              {isApplied ? (
+              {applyState === "applying" ? (
+                "Preparando..."
+              ) : isApplied ? (
                 <>
                   <Check className="size-4" strokeWidth={3} />
                   Aplicado
