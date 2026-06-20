@@ -122,13 +122,106 @@ import templeVid from "@/assets/wp-temple.mp4.asset.json";
 import zenMountainVid from "@/assets/wp-zen-mountain.mp4.asset.json";
 import teaVid from "@/assets/wp-tea.mp4.asset.json";
 
+// Manga
+import mangaTokyo from "@/assets/wp-manga-tokyo.jpg";
+import mangaHero from "@/assets/wp-manga-hero.jpg";
+import mangaRooftop from "@/assets/wp-manga-rooftop.jpg";
+import mangaMecha from "@/assets/wp-manga-mecha.jpg";
+import mangaSamurai from "@/assets/wp-manga-samurai.jpg";
+import mangaCybergirl from "@/assets/wp-manga-cybergirl.jpg";
+import mangaDragon from "@/assets/wp-manga-dragon.jpg";
+import mangaNinja from "@/assets/wp-manga-ninja.jpg";
+import mangaTokyoVid from "@/assets/wp-manga-tokyo.mp4.asset.json";
+import mangaHeroVid from "@/assets/wp-manga-hero.mp4.asset.json";
+import mangaRooftopVid from "@/assets/wp-manga-rooftop.mp4.asset.json";
+import mangaMechaVid from "@/assets/wp-manga-mecha.mp4.asset.json";
+import mangaSamuraiVid from "@/assets/wp-manga-samurai.mp4.asset.json";
+import mangaCybergirlVid from "@/assets/wp-manga-cybergirl.mp4.asset.json";
+import mangaDragonVid from "@/assets/wp-manga-dragon.mp4.asset.json";
+import mangaNinjaVid from "@/assets/wp-manga-ninja.mp4.asset.json";
+
+// Coches alta gama
+import carFerrari from "@/assets/wp-car-ferrari.jpg";
+import carLambo from "@/assets/wp-car-lambo.jpg";
+import carRolls from "@/assets/wp-car-rolls.jpg";
+import carBugatti from "@/assets/wp-car-bugatti.jpg";
+import carPorsche from "@/assets/wp-car-porsche.jpg";
+import carMclaren from "@/assets/wp-car-mclaren.jpg";
+import carBentley from "@/assets/wp-car-bentley.jpg";
+import carAston from "@/assets/wp-car-aston.jpg";
+import carFerrariVid from "@/assets/wp-car-ferrari.mp4.asset.json";
+import carLamboVid from "@/assets/wp-car-lambo.mp4.asset.json";
+import carRollsVid from "@/assets/wp-car-rolls.mp4.asset.json";
+import carBugattiVid from "@/assets/wp-car-bugatti.mp4.asset.json";
+import carPorscheVid from "@/assets/wp-car-porsche.mp4.asset.json";
+import carMclarenVid from "@/assets/wp-car-mclaren.mp4.asset.json";
+import carBentleyVid from "@/assets/wp-car-bentley.mp4.asset.json";
+import carAstonVid from "@/assets/wp-car-aston.mp4.asset.json";
+
+// Gym
+import gymIron from "@/assets/wp-gym-iron.jpg";
+import gymDumbbells from "@/assets/wp-gym-dumbbells.jpg";
+import gymBoxing from "@/assets/wp-gym-boxing.jpg";
+import gymSquat from "@/assets/wp-gym-squat.jpg";
+import gymMirror from "@/assets/wp-gym-mirror.jpg";
+import gymCardio from "@/assets/wp-gym-cardio.jpg";
+import gymCrossfit from "@/assets/wp-gym-crossfit.jpg";
+import gymLocker from "@/assets/wp-gym-locker.jpg";
+import gymIronVid from "@/assets/wp-gym-iron.mp4.asset.json";
+import gymDumbbellsVid from "@/assets/wp-gym-dumbbells.mp4.asset.json";
+import gymBoxingVid from "@/assets/wp-gym-boxing.mp4.asset.json";
+import gymSquatVid from "@/assets/wp-gym-squat.mp4.asset.json";
+import gymMirrorVid from "@/assets/wp-gym-mirror.mp4.asset.json";
+import gymCardioVid from "@/assets/wp-gym-cardio.mp4.asset.json";
+import gymCrossfitVid from "@/assets/wp-gym-crossfit.mp4.asset.json";
+import gymLockerVid from "@/assets/wp-gym-locker.mp4.asset.json";
+
+// MMA
+import mmaOctagon from "@/assets/wp-mma-octagon.jpg";
+import mmaPov from "@/assets/wp-mma-pov.jpg";
+import mmaCage from "@/assets/wp-mma-cage.jpg";
+import mmaFighters from "@/assets/wp-mma-fighters.jpg";
+import mmaCanvas from "@/assets/wp-mma-canvas.jpg";
+import mmaSpotlight from "@/assets/wp-mma-spotlight.jpg";
+import mmaCorner from "@/assets/wp-mma-corner.jpg";
+import mmaOctagonVid from "@/assets/wp-mma-octagon.mp4.asset.json";
+import mmaPovVid from "@/assets/wp-mma-pov.mp4.asset.json";
+import mmaCageVid from "@/assets/wp-mma-cage.mp4.asset.json";
+import mmaFightersVid from "@/assets/wp-mma-fighters.mp4.asset.json";
+import mmaCanvasVid from "@/assets/wp-mma-canvas.mp4.asset.json";
+import mmaSpotlightVid from "@/assets/wp-mma-spotlight.mp4.asset.json";
+import mmaCornerVid from "@/assets/wp-mma-corner.mp4.asset.json";
+
+// Playa
+import beachMaldives from "@/assets/wp-beach-maldives.jpg";
+import beachBorabora from "@/assets/wp-beach-borabora.jpg";
+import beachPalm from "@/assets/wp-beach-palm.jpg";
+import beachAerial from "@/assets/wp-beach-aerial.jpg";
+import beachSunset from "@/assets/wp-beach-sunset.jpg";
+import beachReef from "@/assets/wp-beach-reef.jpg";
+import beachHammock from "@/assets/wp-beach-hammock.jpg";
+import beachLagoon from "@/assets/wp-beach-lagoon.jpg";
+import beachMaldivesVid from "@/assets/wp-beach-maldives.mp4.asset.json";
+import beachBoraboraVid from "@/assets/wp-beach-borabora.mp4.asset.json";
+import beachPalmVid from "@/assets/wp-beach-palm.mp4.asset.json";
+import beachAerialVid from "@/assets/wp-beach-aerial.mp4.asset.json";
+import beachSunsetVid from "@/assets/wp-beach-sunset.mp4.asset.json";
+import beachReefVid from "@/assets/wp-beach-reef.mp4.asset.json";
+import beachHammockVid from "@/assets/wp-beach-hammock.mp4.asset.json";
+import beachLagoonVid from "@/assets/wp-beach-lagoon.mp4.asset.json";
+
 export type Category =
   | "universo"
   | "oceano"
   | "naturaleza"
   | "clima"
   | "cyberpunk"
-  | "zen";
+  | "zen"
+  | "manga"
+  | "coches"
+  | "gym"
+  | "mma"
+  | "playa";
 
 export interface Wallpaper {
   id: string;
