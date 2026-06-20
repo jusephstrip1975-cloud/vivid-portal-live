@@ -62,8 +62,12 @@ export async function setDeviceWallpaper(
     if (platform === "android") {
       const { registerPlugin } = await import("@capacitor/core");
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      const absoluteUrl = new URL(
+        url,
+        typeof window === "undefined" ? undefined : window.location.origin,
+      ).toString();
 
-      await LiveWallpaper.saveVideoFromUrl({ url, fileName: `aetherx-${Date.now()}.mp4` });
+      await LiveWallpaper.saveVideoFromUrl({ url: absoluteUrl, fileName: `aetherx-${Date.now()}.mp4` });
       await LiveWallpaper.openPicker({ target });
 
       return { ok: true, reason: "android-live-wallpaper-picker-opened" };
