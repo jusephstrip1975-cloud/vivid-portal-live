@@ -31,11 +31,7 @@ interface LiveWallpaperPlugin {
 
 interface FilesystemModule {
   Filesystem: {
-    writeFile(options: {
-      path: string;
-      data: string;
-      directory: unknown;
-    }): Promise<unknown>;
+    writeFile(options: { path: string; data: string; directory: unknown }): Promise<unknown>;
   };
   Directory: {
     Cache: unknown;
