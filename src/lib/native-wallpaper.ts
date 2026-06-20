@@ -70,19 +70,28 @@ export async function setDeviceWallpaper(
         `aetherx-${Date.now()}.mp4`,
       );
 
+      let homeApplied = false;
       if (target === "home" || target === "both") {
-        await LiveWallpaper.applyHome();
+        try {
+          const homeResult = await LiveWallpaper.applyHome();
+          homeApplied = Boolean(homeResult.applied && homeResult.verified);
+        } catch (err) {
+          console.warn("Direct home wallpaper apply failed; opening live wallpaper picker", err);
+        }
       }
 
-      if (target === "lock" || target === "both") {
+      try {
         await LiveWallpaper.openPicker({ target });
+      } catch (err) {
+        if (!homeApplied) throw err;
+        console.warn("Live wallpaper picker failed after direct home apply", err);
       }
 
       return {
         ok: true,
         reason: saved.galleryUri
-          ? "android-home-applied-video-saved-and-picker-opened"
-          : "android-home-applied",
+          ? "android-live-wallpaper-ready-video-saved-and-picker-opened"
+          : "android-live-wallpaper-picker-opened",
       };
     }
 
