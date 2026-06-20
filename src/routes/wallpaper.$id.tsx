@@ -55,18 +55,16 @@ function WallpaperDetail() {
   const fav = isFavorite(wp.id);
 
   async function handleDownload() {
-    const ext = wp.src.split("?")[0].split(".").pop()?.toLowerCase() ?? "jpg";
-    const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
-    const fileName = `aetherx-${wp.id}.${safeExt}`;
+    const fileName = `aetherx-${wp.id}.mp4`;
     try {
       setDownloadState("downloading");
 
       if (await isNative()) {
-        const result = await saveWallpaperToDevice(wp.src, fileName);
+        const result = await saveWallpaperToDevice(wp.video, fileName);
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
       } else {
-        // Navegador: descarga clásica de la imagen
-        const res = await fetch(wp.src, { mode: "cors" });
+        // Navegador: descarga clásica del video
+        const res = await fetch(wp.video, { mode: "cors" });
         if (!res.ok) throw new Error("download-failed");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -81,7 +79,7 @@ function WallpaperDetail() {
 
       apply(wp.id);
       setDownloadState("done");
-      setToast("✓ Guardado en tu galería");
+      setToast("✓ Abre Fondo animado AetherX y pulsa Aplicar");
       setTimeout(() => setToast(null), 2600);
       setTimeout(() => setDownloadState("idle"), 1800);
     } catch (err) {
@@ -183,7 +181,7 @@ function WallpaperDetail() {
             ) : (
               <>
                 <Download className="size-4" />
-                Descargar fondo 3D
+                Usar fondo animado
               </>
             )}
           </button>
@@ -202,11 +200,10 @@ function WallpaperDetail() {
             Cómo ponerlo de fondo
           </p>
           <ol className="space-y-1.5 list-decimal pl-5 text-white/65">
-            <li>Pulsa <strong className="text-white">Descargar fondo 3D</strong>.</li>
-            <li>Abre los <strong className="text-white">Ajustes</strong> de tu teléfono.</li>
+            <li>Pulsa <strong className="text-white">Usar fondo animado</strong>.</li>
+            <li>Se abrirá la pantalla de <strong className="text-white">Fondo animado AetherX</strong>.</li>
             <li>
-              Entra en <strong className="text-white">Fondo de pantalla</strong> y elige el
-              archivo recién descargado en tu galería.
+              Pulsa <strong className="text-white">Aplicar</strong> y elige pantalla de inicio o ambas.
             </li>
           </ol>
         </div>
