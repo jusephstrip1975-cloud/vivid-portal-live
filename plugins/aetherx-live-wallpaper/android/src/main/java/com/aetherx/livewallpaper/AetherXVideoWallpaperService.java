@@ -53,6 +53,12 @@ public class AetherXVideoWallpaperService extends WallpaperService {
                 mediaPlayer.setSurface(holder.getSurface());
                 mediaPlayer.setLooping(true);
                 mediaPlayer.setVolume(0f, 0f);
+                mediaPlayer.setOnCompletionListener(mp -> {
+                    try {
+                        mp.seekTo(0);
+                        mp.start();
+                    } catch (Exception ignored) {}
+                });
                 mediaPlayer.setOnPreparedListener(MediaPlayer::start);
                 mediaPlayer.prepareAsync();
             } catch (Exception e) {
