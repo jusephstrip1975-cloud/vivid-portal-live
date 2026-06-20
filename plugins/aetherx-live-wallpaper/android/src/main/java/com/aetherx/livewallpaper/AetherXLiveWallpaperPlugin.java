@@ -63,8 +63,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     }
                 }
 
-                Uri galleryUri = tryCopyVideoToGallery(file, fileName);
-                resolveSaved(call, file, total, galleryUri);
+                resolveSaved(call, file, total, null);
             } catch (Exception e) {
                 call.reject("video-download-save-failed", e);
             } finally {
@@ -89,8 +88,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 output.write(bytes);
             }
 
-            Uri galleryUri = tryCopyVideoToGallery(file, fileName);
-            resolveSaved(call, file, bytes.length, galleryUri);
+            resolveSaved(call, file, bytes.length, null);
         } catch (Exception e) {
             call.reject("video-save-failed", e);
         }
