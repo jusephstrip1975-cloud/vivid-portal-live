@@ -2,11 +2,13 @@
  * Native wallpaper bridge.
  *
  * On web: no-op (resolves false) — used only for UI feedback.
- * On Android (Capacitor): calls the `capacitor-wallpaper` community plugin
- *   to actually set the device wallpaper.
+ * On Android (Capacitor): downloads the asset to local storage and calls the
+ *   `capacitor-wallpaper` community plugin. Tries multiple call shapes /
+ *   argument keys because the home-screen vs lock-screen flags differ
+ *   between plugin versions and Android OEMs (MIUI, OneUI, ColorOS often
+ *   silently ignore FLAG_SYSTEM unless the image is a local file).
  * On iOS: Apple does NOT allow apps to programmatically change the system
- *   wallpaper. We fall back to triggering the Photos save sheet so the user
- *   can long-press → "Use as Wallpaper".
+ *   wallpaper. We save to Photos so the user can apply manually.
  */
 
 type Target = "home" | "lock" | "both";
@@ -25,6 +27,55 @@ export async function isNative(): Promise<boolean> {
   }
 }
 
+/**
+ * Download a remote URL into the app's cache directory and return a local
+ * file:// URI. Many Android wallpaper plugins refuse remote URLs.
+ */
+async function downloadToLocal(url: string): Promise<{ path: string; base64: string }> {
+  const { Filesystem, Directory }: any = await import(
+    /* @vite-ignore */ "@capacitor/filesystem" as string
+  );
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const base64 = await blobToBase64(blob);
+  const filename = `wp-${Date.now()}.jpg`;
+  const written = await Filesystem.writeFile({
+    path: filename,
+    data: base64,
+    directory: Directory.Cache,
+  });
+  return { path: written.uri as string, base64 };
+}
+
+/**
+ * Try every known call signature for a given Android wallpaper flag.
+ * Returns true on first success, false if all attempts threw.
+ */
+async function trySetAndroid(
+  Wallpaper: any,
+  localUri: string,
+  base64: string,
+  flag: 1 | 2,
+): Promise<boolean> {
+  const displayWord = flag === 1 ? "home" : "lock";
+  const attempts: Array<Record<string, unknown>> = [
+    { url: localUri, display: displayWord, which: displayWord, flag },
+    { path: localUri, display: displayWord, flag },
+    { url: localUri, flag },
+    { base64, display: displayWord, flag },
+    { url: localUri }, // last resort — plugin default (usually both/home)
+  ];
+  for (const args of attempts) {
+    try {
+      await Wallpaper.setImage(args);
+      return true;
+    } catch (e) {
+      console.warn(`Wallpaper.setImage failed (${displayWord})`, args, e);
+    }
+  }
+  return false;
+}
+
 export async function setDeviceWallpaper(
   url: string,
   target: Target = "both",
@@ -38,38 +89,39 @@ export async function setDeviceWallpaper(
     const platform = Capacitor.getPlatform();
 
     if (platform === "android") {
-      // Dynamically import the community plugin so the web build does not fail.
-      // Install in your local clone:  npm i capacitor-wallpaper
       const mod: any = await import(/* @vite-ignore */ "capacitor-wallpaper" as string);
       const Wallpaper = mod.Wallpaper ?? mod.default;
-      // Android WallpaperManager flags: FLAG_SYSTEM=1 (home), FLAG_LOCK=2 (lock), both=3.
-      // The plugin accepts several aliases depending on version — we send all common ones.
-      const displayMap = {
-        home: { display: "home", which: "home", flag: 1 },
-        lock: { display: "lock", which: "lock", flag: 2 },
-        both: { display: "both", which: "both", flag: 3 },
-      } as const;
-      const d = displayMap[target];
 
-      if (target === "both") {
-        // Some plugin versions silently apply only to LOCK when asked for BOTH.
-        // Set HOME first, then LOCK, to guarantee both screens are updated.
-        try {
-          await Wallpaper.setImage({ url, display: "home", which: "home", flag: 1 });
-        } catch (e) {
-          console.warn("setImage(home) failed, continuing with lock", e);
-        }
-        await Wallpaper.setImage({ url, display: "lock", which: "lock", flag: 2 });
-      } else {
-        await Wallpaper.setImage({ url, ...d });
+      // Always materialize the image locally first — fixes silent failures
+      // when the plugin only accepts file:// URIs.
+      const { path: localUri, base64 } = await downloadToLocal(url);
+
+      let homeOk = true;
+      let lockOk = true;
+
+      if (target === "home" || target === "both") {
+        homeOk = await trySetAndroid(Wallpaper, localUri, base64, 1);
+      }
+      if (target === "lock" || target === "both") {
+        lockOk = await trySetAndroid(Wallpaper, localUri, base64, 2);
+      }
+
+      if (!homeOk && !lockOk) {
+        return { ok: false, reason: "android-plugin-rejected-all-signatures" };
+      }
+      if (target === "both" && (!homeOk || !lockOk)) {
+        return {
+          ok: true,
+          reason: !homeOk ? "lock-only-home-failed" : "home-only-lock-failed",
+        };
       }
       return { ok: true };
     }
 
     if (platform === "ios") {
-      // iOS restriction: no API to set system wallpaper. Save to Photos so
-      // the user can apply it manually from the iOS share sheet.
-      const { Filesystem, Directory }: any = await import(/* @vite-ignore */ "@capacitor/filesystem" as string);
+      const { Filesystem, Directory }: any = await import(
+        /* @vite-ignore */ "@capacitor/filesystem" as string
+      );
       const res = await fetch(url);
       const blob = await res.blob();
       const base64 = await blobToBase64(blob);
