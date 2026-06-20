@@ -498,6 +498,8 @@ function generate3DWallpapers(): Wallpaper[] {
   return result;
 }
 
+WALLPAPERS.push(...generate3DWallpapers());
+
 export function getWallpaper(id: string): Wallpaper | undefined {
   return WALLPAPERS.find((w) => w.id === id);
 }
