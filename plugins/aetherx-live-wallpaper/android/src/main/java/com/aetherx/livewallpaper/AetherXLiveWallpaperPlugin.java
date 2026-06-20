@@ -213,6 +213,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
             WallpaperManager manager = WallpaperManager.getInstance(getContext());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     if (!manager.isWallpaperSupported()) {
                         call.reject("wallpaper-not-supported");
