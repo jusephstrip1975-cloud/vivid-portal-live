@@ -23,7 +23,6 @@ type Plan = {
   best?: boolean;
 };
 const PLANS: Plan[] = [
-  { id: "monthly", label: "Mensual", price: "4,99 €", note: "facturación mensual" },
   { id: "yearly", label: "Anual", price: "29,99 €", note: "ahorras 50%", best: true },
 ];
 
