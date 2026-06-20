@@ -3,7 +3,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const config: CapacitorConfig = {
   appId: "com.aetherx.wallpapers",
   appName: "AetherX",
-  webDir: ".output/public",
+  webDir: "dist/client/",
   backgroundColor: "#02040a",
   android: {
     backgroundColor: "#02040a",
