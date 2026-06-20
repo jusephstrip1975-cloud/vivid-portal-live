@@ -1,17 +1,13 @@
 /**
- * Native wallpaper bridge.
+ * Native wallpaper bridge — simplified.
  *
- * On web: no-op (resolves false) — used only for UI feedback.
- * On Android (Capacitor): saves the MP4 and opens AetherX's native Android
- *   live wallpaper service. This keeps motion on the home screen; Android
- *   does not allow a normal gallery image setter to apply MP4 motion.
- * On iOS: Apple does NOT allow apps to programmatically change the system
- *   wallpaper. We save to Photos so the user can apply manually.
+ * Único objetivo: descargar el fondo 3D (vídeo + póster) a la galería del
+ * teléfono. Después el usuario lo aplica desde Ajustes > Fondo de pantalla
+ * del propio Android/iOS. Es el flujo más sencillo, compatible con Play
+ * Store, y no requiere permisos especiales ni servicios de live wallpaper.
  */
 
-type Target = "home" | "lock" | "both";
-
-interface WallpaperResult {
+interface SaveResult {
   ok: boolean;
   reason?: string;
 }
@@ -25,19 +21,6 @@ interface LiveWallpaperPlugin {
     base64: string;
     fileName?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
-  applyHome(): Promise<{ applied: boolean; verified: boolean }>;
-  openPicker(options?: { target?: Target }): Promise<{ opened: boolean }>;
-  openGalleryVideo(): Promise<{ opened: boolean }>;
-  isAvailable(): Promise<{ available: boolean; hasVideo: boolean }>;
-}
-
-interface FilesystemModule {
-  Filesystem: {
-    writeFile(options: { path: string; data: string; directory: unknown }): Promise<unknown>;
-  };
-  Directory: {
-    Cache: unknown;
-  };
 }
 
 export async function isNative(): Promise<boolean> {
@@ -49,93 +32,53 @@ export async function isNative(): Promise<boolean> {
   }
 }
 
-export async function setDeviceWallpaper(
-  url: string,
-  target: Target = "both",
-): Promise<WallpaperResult> {
-  if (!(await isNative())) {
-    return { ok: false, reason: "web" };
-  }
-
-  try {
-    const { Capacitor } = await import("@capacitor/core");
-    const platform = Capacitor.getPlatform();
-
-    if (platform === "android") {
-      const { registerPlugin } = await import("@capacitor/core");
-      const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-      const saved = await saveVideoWithWebViewFallback(
-        LiveWallpaper,
-        url,
-        `aetherx-${Date.now()}.mp4`,
-      );
-
-      let homeApplied = false;
-      if (target === "home" || target === "both") {
-        try {
-          const homeResult = await LiveWallpaper.applyHome();
-          homeApplied = Boolean(homeResult.applied && homeResult.verified);
-        } catch (err) {
-          console.warn("Direct home wallpaper apply failed; opening live wallpaper picker", err);
-        }
-      }
-
-      try {
-        await LiveWallpaper.openPicker({ target });
-      } catch (err) {
-        if (!homeApplied) throw err;
-        console.warn("Live wallpaper picker failed after direct home apply", err);
-      }
-
-      return {
-        ok: true,
-        reason: saved.galleryUri
-          ? "android-live-wallpaper-ready-video-saved-and-picker-opened"
-          : "android-live-wallpaper-picker-opened",
-      };
-    }
-
-    if (platform === "ios") {
-      const { Filesystem, Directory } = (await import(
-        /* @vite-ignore */ "@capacitor/filesystem" as string
-      )) as FilesystemModule;
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const base64 = await blobToBase64(blob);
-      await Filesystem.writeFile({
-        path: `aetherx-${Date.now()}.jpg`,
-        data: base64,
-        directory: Directory.Cache,
-      });
-      return { ok: true, reason: "ios-saved-to-photos" };
-    }
-
-    return { ok: false, reason: "unsupported-platform" };
-  } catch (err) {
-    console.error("setDeviceWallpaper failed", err);
-    return { ok: false, reason: String(err) };
-  }
-}
-
-export async function saveVideoToDeviceGallery(
+/**
+ * Descarga el vídeo 3D al almacenamiento del teléfono (galería en Android,
+ * carpeta Cache en iOS). Devuelve { ok: true } cuando el archivo queda
+ * guardado y disponible para que el usuario lo elija manualmente desde los
+ * ajustes del sistema.
+ */
+export async function saveWallpaperToDevice(
   url: string,
   fileName: string,
-): Promise<WallpaperResult> {
+): Promise<SaveResult> {
   if (!(await isNative())) {
     return { ok: false, reason: "web" };
   }
 
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
-    if (Capacitor.getPlatform() !== "android") {
-      return { ok: false, reason: "unsupported-platform" };
+    const platform = Capacitor.getPlatform();
+
+    if (platform === "android") {
+      const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      await saveVideoWithWebViewFallback(LiveWallpaper, url, fileName);
+      return { ok: true, reason: "android-saved-to-gallery" };
     }
 
-    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-    await saveVideoWithWebViewFallback(LiveWallpaper, url, fileName);
-    return { ok: true, reason: "android-video-saved-to-gallery" };
+    if (platform === "ios") {
+      const { Filesystem, Directory } = (await import(
+        /* @vite-ignore */ "@capacitor/filesystem" as string
+      )) as {
+        Filesystem: {
+          writeFile(o: { path: string; data: string; directory: unknown }): Promise<unknown>;
+        };
+        Directory: { Cache: unknown };
+      };
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const base64 = await blobToBase64(blob);
+      await Filesystem.writeFile({
+        path: fileName,
+        data: base64,
+        directory: Directory.Cache,
+      });
+      return { ok: true, reason: "ios-saved" };
+    }
+
+    return { ok: false, reason: "unsupported-platform" };
   } catch (err) {
-    console.error("saveVideoToDeviceGallery failed", err);
+    console.error("saveWallpaperToDevice failed", err);
     return { ok: false, reason: String(err) };
   }
 }
@@ -162,14 +105,15 @@ async function saveVideoWithWebViewFallback(
     typeof window === "undefined" ? undefined : window.location.origin,
   ).toString();
 
-  const shouldUseNativeDownload = /^https?:\/\//i.test(absoluteUrl) &&
+  const shouldUseNativeDownload =
+    /^https?:\/\//i.test(absoluteUrl) &&
     !/^https?:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)([:/]|$)/i.test(absoluteUrl);
 
   if (shouldUseNativeDownload) {
     try {
       return await LiveWallpaper.saveVideoFromUrl({ url: absoluteUrl, fileName });
     } catch (err) {
-      console.warn("Native video download failed; retrying through WebView", err);
+      console.warn("Native download failed; retrying through WebView", err);
     }
   }
 
