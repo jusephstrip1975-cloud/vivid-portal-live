@@ -240,14 +240,15 @@ function WallpaperDetail() {
           <p>
             <strong className="text-white/70">Android:</strong> pulsa{" "}
             <span className="text-electric-blue">Aplicar ahora</span> y se abrirá el selector de{" "}
-            <strong>fondo animado AetherX</strong>; ahí elige <strong>"Pantalla de inicio"</strong> o{" "}
-            <strong>"Pantalla de inicio y de bloqueo"</strong>. La Galería solo guarda fotos estáticas,
-            por eso ya no se usa para aplicar el movimiento.
+            <strong>fondo animado AetherX</strong>; ahí elige <strong>"Pantalla de inicio"</strong>{" "}
+            o <strong>"Pantalla de inicio y de bloqueo"</strong>. La Galería solo guarda fotos
+            estáticas, por eso ya no se usa para aplicar el movimiento.
           </p>
           <p>
-            <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos animados como{" "}
-            <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de inicio se aplica el
-            póster estático automáticamente (es una restricción del sistema, no de la app).
+            <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos
+            animados como <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de
+            inicio se aplica el póster estático automáticamente (es una restricción del sistema, no
+            de la app).
           </p>
         </div>
 
