@@ -55,16 +55,18 @@ function WallpaperDetail() {
   const fav = isFavorite(wp.id);
 
   async function handleDownload() {
-    const fileName = `aetherx-${wp.id}.mp4`;
+    const ext = wp.src.split("?")[0].split(".").pop()?.toLowerCase() ?? "jpg";
+    const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+    const fileName = `aetherx-${wp.id}.${safeExt}`;
     try {
       setDownloadState("downloading");
 
       if (await isNative()) {
-        const result = await saveWallpaperToDevice(wp.video, fileName);
+        const result = await saveWallpaperToDevice(wp.src, fileName);
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
       } else {
-        // Navegador: descarga clásica
-        const res = await fetch(wp.video, { mode: "cors" });
+        // Navegador: descarga clásica de la imagen
+        const res = await fetch(wp.src, { mode: "cors" });
         if (!res.ok) throw new Error("download-failed");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);

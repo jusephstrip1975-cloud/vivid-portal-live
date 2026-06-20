@@ -96,6 +96,107 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void saveImageFromUrl(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null || url.length() == 0) {
+            call.reject("missing-image-url");
+            return;
+        }
+        final String fileName = sanitizeImageFileName(call.getString("fileName"));
+
+        execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(url).openConnection();
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(30000);
+                connection.connect();
+
+                int code = connection.getResponseCode();
+                if (code < 200 || code >= 300) {
+                    call.reject("image-download-failed-" + code);
+                    return;
+                }
+
+                File tmp = new File(getContext().getCacheDir(), fileName);
+                int total = 0;
+                byte[] buffer = new byte[8192];
+                try (InputStream input = connection.getInputStream();
+                     FileOutputStream output = new FileOutputStream(tmp, false)) {
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, read);
+                        total += read;
+                    }
+                }
+
+                Uri uri = copyImageToGallery(tmp, fileName);
+                JSObject result = new JSObject();
+                result.put("path", tmp.getAbsolutePath());
+                result.put("bytes", total);
+                if (uri != null) result.put("galleryUri", uri.toString());
+                call.resolve(result);
+            } catch (Exception e) {
+                call.reject("image-download-save-failed", e);
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        });
+    }
+
+    private String sanitizeImageFileName(String fileName) {
+        String fallback = "aetherx-" + System.currentTimeMillis() + ".jpg";
+        if (fileName == null || fileName.trim().length() == 0) return fallback;
+        String safe = fileName.replaceAll("[^a-zA-Z0-9._-]", "-");
+        String lower = safe.toLowerCase();
+        if (!(lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp"))) {
+            safe = safe + ".jpg";
+        }
+        return safe;
+    }
+
+    private Uri copyImageToGallery(File source, String fileName) throws Exception {
+        ContentResolver resolver = getContext().getContentResolver();
+        String mime = fileName.toLowerCase().endsWith(".png") ? "image/png"
+                    : fileName.toLowerCase().endsWith(".webp") ? "image/webp"
+                    : "image/jpeg";
+        Uri imageUri;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME, fileName);
+            values.put(MediaStore.Images.Media.MIME_TYPE, mime);
+            values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/AetherX");
+            values.put(MediaStore.Images.Media.IS_PENDING, 1);
+
+            Uri collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+            imageUri = resolver.insert(collection, values);
+            if (imageUri == null) throw new IllegalStateException("gallery-image-uri-null");
+
+            try (InputStream input = new java.io.FileInputStream(source);
+                 OutputStream output = resolver.openOutputStream(imageUri, "w")) {
+                if (output == null) throw new IllegalStateException("gallery-image-output-null");
+                copy(input, output);
+            }
+
+            ContentValues published = new ContentValues();
+            published.put(MediaStore.Images.Media.IS_PENDING, 0);
+            resolver.update(imageUri, published, null, null);
+        } else {
+            File picturesDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "AetherX");
+            if (!picturesDir.exists() && !picturesDir.mkdirs()) throw new IllegalStateException("gallery-dir-create-failed");
+            File target = new File(picturesDir, fileName);
+            try (InputStream input = new java.io.FileInputStream(source); FileOutputStream output = new FileOutputStream(target, false)) {
+                copy(input, output);
+            }
+            MediaScannerConnection.scanFile(getContext(), new String[] { target.getAbsolutePath() }, new String[] { mime }, null);
+            imageUri = Uri.fromFile(target);
+        }
+
+        return imageUri;
+    }
+
     private void resolveSaved(PluginCall call, File file, int bytes, Uri galleryUri) {
         JSObject result = new JSObject();
         result.put("path", file.getAbsolutePath());
