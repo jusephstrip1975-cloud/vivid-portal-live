@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, Sparkles, Zap, Gem } from "lucide-react";
-import { useState } from "react";
 
 export const Route = createFileRoute("/premium")({
   head: () => ({
