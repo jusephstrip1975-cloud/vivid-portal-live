@@ -1,0 +1,13 @@
+{
+  "name": "aetherx-live-wallpaper",
+  "version": "0.0.1",
+  "private": true,
+  "description": "AetherX Android video live wallpaper Capacitor plugin",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  }
+}
