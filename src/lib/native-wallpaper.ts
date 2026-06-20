@@ -104,6 +104,31 @@ export async function setDeviceWallpaper(
   }
 }
 
+export async function saveVideoToDeviceGallery(url: string, fileName: string): Promise<WallpaperResult> {
+  if (!(await isNative())) {
+    return { ok: false, reason: "web" };
+  }
+
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (Capacitor.getPlatform() !== "android") {
+      return { ok: false, reason: "unsupported-platform" };
+    }
+
+    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    const absoluteUrl = new URL(
+      url,
+      typeof window === "undefined" ? undefined : window.location.origin,
+    ).toString();
+
+    await LiveWallpaper.saveVideoFromUrl({ url: absoluteUrl, fileName });
+    return { ok: true, reason: "android-video-saved-to-gallery" };
+  } catch (err) {
+    console.error("saveVideoToDeviceGallery failed", err);
+    return { ok: false, reason: String(err) };
+  }
+}
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
