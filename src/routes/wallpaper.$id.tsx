@@ -60,7 +60,8 @@ function WallpaperDetail() {
       setApplyState("applying");
       // If running inside the Capacitor Android build, use the animated file instead of the static poster.
       const { setDeviceWallpaper } = await import("@/lib/native-wallpaper");
-      await setDeviceWallpaper(wp.video, target);
+      const result = await setDeviceWallpaper(wp.video, target);
+      if (!result.ok && result.reason !== "web") return;
       apply(wp.id);
       setJustApplied(true);
       setTimeout(() => setJustApplied(false), 2200);
