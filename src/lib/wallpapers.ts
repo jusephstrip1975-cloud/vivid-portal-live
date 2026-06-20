@@ -478,7 +478,7 @@ function generate3DWallpapers(): Wallpaper[] {
       const isPremium = i % 3 !== 0;
       const fps: 30 | 60 = i % 2 === 0 ? 60 : 30;
       const resolution: "4K" | "8K" = i % 5 === 0 ? "8K" : "4K";
-      const sizeMb = Math.round((10 + (i % 12) + Math.random() * 4) * 10) / 10;
+      const sizeMb = Math.round((10 + (i % 12) + ((i * 7) % 10) * 0.4) * 10) / 10;
       result.push({
         id: `3d-${cat.slug}-${String(i + 1).padStart(2, "0")}`,
         title: cat.titles[i],
