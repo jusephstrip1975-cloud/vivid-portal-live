@@ -5,7 +5,20 @@ import { WallpaperTile } from "@/components/WallpaperTile";
 
 const search = z.object({
   cat: z
-    .enum(["todos", "universo", "oceano", "naturaleza", "clima", "cyberpunk", "zen"])
+    .enum([
+      "todos",
+      "universo",
+      "oceano",
+      "naturaleza",
+      "clima",
+      "cyberpunk",
+      "zen",
+      "manga",
+      "coches",
+      "gym",
+      "mma",
+      "playa",
+    ])
     .catch("todos"),
 });
 

@@ -122,13 +122,106 @@ import templeVid from "@/assets/wp-temple.mp4.asset.json";
 import zenMountainVid from "@/assets/wp-zen-mountain.mp4.asset.json";
 import teaVid from "@/assets/wp-tea.mp4.asset.json";
 
+// Manga
+import mangaTokyo from "@/assets/wp-manga-tokyo.jpg";
+import mangaHero from "@/assets/wp-manga-hero.jpg";
+import mangaRooftop from "@/assets/wp-manga-rooftop.jpg";
+import mangaMecha from "@/assets/wp-manga-mecha.jpg";
+import mangaSamurai from "@/assets/wp-manga-samurai.jpg";
+import mangaCybergirl from "@/assets/wp-manga-cybergirl.jpg";
+import mangaDragon from "@/assets/wp-manga-dragon.jpg";
+import mangaNinja from "@/assets/wp-manga-ninja.jpg";
+import mangaTokyoVid from "@/assets/wp-manga-tokyo.mp4.asset.json";
+import mangaHeroVid from "@/assets/wp-manga-hero.mp4.asset.json";
+import mangaRooftopVid from "@/assets/wp-manga-rooftop.mp4.asset.json";
+import mangaMechaVid from "@/assets/wp-manga-mecha.mp4.asset.json";
+import mangaSamuraiVid from "@/assets/wp-manga-samurai.mp4.asset.json";
+import mangaCybergirlVid from "@/assets/wp-manga-cybergirl.mp4.asset.json";
+import mangaDragonVid from "@/assets/wp-manga-dragon.mp4.asset.json";
+import mangaNinjaVid from "@/assets/wp-manga-ninja.mp4.asset.json";
+
+// Coches alta gama
+import carFerrari from "@/assets/wp-car-ferrari.jpg";
+import carLambo from "@/assets/wp-car-lambo.jpg";
+import carRolls from "@/assets/wp-car-rolls.jpg";
+import carBugatti from "@/assets/wp-car-bugatti.jpg";
+import carPorsche from "@/assets/wp-car-porsche.jpg";
+import carMclaren from "@/assets/wp-car-mclaren.jpg";
+import carBentley from "@/assets/wp-car-bentley.jpg";
+import carAston from "@/assets/wp-car-aston.jpg";
+import carFerrariVid from "@/assets/wp-car-ferrari.mp4.asset.json";
+import carLamboVid from "@/assets/wp-car-lambo.mp4.asset.json";
+import carRollsVid from "@/assets/wp-car-rolls.mp4.asset.json";
+import carBugattiVid from "@/assets/wp-car-bugatti.mp4.asset.json";
+import carPorscheVid from "@/assets/wp-car-porsche.mp4.asset.json";
+import carMclarenVid from "@/assets/wp-car-mclaren.mp4.asset.json";
+import carBentleyVid from "@/assets/wp-car-bentley.mp4.asset.json";
+import carAstonVid from "@/assets/wp-car-aston.mp4.asset.json";
+
+// Gym
+import gymIron from "@/assets/wp-gym-iron.jpg";
+import gymDumbbells from "@/assets/wp-gym-dumbbells.jpg";
+import gymBoxing from "@/assets/wp-gym-boxing.jpg";
+import gymSquat from "@/assets/wp-gym-squat.jpg";
+import gymMirror from "@/assets/wp-gym-mirror.jpg";
+import gymCardio from "@/assets/wp-gym-cardio.jpg";
+import gymCrossfit from "@/assets/wp-gym-crossfit.jpg";
+import gymLocker from "@/assets/wp-gym-locker.jpg";
+import gymIronVid from "@/assets/wp-gym-iron.mp4.asset.json";
+import gymDumbbellsVid from "@/assets/wp-gym-dumbbells.mp4.asset.json";
+import gymBoxingVid from "@/assets/wp-gym-boxing.mp4.asset.json";
+import gymSquatVid from "@/assets/wp-gym-squat.mp4.asset.json";
+import gymMirrorVid from "@/assets/wp-gym-mirror.mp4.asset.json";
+import gymCardioVid from "@/assets/wp-gym-cardio.mp4.asset.json";
+import gymCrossfitVid from "@/assets/wp-gym-crossfit.mp4.asset.json";
+import gymLockerVid from "@/assets/wp-gym-locker.mp4.asset.json";
+
+// MMA
+import mmaOctagon from "@/assets/wp-mma-octagon.jpg";
+import mmaPov from "@/assets/wp-mma-pov.jpg";
+import mmaCage from "@/assets/wp-mma-cage.jpg";
+import mmaFighters from "@/assets/wp-mma-fighters.jpg";
+import mmaCanvas from "@/assets/wp-mma-canvas.jpg";
+import mmaSpotlight from "@/assets/wp-mma-spotlight.jpg";
+import mmaCorner from "@/assets/wp-mma-corner.jpg";
+import mmaOctagonVid from "@/assets/wp-mma-octagon.mp4.asset.json";
+import mmaPovVid from "@/assets/wp-mma-pov.mp4.asset.json";
+import mmaCageVid from "@/assets/wp-mma-cage.mp4.asset.json";
+import mmaFightersVid from "@/assets/wp-mma-fighters.mp4.asset.json";
+import mmaCanvasVid from "@/assets/wp-mma-canvas.mp4.asset.json";
+import mmaSpotlightVid from "@/assets/wp-mma-spotlight.mp4.asset.json";
+import mmaCornerVid from "@/assets/wp-mma-corner.mp4.asset.json";
+
+// Playa
+import beachMaldives from "@/assets/wp-beach-maldives.jpg";
+import beachBorabora from "@/assets/wp-beach-borabora.jpg";
+import beachPalm from "@/assets/wp-beach-palm.jpg";
+import beachAerial from "@/assets/wp-beach-aerial.jpg";
+import beachSunset from "@/assets/wp-beach-sunset.jpg";
+import beachReef from "@/assets/wp-beach-reef.jpg";
+import beachHammock from "@/assets/wp-beach-hammock.jpg";
+import beachLagoon from "@/assets/wp-beach-lagoon.jpg";
+import beachMaldivesVid from "@/assets/wp-beach-maldives.mp4.asset.json";
+import beachBoraboraVid from "@/assets/wp-beach-borabora.mp4.asset.json";
+import beachPalmVid from "@/assets/wp-beach-palm.mp4.asset.json";
+import beachAerialVid from "@/assets/wp-beach-aerial.mp4.asset.json";
+import beachSunsetVid from "@/assets/wp-beach-sunset.mp4.asset.json";
+import beachReefVid from "@/assets/wp-beach-reef.mp4.asset.json";
+import beachHammockVid from "@/assets/wp-beach-hammock.mp4.asset.json";
+import beachLagoonVid from "@/assets/wp-beach-lagoon.mp4.asset.json";
+
 export type Category =
   | "universo"
   | "oceano"
   | "naturaleza"
   | "clima"
   | "cyberpunk"
-  | "zen";
+  | "zen"
+  | "manga"
+  | "coches"
+  | "gym"
+  | "mma"
+  | "playa";
 
 export interface Wallpaper {
   id: string;
@@ -153,6 +246,11 @@ export const CATEGORIES: { id: Category | "todos"; label: string }[] = [
   { id: "clima", label: "Clima" },
   { id: "cyberpunk", label: "Cyberpunk" },
   { id: "zen", label: "Zen" },
+  { id: "manga", label: "Manga" },
+  { id: "coches", label: "Coches" },
+  { id: "gym", label: "Gym" },
+  { id: "mma", label: "MMA" },
+  { id: "playa", label: "Playa" },
 ];
 
 const PURPLE = "rgba(168, 85, 247, 0.45)";
@@ -237,6 +335,56 @@ export const WALLPAPERS: Wallpaper[] = [
   { id: "temple", title: "Templo de Sakura", subtitle: "Cerezos rodeando templo japonés", category: "zen", src: temple, video: templeVid.url, resolution: "4K", sizeMb: 11.7, fps: 30, premium: true, sound: true, accent: PINK },
   { id: "zen-mountain", title: "Montaña Bruma", subtitle: "Picos asomando entre niebla del alba", category: "zen", src: zenMountain, video: zenMountainVid.url, resolution: "4K", sizeMb: 9.6, fps: 30, premium: false, sound: false, accent: WHITE },
   { id: "tea-ceremony", title: "Ceremonia de Té", subtitle: "Vapor de matcha elevándose suave", category: "zen", src: tea, video: teaVid.url, resolution: "4K", sizeMb: 10.0, fps: 30, premium: false, sound: false, accent: TEAL },
+  { id: "tea-ceremony", title: "Ceremonia de Té", subtitle: "Vapor de matcha elevándose suave", category: "zen", src: tea, video: teaVid.url, resolution: "4K", sizeMb: 10.0, fps: 30, premium: false, sound: false, accent: TEAL },
+
+  // MANGA (8)
+  { id: "manga-tokyo", title: "Tokio Neón", subtitle: "Calle japonesa lluviosa con luces neón", category: "manga", src: mangaTokyo, video: mangaTokyoVid.url, resolution: "4K", sizeMb: 16.5, fps: 60, premium: true, sound: true, accent: PINK },
+  { id: "manga-hero", title: "Héroe Shōnen", subtitle: "Aura dorada de energía explosiva", category: "manga", src: mangaHero, video: mangaHeroVid.url, resolution: "4K", sizeMb: 17.1, fps: 60, premium: true, sound: true, accent: "rgba(250, 204, 21, 0.45)" },
+  { id: "manga-rooftop", title: "Azotea al Atardecer", subtitle: "Cielo naranja sobre Tokio estudiantil", category: "manga", src: mangaRooftop, video: mangaRooftopVid.url, resolution: "4K", sizeMb: 13.4, fps: 30, premium: true, sound: false, accent: ORANGE },
+  { id: "manga-mecha", title: "Mecha Colosal", subtitle: "Robot gigante en metrópolis neón", category: "manga", src: mangaMecha, video: mangaMechaVid.url, resolution: "4K", sizeMb: 18.7, fps: 60, premium: true, sound: true, accent: CYAN },
+  { id: "manga-samurai", title: "Duelo Sakura", subtitle: "Samuráis chocando bajo cerezos en flor", category: "manga", src: mangaSamurai, video: mangaSamuraiVid.url, resolution: "4K", sizeMb: 15.9, fps: 60, premium: true, sound: true, accent: PINK },
+  { id: "manga-cybergirl", title: "Cyber Anime", subtitle: "Chica con visor holográfico", category: "manga", src: mangaCybergirl, video: mangaCybergirlVid.url, resolution: "4K", sizeMb: 14.6, fps: 60, premium: true, sound: false, accent: PINK },
+  { id: "manga-dragon", title: "Dragón Oriental", subtitle: "Dragón rojo serpenteando entre nubes", category: "manga", src: mangaDragon, video: mangaDragonVid.url, resolution: "4K", sizeMb: 16.2, fps: 30, premium: true, sound: true, accent: "rgba(239, 68, 68, 0.45)" },
+  { id: "manga-ninja", title: "Ninja Lunar", subtitle: "Ninja saltando ante la luna llena", category: "manga", src: mangaNinja, video: mangaNinjaVid.url, resolution: "4K", sizeMb: 13.8, fps: 30, premium: true, sound: false, accent: BLUE },
+
+  // COCHES (8)
+  { id: "car-ferrari", title: "Ferrari Cabina", subtitle: "Interior cuero rojo y fibra carbono", category: "coches", src: carFerrari, video: carFerrariVid.url, resolution: "4K", sizeMb: 15.1, fps: 60, premium: true, sound: false, accent: "rgba(239, 68, 68, 0.45)" },
+  { id: "car-lambo", title: "Lamborghini Cockpit", subtitle: "Tablero hexagonal con luces naranjas", category: "coches", src: carLambo, video: carLamboVid.url, resolution: "4K", sizeMb: 15.8, fps: 60, premium: true, sound: true, accent: ORANGE },
+  { id: "car-rolls", title: "Rolls Royce Estelar", subtitle: "Techo estrellado y cuero crema", category: "coches", src: carRolls, video: carRollsVid.url, resolution: "4K", sizeMb: 14.3, fps: 30, premium: true, sound: false, accent: WHITE },
+  { id: "car-bugatti", title: "Bugatti Chiron", subtitle: "Tablero azul y aluminio pulido", category: "coches", src: carBugatti, video: carBugattiVid.url, resolution: "4K", sizeMb: 15.5, fps: 60, premium: true, sound: false, accent: BLUE },
+  { id: "car-porsche", title: "Porsche Nocturno", subtitle: "Cabina iluminada sobre ciudad bokeh", category: "coches", src: carPorsche, video: carPorscheVid.url, resolution: "4K", sizeMb: 14.8, fps: 60, premium: true, sound: true, accent: ORANGE },
+  { id: "car-mclaren", title: "McLaren Racing", subtitle: "Asientos baquet negro y naranja", category: "coches", src: carMclaren, video: carMclarenVid.url, resolution: "4K", sizeMb: 13.9, fps: 30, premium: true, sound: false, accent: ORANGE },
+  { id: "car-bentley", title: "Bentley Madera", subtitle: "Cuero acolchado y nogal pulido", category: "coches", src: carBentley, video: carBentleyVid.url, resolution: "4K", sizeMb: 14.0, fps: 30, premium: true, sound: false, accent: "rgba(217, 182, 119, 0.4)" },
+  { id: "car-aston", title: "Aston Martin", subtitle: "Cockpit británico de lujo refinado", category: "coches", src: carAston, video: carAstonVid.url, resolution: "4K", sizeMb: 14.4, fps: 30, premium: true, sound: false, accent: "rgba(217, 182, 119, 0.4)" },
+
+  // GYM (8)
+  { id: "gym-iron", title: "Templo del Hierro", subtitle: "Barra cargada bajo foco dramático", category: "gym", src: gymIron, video: gymIronVid.url, resolution: "4K", sizeMb: 13.2, fps: 60, premium: true, sound: true, accent: "rgba(248, 250, 252, 0.35)" },
+  { id: "gym-dumbbells", title: "Rack Neón", subtitle: "Mancuernas iluminadas en rojo", category: "gym", src: gymDumbbells, video: gymDumbbellsVid.url, resolution: "4K", sizeMb: 12.7, fps: 60, premium: true, sound: false, accent: "rgba(239, 68, 68, 0.45)" },
+  { id: "gym-boxing", title: "Saco de Boxeo", subtitle: "Saco colgando bajo foco solitario", category: "gym", src: gymBoxing, video: gymBoxingVid.url, resolution: "4K", sizeMb: 11.5, fps: 30, premium: true, sound: true, accent: WHITE },
+  { id: "gym-squat", title: "Rack de Sentadilla", subtitle: "Polvo de magnesio cayendo lento", category: "gym", src: gymSquat, video: gymSquatVid.url, resolution: "4K", sizeMb: 12.4, fps: 30, premium: true, sound: false, accent: WHITE },
+  { id: "gym-mirror", title: "Espejos Infinitos", subtitle: "Pasillo de gimnasio con leds dorados", category: "gym", src: gymMirror, video: gymMirrorVid.url, resolution: "4K", sizeMb: 13.0, fps: 60, premium: true, sound: false, accent: "rgba(250, 204, 21, 0.35)" },
+  { id: "gym-cardio", title: "Cardio Neón", subtitle: "Cintas en pasarela azul futurista", category: "gym", src: gymCardio, video: gymCardioVid.url, resolution: "4K", sizeMb: 13.6, fps: 60, premium: true, sound: true, accent: BLUE },
+  { id: "gym-crossfit", title: "Box Crossfit", subtitle: "Kettlebells y cuerdas colgantes", category: "gym", src: gymCrossfit, video: gymCrossfitVid.url, resolution: "4K", sizeMb: 12.9, fps: 30, premium: true, sound: true, accent: ORANGE },
+  { id: "gym-locker", title: "Vestuario Industrial", subtitle: "Lockers negros y banco de madera", category: "gym", src: gymLocker, video: gymLockerVid.url, resolution: "4K", sizeMb: 11.8, fps: 30, premium: true, sound: false, accent: WHITE },
+
+  // MMA (7)
+  { id: "mma-octagon", title: "Octágono Vacío", subtitle: "Focos cenitales sobre la jaula", category: "mma", src: mmaOctagon, video: mmaOctagonVid.url, resolution: "4K", sizeMb: 14.5, fps: 60, premium: true, sound: true, accent: WHITE },
+  { id: "mma-pov", title: "POV Combate", subtitle: "Vista desde el centro del octágono", category: "mma", src: mmaPov, video: mmaPovVid.url, resolution: "4K", sizeMb: 15.2, fps: 60, premium: true, sound: true, accent: BLUE },
+  { id: "mma-cage", title: "Jaula Roja", subtitle: "Humo carmesí inundando la lona", category: "mma", src: mmaCage, video: mmaCageVid.url, resolution: "4K", sizeMb: 13.8, fps: 30, premium: true, sound: true, accent: "rgba(239, 68, 68, 0.5)" },
+  { id: "mma-fighters", title: "Cara a Cara", subtitle: "Siluetas de luchadores en guardia", category: "mma", src: mmaFighters, video: mmaFightersVid.url, resolution: "4K", sizeMb: 14.1, fps: 60, premium: true, sound: true, accent: WHITE },
+  { id: "mma-canvas", title: "Lona de Guerra", subtitle: "Gotas sobre el ring de combate", category: "mma", src: mmaCanvas, video: mmaCanvasVid.url, resolution: "4K", sizeMb: 12.6, fps: 30, premium: true, sound: false, accent: "rgba(239, 68, 68, 0.4)" },
+  { id: "mma-spotlight", title: "Foco Cenital", subtitle: "Haz de luz sobre arena solitaria", category: "mma", src: mmaSpotlight, video: mmaSpotlightVid.url, resolution: "4K", sizeMb: 11.9, fps: 30, premium: true, sound: false, accent: WHITE },
+  { id: "mma-corner", title: "Esquina del Ring", subtitle: "Guantes rojos colgando de la jaula", category: "mma", src: mmaCorner, video: mmaCornerVid.url, resolution: "4K", sizeMb: 13.3, fps: 30, premium: true, sound: true, accent: "rgba(239, 68, 68, 0.45)" },
+
+  // PLAYA (8)
+  { id: "beach-maldives", title: "Maldivas", subtitle: "Laguna turquesa y arena blanca", category: "playa", src: beachMaldives, video: beachMaldivesVid.url, resolution: "4K", sizeMb: 14.7, fps: 60, premium: true, sound: true, accent: TEAL },
+  { id: "beach-borabora", title: "Bora Bora", subtitle: "Bungalows sobre agua cristalina", category: "playa", src: beachBorabora, video: beachBoraboraVid.url, resolution: "4K", sizeMb: 15.6, fps: 60, premium: true, sound: true, accent: TEAL },
+  { id: "beach-palm", title: "Sombra de Palmera", subtitle: "Arena blanca y mar turquesa", category: "playa", src: beachPalm, video: beachPalmVid.url, resolution: "4K", sizeMb: 12.8, fps: 30, premium: true, sound: true, accent: TEAL },
+  { id: "beach-aerial", title: "Atolón Aéreo", subtitle: "Anillo de arena vista cenital", category: "playa", src: beachAerial, video: beachAerialVid.url, resolution: "4K", sizeMb: 13.4, fps: 30, premium: true, sound: false, accent: BLUE },
+  { id: "beach-sunset", title: "Atardecer Tropical", subtitle: "Sol dorado sobre laguna", category: "playa", src: beachSunset, video: beachSunsetVid.url, resolution: "4K", sizeMb: 14.0, fps: 60, premium: true, sound: true, accent: ORANGE },
+  { id: "beach-reef", title: "Arrecife Cristal", subtitle: "Coral bajo agua transparente", category: "playa", src: beachReef, video: beachReefVid.url, resolution: "4K", sizeMb: 13.7, fps: 60, premium: true, sound: true, accent: TEAL },
+  { id: "beach-hammock", title: "Hamaca Paraíso", subtitle: "Hamaca entre dos palmeras al sol", category: "playa", src: beachHammock, video: beachHammockVid.url, resolution: "4K", sizeMb: 13.1, fps: 30, premium: true, sound: true, accent: TEAL },
+  { id: "beach-lagoon", title: "Laguna Oculta", subtitle: "Agua turquesa entre acantilados verdes", category: "playa", src: beachLagoon, video: beachLagoonVid.url, resolution: "4K", sizeMb: 14.2, fps: 30, premium: true, sound: true, accent: TEAL },
 ];
 
 export function getWallpaper(id: string): Wallpaper | undefined {
