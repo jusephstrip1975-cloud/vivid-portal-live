@@ -247,8 +247,8 @@ function WallpaperDetail() {
           </p>
           <p>
             <strong className="text-white/70">Android:</strong> pulsa{" "}
-            <span className="text-electric-blue">Aplicar ahora</span>; el MP4 se guarda como vídeo en{" "}
-            <strong>Movies/AetherX</strong> para que aparezca en la sección{" "}
+            <span className="text-electric-blue">Aplicar ahora</span>; el MP4 se guarda como vídeo{" "}
+            en <strong>Movies/AetherX</strong> para que aparezca en la sección{" "}
             <strong>Vídeos</strong> de la galería, y se abrirá el selector de{" "}
             <strong>fondo animado AetherX</strong> para aplicarlo en inicio o bloqueo.
           </p>
