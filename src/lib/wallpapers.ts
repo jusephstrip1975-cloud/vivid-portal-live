@@ -417,7 +417,6 @@ export const WALLPAPERS: Wallpaper[] = [
   { id: "beach-reef", title: "Arrecife Cristal", subtitle: "Coral bajo agua transparente", category: "playa", src: beachReef, video: beachReefVid.url, resolution: "4K", sizeMb: 13.7, fps: 60, premium: true, sound: true, accent: TEAL },
   { id: "beach-hammock", title: "Hamaca Paraíso", subtitle: "Hamaca entre dos palmeras al sol", category: "playa", src: beachHammock, video: beachHammockVid.url, resolution: "4K", sizeMb: 13.1, fps: 30, premium: true, sound: true, accent: TEAL },
   { id: "beach-lagoon", title: "Laguna Oculta", subtitle: "Agua turquesa entre acantilados verdes", category: "playa", src: beachLagoon, video: beachLagoonVid.url, resolution: "4K", sizeMb: 14.2, fps: 30, premium: true, sound: true, accent: TEAL },
-  ...generate3DWallpapers(),
 ];
 
 const POOL_3D = [
