@@ -42,7 +42,27 @@ export async function setDeviceWallpaper(
       // Install in your local clone:  npm i capacitor-wallpaper
       const mod: any = await import(/* @vite-ignore */ "capacitor-wallpaper" as string);
       const Wallpaper = mod.Wallpaper ?? mod.default;
-      await Wallpaper.setImage({ url, display: target });
+      // Android WallpaperManager flags: FLAG_SYSTEM=1 (home), FLAG_LOCK=2 (lock), both=3.
+      // The plugin accepts several aliases depending on version — we send all common ones.
+      const displayMap = {
+        home: { display: "home", which: "home", flag: 1 },
+        lock: { display: "lock", which: "lock", flag: 2 },
+        both: { display: "both", which: "both", flag: 3 },
+      } as const;
+      const d = displayMap[target];
+
+      if (target === "both") {
+        // Some plugin versions silently apply only to LOCK when asked for BOTH.
+        // Set HOME first, then LOCK, to guarantee both screens are updated.
+        try {
+          await Wallpaper.setImage({ url, display: "home", which: "home", flag: 1 });
+        } catch (e) {
+          console.warn("setImage(home) failed, continuing with lock", e);
+        }
+        await Wallpaper.setImage({ url, display: "lock", which: "lock", flag: 2 });
+      } else {
+        await Wallpaper.setImage({ url, ...d });
+      }
       return { ok: true };
     }
 
