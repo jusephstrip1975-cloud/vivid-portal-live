@@ -1,12 +1,4 @@
-/**
- * Native wallpaper bridge — simplified.
- *
- * Único objetivo: descargar la IMAGEN del fondo (póster JPG) a la galería del
- * teléfono. Después el usuario la aplica desde Ajustes > Fondo de pantalla
- * del propio Android/iOS, eligiéndola del álbum AetherX. Es el flujo más
- * sencillo y 100% compatible con Play Store. Android no permite usar vídeos
- * MP4 como fondo desde esa pantalla, por eso descargamos la imagen estática.
- */
+/** Native wallpaper bridge — saves the MP4 and opens Android's live wallpaper selector. */
 
 interface SaveResult {
   ok: boolean;
@@ -14,10 +6,11 @@ interface SaveResult {
 }
 
 interface LiveWallpaperPlugin {
-  saveImageFromUrl(options: {
+  saveVideoFromUrl(options: {
     url: string;
     fileName?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
+  openPicker(): Promise<{ opened: boolean }>;
 }
 
 export async function isNative(): Promise<boolean> {
@@ -30,7 +23,7 @@ export async function isNative(): Promise<boolean> {
 }
 
 export async function saveWallpaperToDevice(
-  imageUrl: string,
+  videoUrl: string,
   fileName: string,
 ): Promise<SaveResult> {
   if (!(await isNative())) {
@@ -44,11 +37,12 @@ export async function saveWallpaperToDevice(
     if (platform === "android") {
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
       const absoluteUrl = new URL(
-        imageUrl,
+        videoUrl,
         typeof window === "undefined" ? undefined : window.location.origin,
       ).toString();
-      await LiveWallpaper.saveImageFromUrl({ url: absoluteUrl, fileName });
-      return { ok: true, reason: "android-image-saved" };
+      await LiveWallpaper.saveVideoFromUrl({ url: absoluteUrl, fileName });
+      await LiveWallpaper.openPicker();
+      return { ok: true, reason: "android-live-picker-opened" };
     }
 
     if (platform === "ios") {
@@ -60,7 +54,7 @@ export async function saveWallpaperToDevice(
         };
         Directory: { Cache: unknown };
       };
-      const res = await fetch(imageUrl);
+      const res = await fetch(videoUrl);
       const blob = await res.blob();
       const base64 = await blobToBase64(blob);
       await Filesystem.writeFile({
