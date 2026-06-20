@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
+import { isNative, saveWallpaperToDevice } from "@/lib/native-wallpaper";
 
 export const Route = createFileRoute("/wallpaper/$id")({
   loader: ({ params }) => {
@@ -47,60 +48,45 @@ function WallpaperDetail() {
   const wp = Route.useLoaderData();
   const router = useRouter();
   const { isFavorite, toggleFavorite, apply, appliedId } = useAppState();
-  const [justApplied, setJustApplied] = useState(false);
-  const [applyState, setApplyState] = useState<"idle" | "applying">("idle");
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
-  const [target, setTarget] = useState<"home" | "lock" | "both">("both");
+  const [toast, setToast] = useState<string | null>(null);
 
-  const isApplied = appliedId === wp.id;
+  const isDownloaded = appliedId === wp.id;
   const fav = isFavorite(wp.id);
 
-  async function handleApply() {
-    try {
-      setApplyState("applying");
-      // If running inside the Capacitor Android build, use the animated file instead of the static poster.
-      const { setDeviceWallpaper } = await import("@/lib/native-wallpaper");
-      const result = await setDeviceWallpaper(wp.video, target);
-      if (!result.ok && result.reason !== "web") return;
-      apply(wp.id);
-      setJustApplied(true);
-      setTimeout(() => setJustApplied(false), 2200);
-    } finally {
-      setApplyState("idle");
-    }
-  }
-
   async function handleDownload() {
-    const fileName = `aetherx-${wp.id}-animado.mp4`;
-
+    const fileName = `aetherx-${wp.id}.mp4`;
     try {
       setDownloadState("downloading");
-      const { saveVideoToDeviceGallery } = await import("@/lib/native-wallpaper");
-      const nativeSave = await saveVideoToDeviceGallery(wp.video, fileName);
-      if (nativeSave.ok) {
-        setDownloadState("done");
-        setTimeout(() => setDownloadState("idle"), 1800);
-        return;
+
+      if (await isNative()) {
+        const result = await saveWallpaperToDevice(wp.video, fileName);
+        if (!result.ok) throw new Error(result.reason ?? "save-failed");
+      } else {
+        // Navegador: descarga clásica
+        const res = await fetch(wp.video, { mode: "cors" });
+        if (!res.ok) throw new Error("download-failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
-      const res = await fetch(wp.video, { mode: "cors" });
-      if (!res.ok) throw new Error("No se pudo descargar el vídeo");
-      const blob = await res.blob();
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      a.type = "video/mp4";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      apply(wp.id);
       setDownloadState("done");
+      setToast("✓ Guardado en tu galería");
+      setTimeout(() => setToast(null), 2600);
       setTimeout(() => setDownloadState("idle"), 1800);
-    } catch {
-      window.open(wp.video, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error(err);
       setDownloadState("idle");
+      setToast("No se pudo descargar. Inténtalo de nuevo.");
+      setTimeout(() => setToast(null), 2600);
     }
   }
 
@@ -175,71 +161,30 @@ function WallpaperDetail() {
             <Stat label="Audio" value={wp.sound ? "Espacial" : "Silencio"} />
           </dl>
 
-          {/* Target picker: Home / Lock / Both */}
-          <div className="mt-5">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.25em] text-white/45">
-              Aplicar en
-            </p>
-            <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/5 p-1">
-              {(
-                [
-                  { id: "home", label: "Inicio" },
-                  { id: "lock", label: "Bloqueo" },
-                  { id: "both", label: "Ambas" },
-                ] as const
-              ).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTarget(t.id)}
-                  className={`rounded-xl py-2 text-[11px] font-bold uppercase tracking-[0.15em] transition ${
-                    target === t.id
-                      ? "bg-electric-blue text-space-black"
-                      : "text-white/70 hover:text-white"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-[1fr_auto] gap-3">
-            <button
-              type="button"
-              onClick={handleApply}
-              disabled={applyState === "applying"}
-              className={`relative flex items-center justify-center gap-2 rounded-2xl py-4 text-sm font-bold uppercase tracking-[0.18em] transition ${
-                isApplied
-                  ? "bg-electric-blue/15 text-electric-blue ring-1 ring-electric-blue/40"
-                  : "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
-              } disabled:opacity-70`}
-            >
-              {applyState === "applying" ? (
-                "Preparando..."
-              ) : isApplied ? (
-                <>
-                  <Check className="size-4" strokeWidth={3} />
-                  Aplicado
-                </>
-              ) : (
-                "Aplicar ahora"
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={downloadState === "downloading"}
-              className="flex min-w-14 items-center justify-center rounded-2xl border border-white/12 bg-white/5 px-5 text-white transition hover:bg-white/10 disabled:opacity-60"
-              aria-label="Descargar vídeo animado"
-            >
-              {downloadState === "done" ? (
-                <Check className="size-5" />
-              ) : (
-                <Download className="size-5" />
-              )}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={downloadState === "downloading"}
+            className={`mt-5 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-bold uppercase tracking-[0.18em] transition ${
+              isDownloaded
+                ? "bg-electric-blue/15 text-electric-blue ring-1 ring-electric-blue/40"
+                : "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
+            } disabled:opacity-70`}
+          >
+            {downloadState === "downloading" ? (
+              "Descargando..."
+            ) : downloadState === "done" || isDownloaded ? (
+              <>
+                <Check className="size-4" strokeWidth={3} />
+                Descargado
+              </>
+            ) : (
+              <>
+                <Download className="size-4" />
+                Descargar fondo 3D
+              </>
+            )}
+          </button>
 
           {wp.sound && (
             <div className="mt-4 flex items-center gap-2 text-[11px] text-white/45">
@@ -249,29 +194,24 @@ function WallpaperDetail() {
           )}
         </div>
 
-        {/* Note about web limitation */}
-        <div className="mt-4 space-y-2 px-2 text-left text-[10px] leading-relaxed text-white/45">
-          <p className="text-center text-white/55">
-            Cómo aplicar el fondo{" "}
-            <strong className="text-electric-blue">en Inicio y en Bloqueo</strong>:
+        {/* Instrucciones sencillas */}
+        <div className="mt-5 rounded-2xl border border-white/8 bg-white/5 p-5 text-left text-xs leading-relaxed text-white/70">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.25em] text-electric-blue">
+            Cómo ponerlo de fondo
           </p>
-          <p>
-            <strong className="text-white/70">Android:</strong> pulsa{" "}
-            <span className="text-electric-blue">Aplicar ahora</span>; se abrirá el panel de{" "}
-            <strong>fondo animado AetherX</strong>. No lo busques en Galería/Fotos: esa pantalla de
-            Android sólo muestra imágenes estáticas, no vídeos animados.
-          </p>
-          <p>
-            <strong className="text-white/70">iOS / iPhone:</strong> Apple solo permite vídeos
-            animados como <strong>Live Photo</strong> en la pantalla de bloqueo. Para la pantalla de
-            inicio se aplica el póster estático automáticamente (es una restricción del sistema, no
-            de la app).
-          </p>
+          <ol className="space-y-1.5 list-decimal pl-5 text-white/65">
+            <li>Pulsa <strong className="text-white">Descargar fondo 3D</strong>.</li>
+            <li>Abre los <strong className="text-white">Ajustes</strong> de tu teléfono.</li>
+            <li>
+              Entra en <strong className="text-white">Fondo de pantalla</strong> y elige el
+              archivo recién descargado en tu galería.
+            </li>
+          </ol>
         </div>
 
-        {justApplied && (
+        {toast && (
           <div className="glass-nav fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full px-5 py-3 text-xs font-bold uppercase tracking-[0.2em] text-electric-blue shadow-2xl">
-            ✓ Fondo aplicado
+            {toast}
           </div>
         )}
       </section>
