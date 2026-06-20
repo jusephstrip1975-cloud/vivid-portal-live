@@ -6,10 +6,10 @@ interface SaveResult {
 }
 
 interface LiveWallpaperPlugin {
-  saveVideoFromUrl(options: {
-    url: string;
+  saveVideo(options: {
+    base64: string;
     fileName?: string;
-  }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
+  }): Promise<{ path: string; bytes: number }>;
   applyHome(): Promise<{ applied: boolean; verified?: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
 }
@@ -37,11 +37,11 @@ export async function saveWallpaperToDevice(
 
     if (platform === "android") {
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-      const absoluteUrl = new URL(
-        videoUrl,
-        typeof window === "undefined" ? undefined : window.location.origin,
-      ).toString();
-      await LiveWallpaper.saveVideoFromUrl({ url: absoluteUrl, fileName });
+      const res = await fetch(videoUrl);
+      if (!res.ok) throw new Error("video-fetch-failed");
+      const blob = await res.blob();
+      const base64 = await blobToBase64(blob);
+      await LiveWallpaper.saveVideo({ base64, fileName });
       try {
         await LiveWallpaper.applyHome();
         return { ok: true, reason: "android-live-wallpaper-applied" };
