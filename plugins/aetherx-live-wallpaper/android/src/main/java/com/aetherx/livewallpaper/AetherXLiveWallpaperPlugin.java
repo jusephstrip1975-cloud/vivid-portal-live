@@ -172,15 +172,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public void openPicker(PluginCall call) {
         try {
             ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
-            Intent intent;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
-                intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, service);
-            } else {
-                intent = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
-            }
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getActivity().startActivity(intent);
+            openLiveWallpaperPreview(service);
 
             JSObject result = new JSObject();
             result.put("opened", true);
@@ -188,6 +180,26 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("live-wallpaper-picker-failed", e);
         }
+    }
+
+    private void openLiveWallpaperPreview(ComponentName service) throws Exception {
+        Intent intent;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+            intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, service);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                getActivity().startActivity(intent);
+                return;
+            } catch (Exception ignored) {
+                // Some Android skins do not expose the direct preview action.
+                // Fall back to the live wallpaper chooser, never to the image gallery.
+            }
+        }
+
+        intent = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getActivity().startActivity(intent);
     }
 
     @PluginMethod
@@ -200,29 +212,34 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
 
             WallpaperManager manager = WallpaperManager.getInstance(getContext());
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                if (!manager.isWallpaperSupported()) {
-                    call.reject("wallpaper-not-supported");
-                    return;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (!manager.isWallpaperSupported()) {
+                        call.reject("wallpaper-not-supported");
+                        return;
+                    }
+                    if (!manager.isSetWallpaperAllowed()) {
+                        call.reject("set-wallpaper-not-allowed");
+                        return;
+                    }
                 }
-                if (!manager.isSetWallpaperAllowed()) {
-                    call.reject("set-wallpaper-not-allowed");
-                    return;
-                }
+
+                manager.setWallpaperComponent(service);
+
+                WallpaperInfo info = manager.getWallpaperInfo();
+                boolean verified = info != null
+                    && getContext().getPackageName().equals(info.getPackageName())
+                    && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
+
+                JSObject result = new JSObject();
+                result.put("applied", true);
+                result.put("verified", verified);
+                call.resolve(result);
+                return;
             }
 
-            ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
-            manager.setWallpaperComponent(service);
-
-            WallpaperInfo info = manager.getWallpaperInfo();
-            boolean verified = info != null
-                && getContext().getPackageName().equals(info.getPackageName())
-                && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
-
-            JSObject result = new JSObject();
-            result.put("applied", true);
-            result.put("verified", verified);
-            call.resolve(result);
+            call.reject("live-wallpaper-home-apply-unsupported");
         } catch (Exception e) {
             call.reject("live-wallpaper-home-apply-failed", e);
         }
