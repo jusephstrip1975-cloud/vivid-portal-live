@@ -210,6 +210,28 @@ import beachReefVid from "@/assets/wp-beach-reef.mp4.asset.json";
 import beachHammockVid from "@/assets/wp-beach-hammock.mp4.asset.json";
 import beachLagoonVid from "@/assets/wp-beach-lagoon.mp4.asset.json";
 
+// 3D base pool (cycled across 5 new 3D categories, 40 entries each = 200 total)
+import threeDChrome from "@/assets/wp-3d-chrome.jpg";
+import threeDCrystal from "@/assets/wp-3d-crystal.jpg";
+import threeDFractal from "@/assets/wp-3d-fractal.jpg";
+import threeDParticles from "@/assets/wp-3d-particles.jpg";
+import threeDLiquid from "@/assets/wp-3d-liquid.jpg";
+import threeDTorus from "@/assets/wp-3d-torus.jpg";
+import threeDGlass from "@/assets/wp-3d-glass.jpg";
+import threeDVoronoi from "@/assets/wp-3d-voronoi.jpg";
+import threeDRibbon from "@/assets/wp-3d-ribbon.jpg";
+import threeDPlasma from "@/assets/wp-3d-plasma.jpg";
+import threeDChromeVid from "@/assets/wp-3d-chrome.mp4.asset.json";
+import threeDCrystalVid from "@/assets/wp-3d-crystal.mp4.asset.json";
+import threeDFractalVid from "@/assets/wp-3d-fractal.mp4.asset.json";
+import threeDParticlesVid from "@/assets/wp-3d-particles.mp4.asset.json";
+import threeDLiquidVid from "@/assets/wp-3d-liquid.mp4.asset.json";
+import threeDTorusVid from "@/assets/wp-3d-torus.mp4.asset.json";
+import threeDGlassVid from "@/assets/wp-3d-glass.mp4.asset.json";
+import threeDVoronoiVid from "@/assets/wp-3d-voronoi.mp4.asset.json";
+import threeDRibbonVid from "@/assets/wp-3d-ribbon.mp4.asset.json";
+import threeDPlasmaVid from "@/assets/wp-3d-plasma.mp4.asset.json";
+
 export type Category =
   | "universo"
   | "oceano"
