@@ -63,15 +63,11 @@ export async function setDeviceWallpaper(
     if (platform === "android") {
       const { registerPlugin } = await import("@capacitor/core");
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-      const absoluteUrl = new URL(
+      const saved = await saveVideoWithWebViewFallback(
+        LiveWallpaper,
         url,
-        typeof window === "undefined" ? undefined : window.location.origin,
-      ).toString();
-
-      const saved = await LiveWallpaper.saveVideoFromUrl({
-        url: absoluteUrl,
-        fileName: `aetherx-${Date.now()}.mp4`,
-      });
+        `aetherx-${Date.now()}.mp4`,
+      );
       await LiveWallpaper.openPicker({ target });
 
       return {
@@ -119,12 +115,7 @@ export async function saveVideoToDeviceGallery(
     }
 
     const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-    const absoluteUrl = new URL(
-      url,
-      typeof window === "undefined" ? undefined : window.location.origin,
-    ).toString();
-
-    await LiveWallpaper.saveVideoFromUrl({ url: absoluteUrl, fileName });
+    await saveVideoWithWebViewFallback(LiveWallpaper, url, fileName);
     return { ok: true, reason: "android-video-saved-to-gallery" };
   } catch (err) {
     console.error("saveVideoToDeviceGallery failed", err);
@@ -142,4 +133,32 @@ function blobToBase64(blob: Blob): Promise<string> {
     r.onerror = reject;
     r.readAsDataURL(blob);
   });
+}
+
+async function saveVideoWithWebViewFallback(
+  LiveWallpaper: LiveWallpaperPlugin,
+  url: string,
+  fileName: string,
+): Promise<{ path: string; bytes: number; galleryUri?: string }> {
+  const absoluteUrl = new URL(
+    url,
+    typeof window === "undefined" ? undefined : window.location.origin,
+  ).toString();
+
+  const shouldUseNativeDownload = /^https?:\/\//i.test(absoluteUrl) &&
+    !/^https?:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)([:/]|$)/i.test(absoluteUrl);
+
+  if (shouldUseNativeDownload) {
+    try {
+      return await LiveWallpaper.saveVideoFromUrl({ url: absoluteUrl, fileName });
+    } catch (err) {
+      console.warn("Native video download failed; retrying through WebView", err);
+    }
+  }
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`video-fetch-failed-${res.status}`);
+  const blob = await res.blob();
+  const base64 = await blobToBase64(blob);
+  return LiveWallpaper.saveVideo({ base64, fileName });
 }
