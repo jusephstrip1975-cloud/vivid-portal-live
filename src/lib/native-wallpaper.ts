@@ -104,7 +104,10 @@ export async function setDeviceWallpaper(
   }
 }
 
-export async function saveVideoToDeviceGallery(url: string, fileName: string): Promise<WallpaperResult> {
+export async function saveVideoToDeviceGallery(
+  url: string,
+  fileName: string,
+): Promise<WallpaperResult> {
   if (!(await isNative())) {
     return { ok: false, reason: "web" };
   }
