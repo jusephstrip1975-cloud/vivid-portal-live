@@ -19,6 +19,7 @@ interface LiveWallpaperPlugin {
 }
 
 const PUBLISHED_ASSET_ORIGIN = "https://vivid-portal-live.lovable.app";
+const PREVIEW_ASSET_ORIGIN = "https://id-preview--86067037-aec8-403d-b7be-5af9e39ce44c.lovable.app";
 
 export async function isNative(): Promise<boolean> {
   try {
@@ -75,11 +76,19 @@ export async function saveWallpaperToDevice(
   }
 }
 
-function resolveDownloadUrl(url: string): string {
+export function resolveDownloadUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
 
   const browserOrigin = typeof window !== "undefined" ? window.location.origin : "";
-  const origin = /^https?:\/\//i.test(browserOrigin) ? browserOrigin : PUBLISHED_ASSET_ORIGIN;
+  const canServeAssets =
+    /^https?:\/\//i.test(browserOrigin) &&
+    !browserOrigin.includes("localhost") &&
+    !browserOrigin.includes("127.0.0.1");
+  const origin = canServeAssets
+    ? browserOrigin
+    : typeof window !== "undefined"
+      ? PREVIEW_ASSET_ORIGIN
+      : PUBLISHED_ASSET_ORIGIN;
 
   if (url.startsWith("/")) return `${origin}${url}`;
   return `${origin}/${url}`;

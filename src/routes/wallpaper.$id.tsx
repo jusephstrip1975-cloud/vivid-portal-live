@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
-import { isNative, saveWallpaperToDevice } from "@/lib/native-wallpaper";
+import { isNative, resolveDownloadUrl, saveWallpaperToDevice } from "@/lib/native-wallpaper";
 
 export const Route = createFileRoute("/wallpaper/$id")({
   loader: ({ params }) => {
@@ -64,7 +64,7 @@ function WallpaperDetail() {
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
       } else {
         // Navegador: descarga clásica del video
-        const res = await fetch(wp.video, { mode: "cors" });
+        const res = await fetch(resolveDownloadUrl(wp.video), { mode: "cors" });
         if (!res.ok) throw new Error("download-failed");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
