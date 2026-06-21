@@ -17,13 +17,14 @@ interface LiveWallpaperPlugin {
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
   applyHome(): Promise<{ applied: boolean; verified?: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
-  pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string }>;
+  pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
 }
 
 export interface PickedDeviceVideo {
   path: string;
   bytes: number;
   sourceUri: string;
+  galleryUri?: string;
   /** URL usable directamente en un <video> dentro del WebView. */
   previewUrl: string;
 }
