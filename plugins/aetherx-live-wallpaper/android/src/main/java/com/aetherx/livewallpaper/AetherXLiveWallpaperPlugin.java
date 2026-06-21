@@ -343,6 +343,51 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
     }
 
+    private ComponentName getLiveWallpaperComponent() {
+        return new ComponentName(getContext().getPackageName(), AetherXVideoWallpaperService.class.getName());
+    }
+
+    private boolean isCurrentLiveWallpaper(WallpaperManager manager, ComponentName service) {
+        try {
+            WallpaperInfo info = manager.getWallpaperInfo();
+            return info != null
+                && service.getPackageName().equals(info.getPackageName())
+                && service.getClassName().equals(info.getServiceName());
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private boolean isSamsungDevice() {
+        String manufacturer = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER;
+        String brand = Build.BRAND == null ? "" : Build.BRAND;
+        return manufacturer.toLowerCase().contains("samsung") || brand.toLowerCase().contains("samsung");
+    }
+
+    private boolean isLiveWallpaperServiceRegistered(ComponentName service) {
+        PackageManager pm = getContext().getPackageManager();
+        try {
+            if (pm.getServiceInfo(service, 0) == null) return false;
+        } catch (Throwable ignored) {
+            return false;
+        }
+
+        try {
+            Intent intent = new Intent(WallpaperService.SERVICE_INTERFACE);
+            intent.setPackage(service.getPackageName());
+            List<ResolveInfo> services = pm.queryIntentServices(intent, PackageManager.GET_META_DATA | PackageManager.GET_RESOLVED_FILTER);
+            for (ResolveInfo resolved : services) {
+                if (resolved.serviceInfo != null
+                    && service.getPackageName().equals(resolved.serviceInfo.packageName)
+                    && service.getClassName().equals(resolved.serviceInfo.name)
+                    && "android.permission.BIND_WALLPAPER".equals(resolved.serviceInfo.permission)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
     private boolean launchLiveWallpaperPreview(ComponentName service) {
         try {
             Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
