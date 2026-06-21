@@ -15,6 +15,12 @@
         android:name="android.software.live_wallpaper"
         android:required="false" />
 
+    <queries>
+        <intent>
+            <action android:name="android.service.wallpaper.WallpaperService" />
+        </intent>
+    </queries>
+
     <application>
         <service
             android:name="com.aetherx.livewallpaper.AetherXVideoWallpaperService"

@@ -1,10 +1,12 @@
 package com.aetherx.livewallpaper;
 
 import android.media.MediaPlayer;
+import android.os.Build;
 import android.service.wallpaper.WallpaperService;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import java.io.File;
+import java.io.FileInputStream;
 
 public class AetherXVideoWallpaperService extends WallpaperService {
     @Override
@@ -87,12 +89,17 @@ public class AetherXVideoWallpaperService extends WallpaperService {
                 MediaPlayer player = new MediaPlayer();
                 mediaPlayer = player;
                 prepared = false;
-                player.setDataSource(file.getAbsolutePath());
+                try (FileInputStream input = new FileInputStream(file)) {
+                    player.setDataSource(input.getFD());
+                }
                 activeSurface = holder.getSurface();
                 player.setSurface(activeSurface);
                 player.setLooping(true);
                 player.setVolume(0f, 0f);
                 player.setScreenOnWhilePlaying(false);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    player.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
+                }
                 player.setOnErrorListener((mp, what, extra) -> {
                     stopVideo();
                     return true;
