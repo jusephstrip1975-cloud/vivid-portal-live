@@ -95,13 +95,22 @@ function HomePage() {
             Cinematic Reality
           </p>
         </div>
-        <Link
-          to="/profile"
-          className="glass-card flex size-10 items-center justify-center rounded-full"
-          aria-label="Perfil"
-        >
-          <span className="size-2 rounded-full bg-electric-blue animate-shimmer" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/device"
+            className="glass-card flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-electric-blue"
+            aria-label="Simulador de móvil"
+          >
+            S25 Ultra
+          </Link>
+          <Link
+            to="/profile"
+            className="glass-card flex size-10 items-center justify-center rounded-full"
+            aria-label="Perfil"
+          >
+            <span className="size-2 rounded-full bg-electric-blue animate-shimmer" />
+          </Link>
+        </div>
       </header>
 
       {/* Hero Spotlight */}

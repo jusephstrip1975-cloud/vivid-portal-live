@@ -13,6 +13,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PremiumRouteImport } from './routes/premium'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as ExploreRouteImport } from './routes/explore'
+import { Route as DeviceRouteImport } from './routes/device'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WallpaperIdRouteImport } from './routes/wallpaper.$id'
 
@@ -36,6 +37,11 @@ const ExploreRoute = ExploreRouteImport.update({
   path: '/explore',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeviceRoute = DeviceRouteImport.update({
+  id: '/device',
+  path: '/device',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,6 +55,7 @@ const WallpaperIdRoute = WallpaperIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/device': typeof DeviceRoute
   '/explore': typeof ExploreRoute
   '/favorites': typeof FavoritesRoute
   '/premium': typeof PremiumRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/device': typeof DeviceRoute
   '/explore': typeof ExploreRoute
   '/favorites': typeof FavoritesRoute
   '/premium': typeof PremiumRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/device': typeof DeviceRoute
   '/explore': typeof ExploreRoute
   '/favorites': typeof FavoritesRoute
   '/premium': typeof PremiumRoute
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/device'
     | '/explore'
     | '/favorites'
     | '/premium'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/device'
     | '/explore'
     | '/favorites'
     | '/premium'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/device'
     | '/explore'
     | '/favorites'
     | '/premium'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DeviceRoute: typeof DeviceRoute
   ExploreRoute: typeof ExploreRoute
   FavoritesRoute: typeof FavoritesRoute
   PremiumRoute: typeof PremiumRoute
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExploreRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/device': {
+      id: '/device'
+      path: '/device'
+      fullPath: '/device'
+      preLoaderRoute: typeof DeviceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -157,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DeviceRoute: DeviceRoute,
   ExploreRoute: ExploreRoute,
   FavoritesRoute: FavoritesRoute,
   PremiumRoute: PremiumRoute,
