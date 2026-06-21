@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import { ArrowUpRight, FolderOpen, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
+import { isNative, pickAndApplyDeviceVideo } from "@/lib/native-wallpaper";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,6 +29,33 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const hero = WALLPAPERS[0];
   const trending = WALLPAPERS.slice(1, 5);
+  const [pickState, setPickState] = useState<"idle" | "loading">("idle");
+  const [pickToast, setPickToast] = useState<string | null>(null);
+
+  async function handlePickDeviceVideo() {
+    if (!(await isNative())) {
+      setPickToast("Solo disponible en la app de Android");
+      setTimeout(() => setPickToast(null), 2400);
+      return;
+    }
+    setPickState("loading");
+    const result = await pickAndApplyDeviceVideo();
+    setPickState("idle");
+    if (!result.ok) {
+      if (result.reason !== "cancelled") {
+        setPickToast("No se pudo abrir el explorador de archivos");
+        setTimeout(() => setPickToast(null), 2400);
+      }
+      return;
+    }
+    setPickToast(
+      result.needsPicker
+        ? "✓ Pulsa Aplicar y elige Pantalla de inicio"
+        : "✓ Fondo animado aplicado",
+    );
+    setTimeout(() => setPickToast(null), 2800);
+  }
+
 
   return (
     <div className="relative">
@@ -90,6 +119,36 @@ function HomePage() {
           </div>
         </Link>
       </section>
+
+      {/* Pick from device */}
+      <section className="px-6 pt-2">
+        <button
+          type="button"
+          onClick={handlePickDeviceVideo}
+          disabled={pickState === "loading"}
+          className="glass-card flex w-full items-center gap-4 rounded-2xl p-4 text-left transition active:scale-[0.99] disabled:opacity-60"
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-electric-blue to-galaxy-purple">
+            <FolderOpen className="size-5 text-white" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold text-display">
+              {pickState === "loading" ? "Abriendo explorador..." : "Elegir vídeo del dispositivo"}
+            </span>
+            <span className="mt-0.5 block text-[11px] text-white/55">
+              MP4 · MOV · MKV · WEBM · AVI · de Download, DCIM, WhatsApp, Telegram…
+            </span>
+          </span>
+          <ArrowUpRight className="size-4 text-white/40" />
+        </button>
+        {pickToast && (
+          <div className="glass-nav fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full px-5 py-3 text-xs font-bold uppercase tracking-[0.2em] text-electric-blue shadow-2xl">
+            {pickToast}
+          </div>
+        )}
+      </section>
+
+
 
       {/* Categories */}
       <section className="py-4">

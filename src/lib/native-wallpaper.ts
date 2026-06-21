@@ -17,6 +17,36 @@ interface LiveWallpaperPlugin {
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
   applyHome(): Promise<{ applied: boolean; verified?: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
+  pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string }>;
+}
+
+export async function pickAndApplyDeviceVideo(): Promise<SaveResult> {
+  if (!(await isNative())) return { ok: false, reason: "web" };
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (Capacitor.getPlatform() !== "android") {
+      return { ok: false, reason: "unsupported-platform" };
+    }
+    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    await LiveWallpaper.pickVideoFromDevice();
+    try {
+      const applied = await LiveWallpaper.applyHome();
+      if (applied.applied && applied.verified) {
+        return { ok: true, reason: "android-home-applied" };
+      }
+    } catch (err) {
+      console.warn("applyHome failed after picking device video", err);
+    }
+    await LiveWallpaper.openPicker();
+    return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
+  } catch (err) {
+    const reason = String(err);
+    if (reason.includes("pick-video-cancelled")) {
+      return { ok: false, reason: "cancelled" };
+    }
+    console.error("pickAndApplyDeviceVideo failed", err);
+    return { ok: false, reason };
+  }
 }
 
 const PUBLISHED_ASSET_ORIGIN = "https://vivid-portal-live.lovable.app";
