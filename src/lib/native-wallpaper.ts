@@ -20,6 +20,35 @@ interface LiveWallpaperPlugin {
   applyBoth(): Promise<{ applied: boolean; homeVerified: boolean; lockApplied: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
+  checkCompatibility(): Promise<CompatibilityResult>;
+}
+
+export interface CompatibilityResult {
+  canApplyHome: boolean;
+  canApplyLock: boolean;
+  liveWallpaperSupported: boolean;
+  wallpaperSupported: boolean;
+  setWallpaperAllowed: boolean;
+  serviceRegistered: boolean;
+  hasVideo: boolean;
+  isSamsung: boolean;
+  manufacturer: string;
+  sdk: number;
+  reason: string;
+  message: string;
+}
+
+export async function checkWallpaperCompatibility(): Promise<CompatibilityResult | null> {
+  if (!(await isNative())) return null;
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (Capacitor.getPlatform() !== "android") return null;
+    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    return await LiveWallpaper.checkCompatibility();
+  } catch (err) {
+    console.warn("checkWallpaperCompatibility failed", err);
+    return null;
+  }
 }
 
 export type WallpaperTarget = "home" | "lock" | "both";
