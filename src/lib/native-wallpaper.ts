@@ -16,9 +16,13 @@ interface LiveWallpaperPlugin {
     fileName?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
   applyHome(): Promise<{ applied: boolean; verified?: boolean }>;
+  applyLock(): Promise<{ applied: boolean }>;
+  applyBoth(): Promise<{ applied: boolean; homeVerified: boolean; lockApplied: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
 }
+
+export type WallpaperTarget = "home" | "lock" | "both";
 
 export interface PickedDeviceVideo {
   path: string;
