@@ -336,15 +336,17 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             getContext().startActivity(intent);
             return true;
-        } catch (ActivityNotFoundException firstFailure) {
-            try {
-                Intent chooser = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
-                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(chooser);
-                return true;
-            } catch (Exception ignored) {
-                return false;
-            }
+        } catch (Exception ignored) {
+            return launchLiveWallpaperChooser();
+        }
+    }
+
+    private boolean launchLiveWallpaperChooser() {
+        try {
+            Intent chooser = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(chooser);
+            return true;
         } catch (Exception ignored) {
             return false;
         }
