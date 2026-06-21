@@ -13,6 +13,8 @@ import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.provider.MediaStore;
 import android.util.Base64;
@@ -294,6 +296,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             try {
                 insertGalleryVideo(source, "AetherX-" + visibleName, mimeType, AETHERX_GALLERY_PATH, metadata);
             } catch (Exception ignored) {}
+            forceSamsungPickerRefresh(visibleName, mimeType);
             return uri.toString();
         }
 
@@ -323,6 +326,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 if (uri != null) getContext().getContentResolver().notifyChange(uri, null);
             }
         );
+        forceSamsungPickerRefresh(visibleName, mimeType);
         return Uri.fromFile(destination).toString();
     }
 
