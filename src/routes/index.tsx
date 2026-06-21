@@ -1,10 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, FolderOpen, Sparkles } from "lucide-react";
+import { ArrowUpRight, Check, FolderOpen, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
-import { isNative, pickAndApplyDeviceVideo } from "@/lib/native-wallpaper";
+import {
+  applyPickedVideo,
+  isNative,
+  pickDeviceVideo,
+  type PickedDeviceVideo,
+} from "@/lib/native-wallpaper";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,32 +34,49 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const hero = WALLPAPERS[0];
   const trending = WALLPAPERS.slice(1, 5);
-  const [pickState, setPickState] = useState<"idle" | "loading">("idle");
+  const [pickState, setPickState] = useState<"idle" | "loading" | "applying">("idle");
   const [pickToast, setPickToast] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PickedDeviceVideo | null>(null);
+
+  function showToast(msg: string, ms = 2600) {
+    setPickToast(msg);
+    setTimeout(() => setPickToast(null), ms);
+  }
 
   async function handlePickDeviceVideo() {
     if (!(await isNative())) {
-      setPickToast("Solo disponible en la app de Android");
-      setTimeout(() => setPickToast(null), 2400);
+      showToast("Solo disponible en la app de Android");
       return;
     }
     setPickState("loading");
-    const result = await pickAndApplyDeviceVideo();
+    const result = await pickDeviceVideo();
     setPickState("idle");
     if (!result.ok) {
       if (result.reason !== "cancelled") {
-        setPickToast("No se pudo abrir el explorador de archivos");
-        setTimeout(() => setPickToast(null), 2400);
+        showToast("No se pudo abrir el explorador de archivos");
       }
       return;
     }
-    setPickToast(
+    setPreview(result.video);
+  }
+
+  async function handleConfirmApply() {
+    setPickState("applying");
+    const result = await applyPickedVideo();
+    setPickState("idle");
+    if (!result.ok) {
+      showToast("No se pudo aplicar el fondo");
+      return;
+    }
+    setPreview(null);
+    showToast(
       result.needsPicker
         ? "✓ Pulsa Aplicar y elige Pantalla de inicio"
         : "✓ Fondo animado aplicado",
+      2800,
     );
-    setTimeout(() => setPickToast(null), 2800);
   }
+
 
 
   return (
