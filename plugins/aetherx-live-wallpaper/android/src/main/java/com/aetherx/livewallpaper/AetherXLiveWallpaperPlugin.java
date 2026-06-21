@@ -266,7 +266,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             values.put(MediaStore.Video.Media.TITLE, fileName.replaceFirst("(?i)\\.mp4$", ""));
             values.put(MediaStore.Video.Media.DISPLAY_NAME, fileName);
             values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
-            values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AetherX");
+            values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/AetherX");
             values.put(MediaStore.Video.Media.DATE_ADDED, nowSeconds);
             values.put(MediaStore.Video.Media.DATE_MODIFIED, nowSeconds);
             values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
@@ -293,7 +293,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             return uri.toString();
         }
 
-        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "AetherX");
+        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "AetherX");
         if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("gallery-directory-failed");
 
         File destination = new File(dir, fileName);

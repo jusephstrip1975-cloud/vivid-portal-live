@@ -155,9 +155,12 @@ export function resolveDownloadUrl(url: string): string {
     /^https?:\/\//i.test(browserOrigin) &&
     !browserOrigin.includes("localhost") &&
     !browserOrigin.includes("127.0.0.1");
+  const isLocalWebPreview =
+    typeof window !== "undefined" &&
+    (browserOrigin.includes("localhost") || browserOrigin.includes("127.0.0.1"));
   const origin = canServeAssets
     ? browserOrigin
-    : typeof window !== "undefined"
+    : isLocalWebPreview
       ? PREVIEW_ASSET_ORIGIN
       : PUBLISHED_ASSET_ORIGIN;
 
