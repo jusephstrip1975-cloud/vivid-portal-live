@@ -54,23 +54,37 @@ function WallpaperDetail() {
   const router = useRouter();
   const { isFavorite, toggleFavorite, apply, appliedId } = useAppState();
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
+  const [activeTarget, setActiveTarget] = useState<WallpaperTarget | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const isDownloaded = appliedId === wp.id;
   const fav = isFavorite(wp.id);
 
-  async function handleDownload() {
+  const targetLabels: Record<WallpaperTarget, string> = {
+    home: "Pantalla de inicio",
+    lock: "Pantalla de bloqueo",
+    both: "Inicio y bloqueo",
+  };
+
+  async function handleApply(target: WallpaperTarget) {
     const fileName = `aetherx-${wp.id}.mp4`;
     try {
+      setActiveTarget(target);
       setDownloadState("downloading");
 
       if (await isNative()) {
-        const result = await saveWallpaperToDevice(wp.video, fileName);
+        const result = await saveWallpaperToDevice(wp.video, fileName, target);
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
+        const successMsg =
+          target === "lock"
+            ? "✓ Fondo aplicado en pantalla de bloqueo"
+            : target === "both"
+              ? "✓ Aplicado en inicio y bloqueo"
+              : "✓ Fondo animado aplicado en Inicio";
         setToast(
           result.needsPicker
             ? "✓ Pulsa Aplicar y elige Pantalla de inicio"
-            : "✓ Fondo animado aplicado en Inicio",
+            : successMsg,
         );
       } else {
         // Navegador: descarga clásica del video
@@ -91,11 +105,15 @@ function WallpaperDetail() {
       apply(wp.id);
       setDownloadState("done");
       setTimeout(() => setToast(null), 2600);
-      setTimeout(() => setDownloadState("idle"), 1800);
+      setTimeout(() => {
+        setDownloadState("idle");
+        setActiveTarget(null);
+      }, 1800);
     } catch (err) {
       console.error(err);
       setDownloadState("idle");
-      setToast("No se pudo descargar. Inténtalo de nuevo.");
+      setActiveTarget(null);
+      setToast("No se pudo aplicar. Inténtalo de nuevo.");
       setTimeout(() => setToast(null), 2600);
     }
   }
