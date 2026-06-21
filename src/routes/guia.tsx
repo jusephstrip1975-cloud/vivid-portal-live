@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Copy,
+  PlayCircle,
 } from "lucide-react";
 import { useState } from "react";
+import guiaVideo from "../../public/videos/guia-github-apk.mp4.asset.json";
 
 export const Route = createFileRoute("/guia")({
   head: () => ({
