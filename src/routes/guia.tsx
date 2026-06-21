@@ -123,6 +123,26 @@ function GuiaPage() {
           </button>
         </div>
 
+        {/* Video tutorial */}
+        <div className="mb-8 glass-card overflow-hidden rounded-2xl">
+          <div className="flex items-center gap-2 px-5 pt-4">
+            <PlayCircle className="size-4 text-electric-blue" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-electric-blue">
+              Vídeo demostrativo
+            </span>
+          </div>
+          <p className="px-5 pb-3 pt-1 text-xs text-white/60">
+            Mira en 10 segundos cómo conectar GitHub y descargar el APK.
+          </p>
+          <video
+            src={guiaVideo.url}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full aspect-video bg-black"
+          />
+        </div>
+
         {/* Steps */}
         <div className="relative space-y-6">
           {/* Vertical line */}
