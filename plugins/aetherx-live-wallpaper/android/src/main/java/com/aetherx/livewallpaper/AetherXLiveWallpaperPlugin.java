@@ -258,7 +258,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         String name = fileName == null ? "" : fileName.trim();
         if (name.length() == 0) name = "aetherx-live-wallpaper.mp4";
         name = name.replaceAll("[\\\\/:*?\"<>|]", "-");
-        if (!name.toLowerCase().endsWith(".mp4")) name = name + ".mp4";
+        String lower = name.toLowerCase();
+        if (
+            !lower.endsWith(".mp4") &&
+            !lower.endsWith(".mov") &&
+            !lower.endsWith(".mkv") &&
+            !lower.endsWith(".webm") &&
+            !lower.endsWith(".avi") &&
+            !lower.endsWith(".3gp")
+        ) name = name + ".mp4";
         return name;
     }
 
