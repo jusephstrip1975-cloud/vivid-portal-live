@@ -13,6 +13,8 @@ import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.provider.MediaStore;
 import android.util.Base64;
@@ -294,6 +296,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             try {
                 insertGalleryVideo(source, "AetherX-" + visibleName, mimeType, AETHERX_GALLERY_PATH, metadata);
             } catch (Exception ignored) {}
+            forceSamsungPickerRefresh(visibleName, mimeType);
             return uri.toString();
         }
 
@@ -323,6 +326,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 if (uri != null) getContext().getContentResolver().notifyChange(uri, null);
             }
         );
+        forceSamsungPickerRefresh(visibleName, mimeType);
         return Uri.fromFile(destination).toString();
     }
 
@@ -408,19 +412,45 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private void publishMedia(Uri uri, String relativePath, String fileName, String mimeType) {
         ContentResolver resolver = getContext().getContentResolver();
         resolver.notifyChange(uri, null);
+        resolver.notifyChange(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, null);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            resolver.notifyChange(MediaStore.Downloads.EXTERNAL_CONTENT_URI, null);
+        }
         getContext().sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri));
 
         try {
             File physicalFile = new File(Environment.getExternalStorageDirectory(), relativePath + fileName);
-            MediaScannerConnection.scanFile(
-                getContext(),
-                new String[] { physicalFile.getAbsolutePath() },
-                new String[] { mimeType },
-                (path, scannedUri) -> {
-                    if (scannedUri != null) resolver.notifyChange(scannedUri, null);
-                }
-            );
+            scanVisibleFile(physicalFile, mimeType);
         } catch (Exception ignored) {}
+    }
+
+    private void forceSamsungPickerRefresh(String fileName, String mimeType) {
+        final Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(() -> refreshAllVisibleCopies(fileName, mimeType), 350);
+        handler.postDelayed(() -> refreshAllVisibleCopies(fileName, mimeType), 1400);
+    }
+
+    private void refreshAllVisibleCopies(String fileName, String mimeType) {
+        ContentResolver resolver = getContext().getContentResolver();
+        resolver.notifyChange(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, null);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            resolver.notifyChange(MediaStore.Downloads.EXTERNAL_CONTENT_URI, null);
+        }
+
+        scanVisibleFile(new File(Environment.getExternalStorageDirectory(), CAMERA_GALLERY_PATH + fileName), mimeType);
+        scanVisibleFile(new File(Environment.getExternalStorageDirectory(), DOWNLOADS_GALLERY_PATH + fileName), mimeType);
+        scanVisibleFile(new File(Environment.getExternalStorageDirectory(), AETHERX_GALLERY_PATH + "AetherX-" + fileName), mimeType);
+    }
+
+    private void scanVisibleFile(File file, String mimeType) {
+        MediaScannerConnection.scanFile(
+            getContext(),
+            new String[] { file.getAbsolutePath() },
+            new String[] { mimeType },
+            (path, scannedUri) -> {
+                if (scannedUri != null) getContext().getContentResolver().notifyChange(scannedUri, null);
+            }
+        );
     }
 
     private String getDisplayName(ContentResolver resolver, Uri uri) {
