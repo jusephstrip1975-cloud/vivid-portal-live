@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PremiumRouteImport } from './routes/premium'
+import { Route as GuiaRouteImport } from './routes/guia'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as DeviceRouteImport } from './routes/device'
@@ -25,6 +26,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const PremiumRoute = PremiumRouteImport.update({
   id: '/premium',
   path: '/premium',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuiaRoute = GuiaRouteImport.update({
+  id: '/guia',
+  path: '/guia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FavoritesRoute = FavoritesRouteImport.update({
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/device': typeof DeviceRoute
   '/explore': typeof ExploreRoute
   '/favorites': typeof FavoritesRoute
+  '/guia': typeof GuiaRoute
   '/premium': typeof PremiumRoute
   '/profile': typeof ProfileRoute
   '/wallpaper/$id': typeof WallpaperIdRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/device': typeof DeviceRoute
   '/explore': typeof ExploreRoute
   '/favorites': typeof FavoritesRoute
+  '/guia': typeof GuiaRoute
   '/premium': typeof PremiumRoute
   '/profile': typeof ProfileRoute
   '/wallpaper/$id': typeof WallpaperIdRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/device': typeof DeviceRoute
   '/explore': typeof ExploreRoute
   '/favorites': typeof FavoritesRoute
+  '/guia': typeof GuiaRoute
   '/premium': typeof PremiumRoute
   '/profile': typeof ProfileRoute
   '/wallpaper/$id': typeof WallpaperIdRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/device'
     | '/explore'
     | '/favorites'
+    | '/guia'
     | '/premium'
     | '/profile'
     | '/wallpaper/$id'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/device'
     | '/explore'
     | '/favorites'
+    | '/guia'
     | '/premium'
     | '/profile'
     | '/wallpaper/$id'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/device'
     | '/explore'
     | '/favorites'
+    | '/guia'
     | '/premium'
     | '/profile'
     | '/wallpaper/$id'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   DeviceRoute: typeof DeviceRoute
   ExploreRoute: typeof ExploreRoute
   FavoritesRoute: typeof FavoritesRoute
+  GuiaRoute: typeof GuiaRoute
   PremiumRoute: typeof PremiumRoute
   ProfileRoute: typeof ProfileRoute
   WallpaperIdRoute: typeof WallpaperIdRoute
@@ -135,6 +148,13 @@ declare module '@tanstack/react-router' {
       path: '/premium'
       fullPath: '/premium'
       preLoaderRoute: typeof PremiumRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guia': {
+      id: '/guia'
+      path: '/guia'
+      fullPath: '/guia'
+      preLoaderRoute: typeof GuiaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/favorites': {
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   DeviceRoute: DeviceRoute,
   ExploreRoute: ExploreRoute,
   FavoritesRoute: FavoritesRoute,
+  GuiaRoute: GuiaRoute,
   PremiumRoute: PremiumRoute,
   ProfileRoute: ProfileRoute,
   WallpaperIdRoute: WallpaperIdRoute,
@@ -187,3 +208,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
