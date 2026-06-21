@@ -668,7 +668,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             resolver.notifyChange(MediaStore.Downloads.EXTERNAL_CONTENT_URI, null);
         }
-        getContext().sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri));
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            getContext().sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri));
+        }
 
         try {
             File physicalFile = new File(Environment.getExternalStorageDirectory(), relativePath + fileName);
