@@ -28,4 +28,4 @@ export interface AetherXLiveWallpaperPlugin {
     message: string;
   }>;
 }
-export {};
+export const AetherXLiveWallpaper: AetherXLiveWallpaperPlugin;
