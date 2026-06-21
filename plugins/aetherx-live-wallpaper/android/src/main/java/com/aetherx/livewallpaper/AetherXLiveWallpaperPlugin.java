@@ -227,6 +227,88 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void applyLock(PluginCall call) {
+        try {
+            File file = new File(getContext().getFilesDir(), VIDEO_FILE);
+            if (!file.exists() || file.length() == 0) {
+                call.reject("missing-saved-video");
+                return;
+            }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+                call.reject("lock-screen-not-supported");
+                return;
+            }
+            Bitmap frame = extractFirstFrame(file);
+            if (frame == null) {
+                call.reject("lock-frame-extract-failed");
+                return;
+            }
+            WallpaperManager manager = WallpaperManager.getInstance(getContext());
+            manager.setBitmap(frame, null, true, WallpaperManager.FLAG_LOCK);
+            frame.recycle();
+            JSObject result = new JSObject();
+            result.put("applied", true);
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("lock-wallpaper-apply-failed", e);
+        }
+    }
+
+    @PluginMethod
+    public void applyBoth(PluginCall call) {
+        try {
+            File file = new File(getContext().getFilesDir(), VIDEO_FILE);
+            if (!file.exists() || file.length() == 0) {
+                call.reject("missing-saved-video");
+                return;
+            }
+            WallpaperManager manager = WallpaperManager.getInstance(getContext());
+            ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
+            manager.setWallpaperComponent(service);
+
+            boolean lockApplied = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                Bitmap frame = extractFirstFrame(file);
+                if (frame != null) {
+                    try {
+                        manager.setBitmap(frame, null, true, WallpaperManager.FLAG_LOCK);
+                        lockApplied = true;
+                    } finally {
+                        frame.recycle();
+                    }
+                }
+            }
+
+            WallpaperInfo info = manager.getWallpaperInfo();
+            boolean verifiedHome = info != null
+                && getContext().getPackageName().equals(info.getPackageName())
+                && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
+
+            JSObject result = new JSObject();
+            result.put("applied", true);
+            result.put("homeVerified", verifiedHome);
+            result.put("lockApplied", lockApplied);
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("both-wallpaper-apply-failed", e);
+        }
+    }
+
+    private Bitmap extractFirstFrame(File file) {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(file.getAbsolutePath());
+            // First playable frame, scaled to typical phone resolution for memory safety.
+            Bitmap raw = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+            return raw;
+        } catch (Exception e) {
+            return null;
+        } finally {
+            try { retriever.release(); } catch (Exception ignored) {}
+        }
+    }
+
+    @PluginMethod
     public void openPicker(PluginCall call) {
         try {
             ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
