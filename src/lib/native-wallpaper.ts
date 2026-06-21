@@ -129,6 +129,7 @@ export async function isNative(): Promise<boolean> {
 export async function saveWallpaperToDevice(
   videoUrl: string,
   fileName: string,
+  target: WallpaperTarget = "home",
 ): Promise<SaveResult> {
   if (!(await isNative())) {
     return { ok: false, reason: "web" };
@@ -141,16 +142,7 @@ export async function saveWallpaperToDevice(
     if (platform === "android") {
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
       await LiveWallpaper.saveVideoFromUrl({ url: resolveDownloadUrl(videoUrl), fileName });
-      try {
-        const applied = await LiveWallpaper.applyHome();
-        if (applied.applied && applied.verified) {
-          return { ok: true, reason: "android-home-applied" };
-        }
-      } catch (err) {
-        console.warn("Direct live wallpaper apply failed; opening Android picker", err);
-      }
-      await LiveWallpaper.openPicker();
-      return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
+      return applyPickedVideo(target);
     }
 
     if (platform === "ios") {
