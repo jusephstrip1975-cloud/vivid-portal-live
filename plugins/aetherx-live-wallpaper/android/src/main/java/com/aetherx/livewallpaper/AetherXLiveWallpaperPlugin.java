@@ -332,7 +332,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     private boolean isCurrentLiveWallpaper(WallpaperManager manager, ComponentName service) {
         try {
-            WallpaperInfo info = manager.getWallpaperInfo();
+            WallpaperInfo info;
+            if (Build.VERSION.SDK_INT >= 34) {
+                info = manager.getWallpaperInfo(WallpaperManager.FLAG_SYSTEM);
+            } else {
+                info = manager.getWallpaperInfo();
+            }
             return info != null
                 && service.getPackageName().equals(info.getPackageName())
                 && service.getClassName().equals(info.getServiceName());
@@ -375,8 +380,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         try {
             Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
             intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, service);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
+            intent.putExtra("android.service.wallpaper.extra.FROM_FOREGROUND_APP", true);
+            intent.putExtra("SET_LOCKSCREEN_WALLPAPER", false);
+            Activity activity = getActivity();
+            if (activity != null) {
+                activity.startActivity(intent);
+            } else {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(intent);
+            }
             return true;
         } catch (Exception ignored) {
             return launchLiveWallpaperChooser();
@@ -386,8 +398,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private boolean launchLiveWallpaperChooser() {
         try {
             Intent chooser = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
-            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(chooser);
+            Activity activity = getActivity();
+            if (activity != null) {
+                activity.startActivity(chooser);
+            } else {
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(chooser);
+            }
             return true;
         } catch (Exception ignored) {
             return false;
