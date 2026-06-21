@@ -13,11 +13,11 @@
     <path
         android:fillColor="#2563EB"
         android:fillAlpha="0.85"
-        android:pathData="M76,44a44,44 0,1 0,0.1 0M76,60a28,28 0,1 1,-0.1 0" />
+        android:pathData="M32,34L112,18L128,92L48,108z" />
     <path
         android:fillColor="#8B5CF6"
         android:fillAlpha="0.65"
-        android:pathData="M204,34a56,56 0,1 0,0.1 0M204,54a36,36 0,1 1,-0.1 0" />
+        android:pathData="M202,24L286,54L250,132L166,102z" />
     <path
         android:fillColor="#F8FAFC"
         android:pathData="M138,76l48,28l-48,28z" />
