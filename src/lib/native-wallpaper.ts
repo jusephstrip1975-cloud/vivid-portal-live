@@ -15,9 +15,9 @@ interface LiveWallpaperPlugin {
     base64: string;
     fileName?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
-  applyHome(): Promise<{ applied: boolean; verified?: boolean }>;
+  applyHome(): Promise<{ applied: boolean; verified?: boolean; openedPicker?: boolean; needsConfirmation?: boolean }>;
   applyLock(): Promise<{ applied: boolean }>;
-  applyBoth(): Promise<{ applied: boolean; homeVerified: boolean; lockApplied: boolean }>;
+  applyBoth(): Promise<{ applied: boolean; homeVerified: boolean; lockApplied: boolean; openedPicker?: boolean; needsConfirmation?: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
   checkCompatibility(): Promise<CompatibilityResult>;
@@ -111,6 +111,9 @@ export async function applyPickedVideo(
         if (res.applied && res.homeVerified) {
           return { ok: true, reason: "android-both-applied" };
         }
+        if (res.openedPicker || res.needsConfirmation) {
+          return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
+        }
       } catch (err) {
         console.warn("applyBoth failed; opening picker", err);
       }
@@ -122,6 +125,9 @@ export async function applyPickedVideo(
       const applied = await LiveWallpaper.applyHome();
       if (applied.applied && applied.verified) {
         return { ok: true, reason: "android-home-applied" };
+      }
+      if (applied.openedPicker || applied.needsConfirmation) {
+        return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
       }
     } catch (err) {
       console.warn("applyHome failed; opening picker", err);
