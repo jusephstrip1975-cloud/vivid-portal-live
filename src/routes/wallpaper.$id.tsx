@@ -1,10 +1,15 @@
 import { createFileRoute, Link, notFound, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, Check, Download, Heart, Share2, Volume2 } from "lucide-react";
+import { ArrowLeft, Check, Heart, Home, Layers, Lock, Share2, Volume2 } from "lucide-react";
 import { useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
-import { isNative, resolveDownloadUrl, saveWallpaperToDevice } from "@/lib/native-wallpaper";
+import {
+  isNative,
+  resolveDownloadUrl,
+  saveWallpaperToDevice,
+  type WallpaperTarget,
+} from "@/lib/native-wallpaper";
 
 export const Route = createFileRoute("/wallpaper/$id")({
   loader: ({ params }) => {
