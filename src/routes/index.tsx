@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import { ArrowUpRight, FolderOpen, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
+import { isNative, pickAndApplyDeviceVideo } from "@/lib/native-wallpaper";
 
 export const Route = createFileRoute("/")({
   head: () => ({
