@@ -13,5 +13,19 @@ export interface AetherXLiveWallpaperPlugin {
   applyBoth(): Promise<{ applied: boolean; homeVerified: boolean; lockApplied: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
   isAvailable(): Promise<{ available: boolean; hasVideo: boolean }>;
+  checkCompatibility(): Promise<{
+    canApplyHome: boolean;
+    canApplyLock: boolean;
+    liveWallpaperSupported: boolean;
+    wallpaperSupported: boolean;
+    setWallpaperAllowed: boolean;
+    serviceRegistered: boolean;
+    hasVideo: boolean;
+    isSamsung: boolean;
+    manufacturer: string;
+    sdk: number;
+    reason: string;
+    message: string;
+  }>;
 }
 export {};
