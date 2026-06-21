@@ -16,9 +16,13 @@ interface LiveWallpaperPlugin {
     fileName?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
   applyHome(): Promise<{ applied: boolean; verified?: boolean }>;
+  applyLock(): Promise<{ applied: boolean }>;
+  applyBoth(): Promise<{ applied: boolean; homeVerified: boolean; lockApplied: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
 }
+
+export type WallpaperTarget = "home" | "lock" | "both";
 
 export interface PickedDeviceVideo {
   path: string;
@@ -51,13 +55,40 @@ export async function pickDeviceVideo(): Promise<
   }
 }
 
-/** Aplica el último vídeo guardado en filesDir como live wallpaper. */
-export async function applyPickedVideo(): Promise<SaveResult> {
+/** Aplica el último vídeo guardado en filesDir al destino indicado. */
+export async function applyPickedVideo(
+  target: WallpaperTarget = "home",
+): Promise<SaveResult> {
   if (!(await isNative())) return { ok: false, reason: "web" };
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
     if (Capacitor.getPlatform() !== "android") return { ok: false, reason: "unsupported-platform" };
     const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+
+    if (target === "lock") {
+      try {
+        const res = await LiveWallpaper.applyLock();
+        if (res.applied) return { ok: true, reason: "android-lock-applied" };
+      } catch (err) {
+        console.warn("applyLock failed", err);
+        return { ok: false, reason: String(err) };
+      }
+      return { ok: false, reason: "lock-apply-failed" };
+    }
+
+    if (target === "both") {
+      try {
+        const res = await LiveWallpaper.applyBoth();
+        if (res.applied && res.homeVerified) {
+          return { ok: true, reason: "android-both-applied" };
+        }
+      } catch (err) {
+        console.warn("applyBoth failed; opening picker", err);
+      }
+      await LiveWallpaper.openPicker();
+      return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
+    }
+
     try {
       const applied = await LiveWallpaper.applyHome();
       if (applied.applied && applied.verified) {
@@ -75,10 +106,12 @@ export async function applyPickedVideo(): Promise<SaveResult> {
 }
 
 /** Compatibilidad: pick + apply en un solo paso (sin preview). */
-export async function pickAndApplyDeviceVideo(): Promise<SaveResult> {
+export async function pickAndApplyDeviceVideo(
+  target: WallpaperTarget = "home",
+): Promise<SaveResult> {
   const picked = await pickDeviceVideo();
   if (!picked.ok) return { ok: false, reason: picked.reason };
-  return applyPickedVideo();
+  return applyPickedVideo(target);
 }
 
 const PUBLISHED_ASSET_ORIGIN = "https://vivid-portal-live.lovable.app";
@@ -96,6 +129,7 @@ export async function isNative(): Promise<boolean> {
 export async function saveWallpaperToDevice(
   videoUrl: string,
   fileName: string,
+  target: WallpaperTarget = "home",
 ): Promise<SaveResult> {
   if (!(await isNative())) {
     return { ok: false, reason: "web" };
@@ -108,16 +142,7 @@ export async function saveWallpaperToDevice(
     if (platform === "android") {
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
       await LiveWallpaper.saveVideoFromUrl({ url: resolveDownloadUrl(videoUrl), fileName });
-      try {
-        const applied = await LiveWallpaper.applyHome();
-        if (applied.applied && applied.verified) {
-          return { ok: true, reason: "android-home-applied" };
-        }
-      } catch (err) {
-        console.warn("Direct live wallpaper apply failed; opening Android picker", err);
-      }
-      await LiveWallpaper.openPicker();
-      return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
+      return applyPickedVideo(target);
     }
 
     if (platform === "ios") {

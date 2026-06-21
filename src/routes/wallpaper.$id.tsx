@@ -1,10 +1,15 @@
 import { createFileRoute, Link, notFound, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, Check, Download, Heart, Share2, Volume2 } from "lucide-react";
+import { ArrowLeft, Check, Heart, Home, Layers, Lock, Share2, Volume2 } from "lucide-react";
 import { useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
-import { isNative, resolveDownloadUrl, saveWallpaperToDevice } from "@/lib/native-wallpaper";
+import {
+  isNative,
+  resolveDownloadUrl,
+  saveWallpaperToDevice,
+  type WallpaperTarget,
+} from "@/lib/native-wallpaper";
 
 export const Route = createFileRoute("/wallpaper/$id")({
   loader: ({ params }) => {
@@ -49,23 +54,37 @@ function WallpaperDetail() {
   const router = useRouter();
   const { isFavorite, toggleFavorite, apply, appliedId } = useAppState();
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
+  const [activeTarget, setActiveTarget] = useState<WallpaperTarget | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const isDownloaded = appliedId === wp.id;
   const fav = isFavorite(wp.id);
 
-  async function handleDownload() {
+  const targetLabels: Record<WallpaperTarget, string> = {
+    home: "Pantalla de inicio",
+    lock: "Pantalla de bloqueo",
+    both: "Inicio y bloqueo",
+  };
+
+  async function handleApply(target: WallpaperTarget) {
     const fileName = `aetherx-${wp.id}.mp4`;
     try {
+      setActiveTarget(target);
       setDownloadState("downloading");
 
       if (await isNative()) {
-        const result = await saveWallpaperToDevice(wp.video, fileName);
+        const result = await saveWallpaperToDevice(wp.video, fileName, target);
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
+        const successMsg =
+          target === "lock"
+            ? "✓ Fondo aplicado en pantalla de bloqueo"
+            : target === "both"
+              ? "✓ Aplicado en inicio y bloqueo"
+              : "✓ Fondo animado aplicado en Inicio";
         setToast(
           result.needsPicker
             ? "✓ Pulsa Aplicar y elige Pantalla de inicio"
-            : "✓ Fondo animado aplicado en Inicio",
+            : successMsg,
         );
       } else {
         // Navegador: descarga clásica del video
@@ -86,11 +105,15 @@ function WallpaperDetail() {
       apply(wp.id);
       setDownloadState("done");
       setTimeout(() => setToast(null), 2600);
-      setTimeout(() => setDownloadState("idle"), 1800);
+      setTimeout(() => {
+        setDownloadState("idle");
+        setActiveTarget(null);
+      }, 1800);
     } catch (err) {
       console.error(err);
       setDownloadState("idle");
-      setToast("No se pudo descargar. Inténtalo de nuevo.");
+      setActiveTarget(null);
+      setToast("No se pudo aplicar. Inténtalo de nuevo.");
       setTimeout(() => setToast(null), 2600);
     }
   }
@@ -166,30 +189,45 @@ function WallpaperDetail() {
             <Stat label="Audio" value={wp.sound ? "Espacial" : "Silencio"} />
           </dl>
 
-          <button
-            type="button"
-            onClick={handleDownload}
-            disabled={downloadState === "downloading"}
-            className={`mt-5 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-bold uppercase tracking-[0.18em] transition ${
-              isDownloaded
-                ? "bg-electric-blue/15 text-electric-blue ring-1 ring-electric-blue/40"
-                : "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
-            } disabled:opacity-70`}
-          >
-            {downloadState === "downloading" ? (
-              "Descargando..."
-            ) : downloadState === "done" || isDownloaded ? (
-              <>
-                <Check className="size-4" strokeWidth={3} />
-                Descargado
-              </>
-            ) : (
-              <>
-                <Download className="size-4" />
-                Aplicar en Inicio
-              </>
+          <div className="mt-5 grid gap-2">
+            {(["home", "lock", "both"] as WallpaperTarget[]).map((target) => {
+              const isActive = activeTarget === target;
+              const Icon = target === "home" ? Home : target === "lock" ? Lock : Layers;
+              const isPrimary = target === "both";
+              return (
+                <button
+                  key={target}
+                  type="button"
+                  onClick={() => handleApply(target)}
+                  disabled={downloadState === "downloading"}
+                  className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[12px] font-bold uppercase tracking-[0.18em] transition disabled:opacity-60 ${
+                    isPrimary
+                      ? "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
+                      : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  }`}
+                >
+                  {isActive && downloadState === "downloading" ? (
+                    "Aplicando..."
+                  ) : isActive && downloadState === "done" ? (
+                    <>
+                      <Check className="size-4" strokeWidth={3} />
+                      Aplicado
+                    </>
+                  ) : (
+                    <>
+                      <Icon className="size-4" />
+                      Establecer en {targetLabels[target]}
+                    </>
+                  )}
+                </button>
+              );
+            })}
+            {isDownloaded && (
+              <p className="mt-1 text-center text-[10px] uppercase tracking-[0.25em] text-electric-blue/80">
+                Último aplicado
+              </p>
             )}
-          </button>
+          </div>
 
           {wp.sound && (
             <div className="mt-4 flex items-center gap-2 text-[11px] text-white/45">
