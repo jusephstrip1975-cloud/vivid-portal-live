@@ -126,7 +126,10 @@ public class AetherXVideoWallpaperService extends WallpaperService {
         }
 
         private void stopVideo() {
-            if (mediaPlayer == null) return;
+            if (mediaPlayer == null) {
+                activeSurface = null;
+                return;
+            }
             prepared = false;
             try {
                 mediaPlayer.stop();
@@ -135,6 +138,7 @@ public class AetherXVideoWallpaperService extends WallpaperService {
                 mediaPlayer.release();
             } catch (Exception ignored) {}
             mediaPlayer = null;
+            activeSurface = null;
         }
     }
 }
