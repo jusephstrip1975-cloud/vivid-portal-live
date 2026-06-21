@@ -74,6 +74,25 @@ function WallpaperDetail() {
       setDownloadState("downloading");
 
       if (await isNative()) {
+        // Verificación previa de compatibilidad (solo bloquea si el destino requiere Live Wallpaper)
+        const compat = await checkWallpaperCompatibility();
+        if (compat) {
+          const needsLive = target === "home" || target === "both";
+          if (needsLive && !compat.canApplyHome && compat.reason !== "no-video") {
+            setDownloadState("idle");
+            setActiveTarget(null);
+            setToast(`⚠ ${compat.message}`);
+            setTimeout(() => setToast(null), 3600);
+            return;
+          }
+          if (target === "lock" && !compat.canApplyLock) {
+            setDownloadState("idle");
+            setActiveTarget(null);
+            setToast(`⚠ ${compat.message}`);
+            setTimeout(() => setToast(null), 3600);
+            return;
+          }
+        }
         const result = await saveWallpaperToDevice(wp.video, fileName, target);
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
         const successMsg =
