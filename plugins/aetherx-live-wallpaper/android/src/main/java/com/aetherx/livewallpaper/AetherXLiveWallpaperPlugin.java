@@ -35,9 +35,8 @@ import java.net.URL;
 public class AetherXLiveWallpaperPlugin extends Plugin {
     static final String VIDEO_FILE = "aetherx-live-wallpaper.mp4";
     private static final String DEFAULT_MP4_MIME = "video/mp4";
-    private static final String CAMERA_GALLERY_PATH = Environment.DIRECTORY_DCIM + "/Camera";
-    private static final String AETHERX_GALLERY_PATH = Environment.DIRECTORY_PICTURES + "/AetherX";
-    private static final String AETHERX_DOWNLOADS_PATH = Environment.DIRECTORY_DOWNLOADS + "/AetherX";
+    private static final String CAMERA_GALLERY_PATH = Environment.DIRECTORY_DCIM + "/Camera/";
+    private static final String AETHERX_GALLERY_PATH = Environment.DIRECTORY_MOVIES + "/AetherX/";
 
     @PluginMethod
     public void saveVideoFromUrl(PluginCall call) {
@@ -286,8 +285,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             Uri uri = insertGalleryVideo(source, visibleName, mimeType, CAMERA_GALLERY_PATH, metadata);
-            // Samsung's wallpaper/gallery picker refreshes Camera/DCIM faster when the item is also touched by the scanner.
-            MediaScannerConnection.scanFile(getContext(), new String[] { uri.toString() }, new String[] { mimeType }, null);
+            // Secondary indexed copy: some Android/Samsung pickers read the Video album, others prioritize Camera/DCIM.
+            try {
+                insertGalleryVideo(source, "AetherX-" + visibleName, mimeType, AETHERX_GALLERY_PATH, metadata);
+            } catch (Exception ignored) {}
             return uri.toString();
         }
 
