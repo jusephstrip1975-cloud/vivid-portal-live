@@ -5,6 +5,7 @@ import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
 import {
+  checkWallpaperCompatibility,
   isNative,
   resolveDownloadUrl,
   saveWallpaperToDevice,
