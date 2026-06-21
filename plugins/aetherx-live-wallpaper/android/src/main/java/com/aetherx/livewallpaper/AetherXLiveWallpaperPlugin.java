@@ -6,6 +6,7 @@ import android.app.WallpaperManager;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.ComponentName;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -210,16 +211,26 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
 
             ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
-            manager.setWallpaperComponent(service);
+            boolean openedPicker = false;
+            try {
+                manager.setWallpaperComponent(service);
+            } catch (Throwable ignored) {
+                openedPicker = launchLiveWallpaperPreview(service);
+            }
 
             WallpaperInfo info = manager.getWallpaperInfo();
             boolean verified = info != null
                 && getContext().getPackageName().equals(info.getPackageName())
                 && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
+            if (!verified && !openedPicker) {
+                openedPicker = launchLiveWallpaperPreview(service);
+            }
 
             JSObject result = new JSObject();
-            result.put("applied", true);
+            result.put("applied", verified);
             result.put("verified", verified);
+            result.put("openedPicker", openedPicker);
+            result.put("needsConfirmation", openedPicker && !verified);
             call.resolve(result);
         } catch (Exception e) {
             call.reject("live-wallpaper-home-apply-failed", e);
@@ -264,7 +275,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
             WallpaperManager manager = WallpaperManager.getInstance(getContext());
             ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
-            manager.setWallpaperComponent(service);
+            boolean openedPicker = false;
+            try {
+                manager.setWallpaperComponent(service);
+            } catch (Throwable ignored) {
+                openedPicker = launchLiveWallpaperPreview(service);
+            }
 
             boolean lockApplied = false;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -283,11 +299,16 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             boolean verifiedHome = info != null
                 && getContext().getPackageName().equals(info.getPackageName())
                 && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
+            if (!verifiedHome && !openedPicker) {
+                openedPicker = launchLiveWallpaperPreview(service);
+            }
 
             JSObject result = new JSObject();
-            result.put("applied", true);
+            result.put("applied", verifiedHome || lockApplied || openedPicker);
             result.put("homeVerified", verifiedHome);
             result.put("lockApplied", lockApplied);
+            result.put("openedPicker", openedPicker);
+            result.put("needsConfirmation", openedPicker && !verifiedHome);
             call.resolve(result);
         } catch (Exception e) {
             call.reject("both-wallpaper-apply-failed", e);
@@ -312,10 +333,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public void openPicker(PluginCall call) {
         try {
             ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
-            Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
-            intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, service);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getActivity().startActivity(intent);
+            launchLiveWallpaperPreview(service);
 
             JSObject result = new JSObject();
             result.put("opened", true);
