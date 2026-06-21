@@ -415,7 +415,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     @PluginMethod
     public void openPicker(PluginCall call) {
         try {
-            ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
+            ComponentName service = getLiveWallpaperComponent();
+            if (!isLiveWallpaperServiceRegistered(service)) {
+                call.reject("live-wallpaper-service-not-registered");
+                return;
+            }
             boolean opened = launchLiveWallpaperPreview(service);
             if (!opened) {
                 call.reject("live-wallpaper-picker-unavailable");
