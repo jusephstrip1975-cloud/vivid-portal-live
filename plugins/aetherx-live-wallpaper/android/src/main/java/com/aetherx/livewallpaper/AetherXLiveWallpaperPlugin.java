@@ -289,12 +289,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             values.put(MediaStore.Video.Media.DATE_MODIFIED, nowSeconds);
             values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
             resolver.update(uri, values, null, null);
-            MediaScannerConnection.scanFile(
-                getContext(),
-                new String[] { uri.toString() },
-                new String[] { "video/mp4" },
-                null
-            );
+            resolver.notifyChange(uri, null);
             return uri.toString();
         }
 
