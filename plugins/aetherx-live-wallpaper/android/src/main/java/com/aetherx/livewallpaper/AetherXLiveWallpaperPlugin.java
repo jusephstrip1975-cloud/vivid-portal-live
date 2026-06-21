@@ -299,7 +299,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
             resolver.update(uri, values, null, null);
             resolver.notifyChange(uri, null);
-            MediaScannerConnection.scanFile(getContext(), new String[] { uri.toString() }, new String[] { mimeType }, null);
+            Intent scanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri);
+            getContext().sendBroadcast(scanIntent);
             return uri.toString();
         }
 
@@ -318,6 +319,27 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             null
         );
         return Uri.fromFile(destination).toString();
+    }
+
+    private String getDisplayName(ContentResolver resolver, Uri uri) {
+        try (Cursor cursor = resolver.query(uri, new String[] { OpenableColumns.DISPLAY_NAME }, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (index >= 0) return cursor.getString(index);
+            }
+        } catch (Exception ignored) {}
+        return "aetherx-video-importado.mp4";
+    }
+
+    private String normalizeMimeType(String mimeType, String fileName) {
+        String lower = fileName == null ? "" : fileName.toLowerCase();
+        if (mimeType != null && mimeType.startsWith("video/")) return mimeType;
+        if (lower.endsWith(".mov")) return "video/quicktime";
+        if (lower.endsWith(".mkv")) return "video/x-matroska";
+        if (lower.endsWith(".webm")) return "video/webm";
+        if (lower.endsWith(".avi")) return "video/x-msvideo";
+        if (lower.endsWith(".3gp")) return "video/3gpp";
+        return DEFAULT_MP4_MIME;
     }
 
     private void assertPlayableVideo(File file) throws Exception {
