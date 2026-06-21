@@ -1,5 +1,6 @@
 package com.aetherx.livewallpaper;
 
+import android.app.Activity;
 import android.app.WallpaperInfo;
 import android.app.WallpaperManager;
 import android.content.ContentResolver;
@@ -12,10 +13,12 @@ import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
+import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileInputStream;
@@ -92,6 +95,77 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             resolveSaved(call, file, bytes.length, galleryUri);
         } catch (Exception e) {
             call.reject("video-save-failed", e);
+        }
+    }
+
+    /**
+     * Abre el explorador de archivos COMPLETO del sistema (Storage Access Framework)
+     * para que el usuario pueda navegar TODAS las carpetas del dispositivo
+     * (Download, DCIM, Movies, WhatsApp, Telegram, etc.) y elegir cualquier
+     * vídeo en cualquier formato (mp4, mov, mkv, webm, avi, 3gp...).
+     */
+    @PluginMethod
+    public void pickVideoFromDevice(PluginCall call) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("video/*");
+            intent.putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                new String[] {
+                    "video/mp4",
+                    "video/quicktime",
+                    "video/x-matroska",
+                    "video/webm",
+                    "video/x-msvideo",
+                    "video/3gpp",
+                    "video/*"
+                }
+            );
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            Intent chooser = Intent.createChooser(intent, "Elige un vídeo");
+            startActivityForResult(call, chooser, "handlePickedVideo");
+        } catch (Exception e) {
+            call.reject("pick-video-failed", e);
+        }
+    }
+
+    @ActivityCallback
+    private void handlePickedVideo(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result == null || result.getResultCode() != Activity.RESULT_OK || result.getData() == null) {
+            call.reject("pick-video-cancelled");
+            return;
+        }
+        Uri uri = result.getData().getData();
+        if (uri == null) {
+            call.reject("pick-video-no-uri");
+            return;
+        }
+
+        try {
+            ContentResolver resolver = getContext().getContentResolver();
+            File destination = new File(getContext().getFilesDir(), VIDEO_FILE);
+            int total = 0;
+            byte[] buffer = new byte[8192];
+            try (InputStream input = resolver.openInputStream(uri);
+                 FileOutputStream output = new FileOutputStream(destination, false)) {
+                if (input == null) throw new IllegalStateException("cannot-open-input");
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, read);
+                    total += read;
+                }
+            }
+
+            JSObject obj = new JSObject();
+            obj.put("path", destination.getAbsolutePath());
+            obj.put("bytes", total);
+            obj.put("sourceUri", uri.toString());
+            call.resolve(obj);
+        } catch (Exception e) {
+            call.reject("pick-video-copy-failed", e);
         }
     }
 
