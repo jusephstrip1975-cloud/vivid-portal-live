@@ -189,30 +189,45 @@ function WallpaperDetail() {
             <Stat label="Audio" value={wp.sound ? "Espacial" : "Silencio"} />
           </dl>
 
-          <button
-            type="button"
-            onClick={handleDownload}
-            disabled={downloadState === "downloading"}
-            className={`mt-5 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-bold uppercase tracking-[0.18em] transition ${
-              isDownloaded
-                ? "bg-electric-blue/15 text-electric-blue ring-1 ring-electric-blue/40"
-                : "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
-            } disabled:opacity-70`}
-          >
-            {downloadState === "downloading" ? (
-              "Descargando..."
-            ) : downloadState === "done" || isDownloaded ? (
-              <>
-                <Check className="size-4" strokeWidth={3} />
-                Descargado
-              </>
-            ) : (
-              <>
-                <Download className="size-4" />
-                Aplicar en Inicio
-              </>
+          <div className="mt-5 grid gap-2">
+            {(["home", "lock", "both"] as WallpaperTarget[]).map((target) => {
+              const isActive = activeTarget === target;
+              const Icon = target === "home" ? Home : target === "lock" ? Lock : Layers;
+              const isPrimary = target === "both";
+              return (
+                <button
+                  key={target}
+                  type="button"
+                  onClick={() => handleApply(target)}
+                  disabled={downloadState === "downloading"}
+                  className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[12px] font-bold uppercase tracking-[0.18em] transition disabled:opacity-60 ${
+                    isPrimary
+                      ? "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
+                      : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  }`}
+                >
+                  {isActive && downloadState === "downloading" ? (
+                    "Aplicando..."
+                  ) : isActive && downloadState === "done" ? (
+                    <>
+                      <Check className="size-4" strokeWidth={3} />
+                      Aplicado
+                    </>
+                  ) : (
+                    <>
+                      <Icon className="size-4" />
+                      Establecer en {targetLabels[target]}
+                    </>
+                  )}
+                </button>
+              );
+            })}
+            {isDownloaded && (
+              <p className="mt-1 text-center text-[10px] uppercase tracking-[0.25em] text-electric-blue/80">
+                Último aplicado
+              </p>
             )}
-          </button>
+          </div>
 
           {wp.sound && (
             <div className="mt-4 flex items-center gap-2 text-[11px] text-white/45">
