@@ -35,6 +35,8 @@ import java.net.URL;
 public class AetherXLiveWallpaperPlugin extends Plugin {
     static final String VIDEO_FILE = "aetherx-live-wallpaper.mp4";
     private static final String DEFAULT_MP4_MIME = "video/mp4";
+    private static final String CAMERA_GALLERY_PATH = Environment.DIRECTORY_DCIM + "/Camera/";
+    private static final String AETHERX_GALLERY_PATH = Environment.DIRECTORY_MOVIES + "/AetherX/";
 
     @PluginMethod
     public void saveVideoFromUrl(PluginCall call) {
@@ -254,6 +256,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         call.resolve(result);
     }
 
+    private static class VideoMetadata {
+        long size;
+        long durationMs;
+        int width;
+        int height;
+    }
+
     private String normalizeFileName(String fileName) {
         String name = fileName == null ? "" : fileName.trim();
         if (name.length() == 0) name = "aetherx-live-wallpaper.mp4";
@@ -271,51 +280,22 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private String saveToGallery(File source, String fileName, String mimeType) throws Exception {
-        final long nowMillis = System.currentTimeMillis();
-        final long nowSeconds = nowMillis / 1000;
-        final String title = fileName.replaceFirst("(?i)\\.[^.]+$", "");
+        VideoMetadata metadata = readVideoMetadata(source);
+        String visibleName = makeFreshGalleryName(fileName);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ContentResolver resolver = getContext().getContentResolver();
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.Video.Media.TITLE, title);
-            values.put(MediaStore.Video.Media.DISPLAY_NAME, fileName);
-            values.put(MediaStore.Video.Media.MIME_TYPE, mimeType);
-            values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AetherX");
-            values.put(MediaStore.Video.Media.DATE_ADDED, nowSeconds);
-            values.put(MediaStore.Video.Media.DATE_MODIFIED, nowSeconds);
-            values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
-            values.put(MediaStore.Video.Media.IS_PENDING, 1);
-
-            Uri collection = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                ? MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                : MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
-            Uri uri = resolver.insert(collection, values);
-            if (uri == null) throw new IllegalStateException("gallery-insert-failed");
-
-            try (OutputStream output = resolver.openOutputStream(uri)) {
-                if (output == null) throw new IllegalStateException("gallery-output-failed");
-                copyFile(source, output);
-            } catch (Exception e) {
-                resolver.delete(uri, null, null);
-                throw e;
-            }
-
-            values.clear();
-            values.put(MediaStore.Video.Media.IS_PENDING, 0);
-            values.put(MediaStore.Video.Media.DATE_ADDED, nowSeconds);
-            values.put(MediaStore.Video.Media.DATE_MODIFIED, nowSeconds);
-            values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
-            resolver.update(uri, values, null, null);
-            resolver.notifyChange(uri, null);
-            Intent scanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri);
-            getContext().sendBroadcast(scanIntent);
+            Uri uri = insertGalleryVideo(source, visibleName, mimeType, CAMERA_GALLERY_PATH, metadata);
+            // Secondary indexed copy: some Android/Samsung pickers read the Video album, others prioritize Camera/DCIM.
+            try {
+                insertGalleryVideo(source, "AetherX-" + visibleName, mimeType, AETHERX_GALLERY_PATH, metadata);
+            } catch (Exception ignored) {}
             return uri.toString();
         }
 
-        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "AetherX");
-        if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("gallery-directory-failed");
+        File cameraDir = Environment.getExternalStoragePublicDirectory(CAMERA_GALLERY_PATH);
+        if (!cameraDir.exists() && !cameraDir.mkdirs()) throw new IllegalStateException("gallery-directory-failed");
 
-        File destination = new File(dir, fileName);
+        File destination = new File(cameraDir, visibleName);
         try (FileOutputStream output = new FileOutputStream(destination, false)) {
             copyFile(source, output);
         }
@@ -324,9 +304,56 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             getContext(),
             new String[] { destination.getAbsolutePath() },
             new String[] { mimeType },
-            null
+            (path, uri) -> {
+                if (uri != null) getContext().getContentResolver().notifyChange(uri, null);
+            }
         );
         return Uri.fromFile(destination).toString();
+    }
+
+    private Uri insertGalleryVideo(File source, String fileName, String mimeType, String relativePath, VideoMetadata metadata) throws Exception {
+        final long nowMillis = System.currentTimeMillis();
+        final long nowSeconds = nowMillis / 1000;
+        final String title = fileName.replaceFirst("(?i)\\.[^.]+$", "");
+        ContentResolver resolver = getContext().getContentResolver();
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Video.Media.TITLE, title);
+        values.put(MediaStore.Video.Media.DISPLAY_NAME, fileName);
+        values.put(MediaStore.Video.Media.MIME_TYPE, mimeType);
+        values.put(MediaStore.Video.Media.RELATIVE_PATH, relativePath);
+        values.put(MediaStore.Video.Media.DATE_ADDED, nowSeconds);
+        values.put(MediaStore.Video.Media.DATE_MODIFIED, nowSeconds);
+        values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
+        values.put(MediaStore.Video.Media.SIZE, metadata.size);
+        values.put(MediaStore.Video.Media.DURATION, metadata.durationMs);
+        if (metadata.width > 0) values.put(MediaStore.Video.Media.WIDTH, metadata.width);
+        if (metadata.height > 0) values.put(MediaStore.Video.Media.HEIGHT, metadata.height);
+        values.put(MediaStore.Video.Media.IS_PENDING, 1);
+
+        Uri collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+        Uri uri = resolver.insert(collection, values);
+        if (uri == null) throw new IllegalStateException("gallery-insert-failed");
+
+        try (OutputStream output = resolver.openOutputStream(uri, "w")) {
+            if (output == null) throw new IllegalStateException("gallery-output-failed");
+            copyFile(source, output);
+            output.flush();
+        } catch (Exception e) {
+            resolver.delete(uri, null, null);
+            throw e;
+        }
+
+        values.clear();
+        values.put(MediaStore.Video.Media.IS_PENDING, 0);
+        values.put(MediaStore.Video.Media.DATE_ADDED, nowSeconds);
+        values.put(MediaStore.Video.Media.DATE_MODIFIED, nowSeconds);
+        values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
+        values.put(MediaStore.Video.Media.SIZE, metadata.size);
+        values.put(MediaStore.Video.Media.DURATION, metadata.durationMs);
+        resolver.update(uri, values, null, null);
+        resolver.notifyChange(uri, null);
+        getContext().sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri));
+        return uri;
     }
 
     private String getDisplayName(ContentResolver resolver, Uri uri) {
@@ -348,6 +375,47 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         if (lower.endsWith(".avi")) return "video/x-msvideo";
         if (lower.endsWith(".3gp")) return "video/3gpp";
         return DEFAULT_MP4_MIME;
+    }
+
+    private String makeFreshGalleryName(String fileName) {
+        String normalized = normalizeFileName(fileName);
+        String base = normalized.replaceFirst("(?i)\\.[^.]+$", "");
+        String ext = ".mp4";
+        int dot = normalized.lastIndexOf('.');
+        if (dot >= 0) ext = normalized.substring(dot);
+        return base + "-" + System.currentTimeMillis() + ext;
+    }
+
+    private VideoMetadata readVideoMetadata(File file) throws Exception {
+        VideoMetadata metadata = new VideoMetadata();
+        metadata.size = file.length();
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(file.getAbsolutePath());
+            metadata.durationMs = parseLong(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
+            metadata.width = parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+            metadata.height = parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+            if (metadata.durationMs <= 0) throw new IllegalStateException("invalid-video-duration");
+        } finally {
+            retriever.release();
+        }
+        return metadata;
+    }
+
+    private long parseLong(String value) {
+        try {
+            return value == null ? 0 : Long.parseLong(value);
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
+    private int parseInt(String value) {
+        try {
+            return value == null ? 0 : Integer.parseInt(value);
+        } catch (Exception ignored) {
+            return 0;
+        }
     }
 
     private void assertPlayableVideo(File file) throws Exception {
