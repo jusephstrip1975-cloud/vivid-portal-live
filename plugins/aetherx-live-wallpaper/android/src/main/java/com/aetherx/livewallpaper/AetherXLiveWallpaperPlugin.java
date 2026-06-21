@@ -8,6 +8,7 @@ import android.content.ContentValues;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
