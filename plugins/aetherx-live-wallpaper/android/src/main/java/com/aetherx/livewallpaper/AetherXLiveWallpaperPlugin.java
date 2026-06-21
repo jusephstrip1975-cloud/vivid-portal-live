@@ -329,11 +329,36 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
     }
 
+    private boolean launchLiveWallpaperPreview(ComponentName service) {
+        try {
+            Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+            intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, service);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            return true;
+        } catch (ActivityNotFoundException firstFailure) {
+            try {
+                Intent chooser = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(chooser);
+                return true;
+            } catch (Exception ignored) {
+                return false;
+            }
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     @PluginMethod
     public void openPicker(PluginCall call) {
         try {
             ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
-            launchLiveWallpaperPreview(service);
+            boolean opened = launchLiveWallpaperPreview(service);
+            if (!opened) {
+                call.reject("live-wallpaper-picker-unavailable");
+                return;
+            }
 
             JSObject result = new JSObject();
             result.put("opened", true);
