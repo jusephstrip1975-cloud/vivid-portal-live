@@ -376,6 +376,47 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         return DEFAULT_MP4_MIME;
     }
 
+    private String makeFreshGalleryName(String fileName) {
+        String normalized = normalizeFileName(fileName);
+        String base = normalized.replaceFirst("(?i)\\.[^.]+$", "");
+        String ext = ".mp4";
+        int dot = normalized.lastIndexOf('.');
+        if (dot >= 0) ext = normalized.substring(dot);
+        return base + "-" + System.currentTimeMillis() + ext;
+    }
+
+    private VideoMetadata readVideoMetadata(File file) throws Exception {
+        VideoMetadata metadata = new VideoMetadata();
+        metadata.size = file.length();
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(file.getAbsolutePath());
+            metadata.durationMs = parseLong(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
+            metadata.width = parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+            metadata.height = parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+            if (metadata.durationMs <= 0) throw new IllegalStateException("invalid-video-duration");
+        } finally {
+            retriever.release();
+        }
+        return metadata;
+    }
+
+    private long parseLong(String value) {
+        try {
+            return value == null ? 0 : Long.parseLong(value);
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
+    private int parseInt(String value) {
+        try {
+            return value == null ? 0 : Integer.parseInt(value);
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
     private void assertPlayableVideo(File file) throws Exception {
         if (!file.exists() || file.length() == 0) throw new IllegalStateException("empty-video-file");
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
