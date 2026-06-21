@@ -7,6 +7,7 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.media.MediaMetadataRetriever;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
@@ -66,6 +67,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     }
                 }
 
+                assertPlayableVideo(file);
+
                 String galleryUri = saveToGallery(file, fileName);
                 resolveSaved(call, file, total, galleryUri);
             } catch (Exception e) {
@@ -91,6 +94,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 output.write(bytes);
             }
 
+            assertPlayableVideo(file);
             String galleryUri = saveToGallery(file, normalizeFileName(call.getString("fileName")));
             resolveSaved(call, file, bytes.length, galleryUri);
         } catch (Exception e) {
@@ -159,10 +163,14 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 }
             }
 
+            assertPlayableVideo(destination);
+            String galleryUri = saveToGallery(destination, "aetherx-video-importado.mp4");
+
             JSObject obj = new JSObject();
             obj.put("path", destination.getAbsolutePath());
             obj.put("bytes", total);
             obj.put("sourceUri", uri.toString());
+            obj.put("galleryUri", galleryUri);
             call.resolve(obj);
         } catch (Exception e) {
             call.reject("pick-video-copy-failed", e);
