@@ -262,22 +262,26 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         return name;
     }
 
-    private String saveToGallery(File source, String fileName) throws Exception {
+    private String saveToGallery(File source, String fileName, String mimeType) throws Exception {
         final long nowMillis = System.currentTimeMillis();
         final long nowSeconds = nowMillis / 1000;
+        final String title = fileName.replaceFirst("(?i)\\.[^.]+$", "");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ContentResolver resolver = getContext().getContentResolver();
             ContentValues values = new ContentValues();
-            values.put(MediaStore.Video.Media.TITLE, fileName.replaceFirst("(?i)\\.mp4$", ""));
+            values.put(MediaStore.Video.Media.TITLE, title);
             values.put(MediaStore.Video.Media.DISPLAY_NAME, fileName);
-            values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
-            values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/AetherX");
+            values.put(MediaStore.Video.Media.MIME_TYPE, mimeType);
+            values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AetherX");
             values.put(MediaStore.Video.Media.DATE_ADDED, nowSeconds);
             values.put(MediaStore.Video.Media.DATE_MODIFIED, nowSeconds);
             values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
             values.put(MediaStore.Video.Media.IS_PENDING, 1);
 
-            Uri uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+            Uri collection = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                ? MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                : MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
+            Uri uri = resolver.insert(collection, values);
             if (uri == null) throw new IllegalStateException("gallery-insert-failed");
 
             try (OutputStream output = resolver.openOutputStream(uri)) {
@@ -295,10 +299,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
             resolver.update(uri, values, null, null);
             resolver.notifyChange(uri, null);
+            MediaScannerConnection.scanFile(getContext(), new String[] { uri.toString() }, new String[] { mimeType }, null);
             return uri.toString();
         }
 
-        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "AetherX");
+        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "AetherX");
         if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("gallery-directory-failed");
 
         File destination = new File(dir, fileName);
@@ -309,7 +314,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         MediaScannerConnection.scanFile(
             getContext(),
             new String[] { destination.getAbsolutePath() },
-            new String[] { "video/mp4" },
+            new String[] { mimeType },
             null
         );
         return Uri.fromFile(destination).toString();
