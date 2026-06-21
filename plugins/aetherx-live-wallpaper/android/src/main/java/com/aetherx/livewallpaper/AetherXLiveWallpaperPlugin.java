@@ -258,12 +258,18 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private String saveToGallery(File source, String fileName) throws Exception {
+        final long nowMillis = System.currentTimeMillis();
+        final long nowSeconds = nowMillis / 1000;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ContentResolver resolver = getContext().getContentResolver();
             ContentValues values = new ContentValues();
+            values.put(MediaStore.Video.Media.TITLE, fileName.replaceFirst("(?i)\\.mp4$", ""));
             values.put(MediaStore.Video.Media.DISPLAY_NAME, fileName);
             values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
             values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/AetherX");
+            values.put(MediaStore.Video.Media.DATE_ADDED, nowSeconds);
+            values.put(MediaStore.Video.Media.DATE_MODIFIED, nowSeconds);
+            values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
             values.put(MediaStore.Video.Media.IS_PENDING, 1);
 
             Uri uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
@@ -279,7 +285,16 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
             values.clear();
             values.put(MediaStore.Video.Media.IS_PENDING, 0);
+            values.put(MediaStore.Video.Media.DATE_ADDED, nowSeconds);
+            values.put(MediaStore.Video.Media.DATE_MODIFIED, nowSeconds);
+            values.put(MediaStore.Video.Media.DATE_TAKEN, nowMillis);
             resolver.update(uri, values, null, null);
+            MediaScannerConnection.scanFile(
+                getContext(),
+                new String[] { uri.toString() },
+                new String[] { "video/mp4" },
+                null
+            );
             return uri.toString();
         }
 
@@ -298,6 +313,18 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             null
         );
         return Uri.fromFile(destination).toString();
+    }
+
+    private void assertPlayableVideo(File file) throws Exception {
+        if (!file.exists() || file.length() == 0) throw new IllegalStateException("empty-video-file");
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(file.getAbsolutePath());
+            String duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            if (duration == null || duration.length() == 0) throw new IllegalStateException("invalid-video-file");
+        } finally {
+            retriever.release();
+        }
     }
 
     private void copyFile(File source, OutputStream output) throws Exception {
