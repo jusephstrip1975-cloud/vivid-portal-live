@@ -7,11 +7,13 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.database.Cursor;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.provider.OpenableColumns;
 import android.provider.MediaStore;
 import android.util.Base64;
 import androidx.activity.result.ActivityResult;
@@ -32,6 +34,7 @@ import java.net.URL;
 @CapacitorPlugin(name = "AetherXLiveWallpaper")
 public class AetherXLiveWallpaperPlugin extends Plugin {
     static final String VIDEO_FILE = "aetherx-live-wallpaper.mp4";
+    private static final String DEFAULT_MP4_MIME = "video/mp4";
 
     @PluginMethod
     public void saveVideoFromUrl(PluginCall call) {
@@ -69,7 +72,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
                 assertPlayableVideo(file);
 
-                String galleryUri = saveToGallery(file, fileName);
+                String galleryUri = saveToGallery(file, fileName, DEFAULT_MP4_MIME);
                 resolveSaved(call, file, total, galleryUri);
             } catch (Exception e) {
                 call.reject("video-download-save-failed", e);
@@ -95,7 +98,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
 
             assertPlayableVideo(file);
-            String galleryUri = saveToGallery(file, normalizeFileName(call.getString("fileName")));
+            String galleryUri = saveToGallery(file, normalizeFileName(call.getString("fileName")), DEFAULT_MP4_MIME);
             resolveSaved(call, file, bytes.length, galleryUri);
         } catch (Exception e) {
             call.reject("video-save-failed", e);
@@ -164,7 +167,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
 
             assertPlayableVideo(destination);
-            String galleryUri = saveToGallery(destination, "aetherx-video-importado.mp4");
+            String sourceMime = resolver.getType(uri);
+            String sourceName = getDisplayName(resolver, uri);
+            String galleryUri = saveToGallery(destination, normalizeFileName(sourceName), normalizeMimeType(sourceMime, sourceName));
 
             JSObject obj = new JSObject();
             obj.put("path", destination.getAbsolutePath());
