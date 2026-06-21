@@ -17,7 +17,7 @@
 
     <application>
         <service
-            android:name=".AetherXVideoWallpaperService"
+            android:name="com.aetherx.livewallpaper.AetherXVideoWallpaperService"
             android:exported="true"
             android:label="AetherX Live Wallpaper"
             android:permission="android.permission.BIND_WALLPAPER">

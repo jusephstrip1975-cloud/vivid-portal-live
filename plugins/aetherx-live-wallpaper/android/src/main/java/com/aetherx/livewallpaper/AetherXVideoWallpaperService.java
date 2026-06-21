@@ -2,6 +2,7 @@ package com.aetherx.livewallpaper;
 
 import android.media.MediaPlayer;
 import android.service.wallpaper.WallpaperService;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import java.io.File;
 
@@ -18,6 +19,7 @@ public class AetherXVideoWallpaperService extends WallpaperService {
         private boolean prepared = false;
         private long loadedLastModified = -1L;
         private long loadedLength = -1L;
+        private Surface activeSurface;
 
         @Override
         public void onSurfaceCreated(SurfaceHolder holder) {
@@ -37,9 +39,9 @@ public class AetherXVideoWallpaperService extends WallpaperService {
 
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
-            surfaceHolder = null;
-            stopVideo();
             super.onSurfaceDestroyed(holder);
+            stopVideo();
+            surfaceHolder = null;
         }
 
         @Override
@@ -63,8 +65,10 @@ public class AetherXVideoWallpaperService extends WallpaperService {
             File file = new File(getApplicationContext().getFilesDir(), AetherXLiveWallpaperPlugin.VIDEO_FILE);
             if (!file.exists() || file.length() == 0) return;
 
-            boolean changed = file.lastModified() != loadedLastModified || file.length() != loadedLength;
-            if (mediaPlayer == null || changed) {
+            Surface surface = surfaceHolder.getSurface();
+            boolean fileChanged = file.lastModified() != loadedLastModified || file.length() != loadedLength;
+            boolean surfaceChanged = activeSurface == null || activeSurface != surface;
+            if (mediaPlayer == null || fileChanged || surfaceChanged) {
                 startVideo(surfaceHolder, file);
                 return;
             }
@@ -84,7 +88,8 @@ public class AetherXVideoWallpaperService extends WallpaperService {
                 mediaPlayer = player;
                 prepared = false;
                 player.setDataSource(file.getAbsolutePath());
-                player.setSurface(holder.getSurface());
+                activeSurface = holder.getSurface();
+                player.setSurface(activeSurface);
                 player.setLooping(true);
                 player.setVolume(0f, 0f);
                 player.setScreenOnWhilePlaying(false);
@@ -121,7 +126,10 @@ public class AetherXVideoWallpaperService extends WallpaperService {
         }
 
         private void stopVideo() {
-            if (mediaPlayer == null) return;
+            if (mediaPlayer == null) {
+                activeSurface = null;
+                return;
+            }
             prepared = false;
             try {
                 mediaPlayer.stop();
@@ -130,6 +138,7 @@ public class AetherXVideoWallpaperService extends WallpaperService {
                 mediaPlayer.release();
             } catch (Exception ignored) {}
             mediaPlayer = null;
+            activeSurface = null;
         }
     }
 }

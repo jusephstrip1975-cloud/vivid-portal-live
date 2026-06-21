@@ -7,6 +7,8 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.media.MediaMetadataRetriever;
@@ -18,6 +20,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.provider.MediaStore;
+import android.service.wallpaper.WallpaperService;
 import android.util.Base64;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
@@ -33,6 +36,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.List;
 
 @CapacitorPlugin(name = "AetherXLiveWallpaper")
 public class AetherXLiveWallpaperPlugin extends Plugin {
@@ -209,18 +213,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 }
             }
 
-            ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
-            boolean openedPicker = false;
-            try {
-                manager.setWallpaperComponent(service);
-            } catch (Throwable ignored) {
-                openedPicker = launchLiveWallpaperPreview(service);
+            ComponentName service = getLiveWallpaperComponent();
+            if (!isLiveWallpaperServiceRegistered(service)) {
+                call.reject("live-wallpaper-service-not-registered");
+                return;
             }
 
-            WallpaperInfo info = manager.getWallpaperInfo();
-            boolean verified = info != null
-                && getContext().getPackageName().equals(info.getPackageName())
-                && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
+            boolean openedPicker = launchLiveWallpaperPreview(service);
+
+            boolean verified = isCurrentLiveWallpaper(manager, service);
             if (!verified && !openedPicker) {
                 openedPicker = launchLiveWallpaperPreview(service);
             }
@@ -273,13 +274,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 return;
             }
             WallpaperManager manager = WallpaperManager.getInstance(getContext());
-            ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
-            boolean openedPicker = false;
-            try {
-                manager.setWallpaperComponent(service);
-            } catch (Throwable ignored) {
-                openedPicker = launchLiveWallpaperPreview(service);
+            ComponentName service = getLiveWallpaperComponent();
+            if (!isLiveWallpaperServiceRegistered(service)) {
+                call.reject("live-wallpaper-service-not-registered");
+                return;
             }
+
+            boolean openedPicker = launchLiveWallpaperPreview(service);
 
             boolean lockApplied = false;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -294,10 +295,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 }
             }
 
-            WallpaperInfo info = manager.getWallpaperInfo();
-            boolean verifiedHome = info != null
-                && getContext().getPackageName().equals(info.getPackageName())
-                && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
+            boolean verifiedHome = isCurrentLiveWallpaper(manager, service);
             if (!verifiedHome && !openedPicker) {
                 openedPicker = launchLiveWallpaperPreview(service);
             }
@@ -328,6 +326,51 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
     }
 
+    private ComponentName getLiveWallpaperComponent() {
+        return new ComponentName(getContext().getPackageName(), AetherXVideoWallpaperService.class.getName());
+    }
+
+    private boolean isCurrentLiveWallpaper(WallpaperManager manager, ComponentName service) {
+        try {
+            WallpaperInfo info = manager.getWallpaperInfo();
+            return info != null
+                && service.getPackageName().equals(info.getPackageName())
+                && service.getClassName().equals(info.getServiceName());
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private boolean isSamsungDevice() {
+        String manufacturer = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER;
+        String brand = Build.BRAND == null ? "" : Build.BRAND;
+        return manufacturer.toLowerCase().contains("samsung") || brand.toLowerCase().contains("samsung");
+    }
+
+    private boolean isLiveWallpaperServiceRegistered(ComponentName service) {
+        PackageManager pm = getContext().getPackageManager();
+        try {
+            if (pm.getServiceInfo(service, 0) == null) return false;
+        } catch (Throwable ignored) {
+            return false;
+        }
+
+        try {
+            Intent intent = new Intent(WallpaperService.SERVICE_INTERFACE);
+            intent.setPackage(service.getPackageName());
+            List<ResolveInfo> services = pm.queryIntentServices(intent, PackageManager.GET_META_DATA | PackageManager.GET_RESOLVED_FILTER);
+            for (ResolveInfo resolved : services) {
+                if (resolved.serviceInfo != null
+                    && service.getPackageName().equals(resolved.serviceInfo.packageName)
+                    && service.getClassName().equals(resolved.serviceInfo.name)
+                    && "android.permission.BIND_WALLPAPER".equals(resolved.serviceInfo.permission)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
     private boolean launchLiveWallpaperPreview(ComponentName service) {
         try {
             Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
@@ -354,7 +397,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     @PluginMethod
     public void openPicker(PluginCall call) {
         try {
-            ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
+            ComponentName service = getLiveWallpaperComponent();
+            if (!isLiveWallpaperServiceRegistered(service)) {
+                call.reject("live-wallpaper-service-not-registered");
+                return;
+            }
             boolean opened = launchLiveWallpaperPreview(service);
             if (!opened) {
                 call.reject("live-wallpaper-picker-unavailable");
@@ -392,21 +439,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         } catch (Throwable ignored) {}
 
         String manufacturer = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER;
-        boolean isSamsung = manufacturer.toLowerCase().contains("samsung");
+        boolean isSamsung = isSamsungDevice();
         int sdk = Build.VERSION.SDK_INT;
         File file = new File(getContext().getFilesDir(), VIDEO_FILE);
         boolean hasVideo = file.exists() && file.length() > 0;
 
-        boolean serviceRegistered = false;
-        try {
-            ComponentName cn = new ComponentName(
-                getContext(),
-                AetherXVideoWallpaperService.class
-            );
-            serviceRegistered = getContext()
-                .getPackageManager()
-                .getServiceInfo(cn, 0) != null;
-        } catch (Throwable ignored) {}
+        ComponentName service = getLiveWallpaperComponent();
+        boolean serviceRegistered = isLiveWallpaperServiceRegistered(service);
 
         boolean canApplyHome = liveWallpaperSupported && wallpaperSupported && setWallpaperAllowed && serviceRegistered;
 
@@ -611,7 +650,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             resolver.notifyChange(MediaStore.Downloads.EXTERNAL_CONTENT_URI, null);
         }
-        getContext().sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri));
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            getContext().sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri));
+        }
 
         try {
             File physicalFile = new File(Environment.getExternalStorageDirectory(), relativePath + fileName);
