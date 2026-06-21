@@ -20,6 +20,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.provider.MediaStore;
+import android.service.wallpaper.WallpaperService;
 import android.util.Base64;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
@@ -452,21 +453,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         } catch (Throwable ignored) {}
 
         String manufacturer = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER;
-        boolean isSamsung = manufacturer.toLowerCase().contains("samsung");
+        boolean isSamsung = isSamsungDevice();
         int sdk = Build.VERSION.SDK_INT;
         File file = new File(getContext().getFilesDir(), VIDEO_FILE);
         boolean hasVideo = file.exists() && file.length() > 0;
 
-        boolean serviceRegistered = false;
-        try {
-            ComponentName cn = new ComponentName(
-                getContext(),
-                AetherXVideoWallpaperService.class
-            );
-            serviceRegistered = getContext()
-                .getPackageManager()
-                .getServiceInfo(cn, 0) != null;
-        } catch (Throwable ignored) {}
+        ComponentName service = getLiveWallpaperComponent();
+        boolean serviceRegistered = isLiveWallpaperServiceRegistered(service);
 
         boolean canApplyHome = liveWallpaperSupported && wallpaperSupported && setWallpaperAllowed && serviceRegistered;
 
