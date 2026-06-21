@@ -35,6 +35,9 @@ import java.net.URL;
 public class AetherXLiveWallpaperPlugin extends Plugin {
     static final String VIDEO_FILE = "aetherx-live-wallpaper.mp4";
     private static final String DEFAULT_MP4_MIME = "video/mp4";
+    private static final String CAMERA_GALLERY_PATH = Environment.DIRECTORY_DCIM + "/Camera";
+    private static final String AETHERX_GALLERY_PATH = Environment.DIRECTORY_PICTURES + "/AetherX";
+    private static final String AETHERX_DOWNLOADS_PATH = Environment.DIRECTORY_DOWNLOADS + "/AetherX";
 
     @PluginMethod
     public void saveVideoFromUrl(PluginCall call) {
@@ -252,6 +255,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         result.put("bytes", bytes);
         result.put("galleryUri", galleryUri);
         call.resolve(result);
+    }
+
+    private static class VideoMetadata {
+        long size;
+        long durationMs;
+        int width;
+        int height;
     }
 
     private String normalizeFileName(String fileName) {
