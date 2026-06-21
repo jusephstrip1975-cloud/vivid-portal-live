@@ -1,10 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, FolderOpen, Sparkles } from "lucide-react";
+import { ArrowUpRight, Check, FolderOpen, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
-import { isNative, pickAndApplyDeviceVideo } from "@/lib/native-wallpaper";
+import {
+  applyPickedVideo,
+  isNative,
+  pickDeviceVideo,
+  type PickedDeviceVideo,
+} from "@/lib/native-wallpaper";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,32 +34,49 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const hero = WALLPAPERS[0];
   const trending = WALLPAPERS.slice(1, 5);
-  const [pickState, setPickState] = useState<"idle" | "loading">("idle");
+  const [pickState, setPickState] = useState<"idle" | "loading" | "applying">("idle");
   const [pickToast, setPickToast] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PickedDeviceVideo | null>(null);
+
+  function showToast(msg: string, ms = 2600) {
+    setPickToast(msg);
+    setTimeout(() => setPickToast(null), ms);
+  }
 
   async function handlePickDeviceVideo() {
     if (!(await isNative())) {
-      setPickToast("Solo disponible en la app de Android");
-      setTimeout(() => setPickToast(null), 2400);
+      showToast("Solo disponible en la app de Android");
       return;
     }
     setPickState("loading");
-    const result = await pickAndApplyDeviceVideo();
+    const result = await pickDeviceVideo();
     setPickState("idle");
     if (!result.ok) {
       if (result.reason !== "cancelled") {
-        setPickToast("No se pudo abrir el explorador de archivos");
-        setTimeout(() => setPickToast(null), 2400);
+        showToast("No se pudo abrir el explorador de archivos");
       }
       return;
     }
-    setPickToast(
+    setPreview(result.video);
+  }
+
+  async function handleConfirmApply() {
+    setPickState("applying");
+    const result = await applyPickedVideo();
+    setPickState("idle");
+    if (!result.ok) {
+      showToast("No se pudo aplicar el fondo");
+      return;
+    }
+    setPreview(null);
+    showToast(
       result.needsPicker
         ? "✓ Pulsa Aplicar y elige Pantalla de inicio"
         : "✓ Fondo animado aplicado",
+      2800,
     );
-    setTimeout(() => setPickToast(null), 2800);
   }
+
 
 
   return (
@@ -241,6 +263,74 @@ function HomePage() {
           </div>
         </Link>
       </section>
+
+      {preview && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-space-black/80 backdrop-blur-md sm:items-center">
+          <div className="glass-card relative w-full max-w-md overflow-hidden rounded-t-[32px] sm:rounded-[32px]">
+            <button
+              type="button"
+              onClick={() => pickState !== "applying" && setPreview(null)}
+              className="absolute right-4 top-4 z-10 flex size-9 items-center justify-center rounded-full bg-space-black/60 backdrop-blur"
+              aria-label="Cerrar previsualización"
+            >
+              <X className="size-4 text-white" />
+            </button>
+            <div className="relative aspect-[9/16] max-h-[65vh] w-full overflow-hidden bg-black">
+              <video
+                src={preview.previewUrl}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="size-full object-cover"
+              />
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-space-black to-transparent" />
+              <div className="absolute left-4 top-4 flex items-center gap-1.5 rounded-full bg-space-black/60 px-3 py-1 backdrop-blur-md">
+                <span className="size-1.5 rounded-full bg-electric-blue animate-shimmer" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-electric-blue">
+                  Previsualización
+                </span>
+              </div>
+            </div>
+            <div className="space-y-3 p-5">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/40">
+                  Vídeo del dispositivo
+                </p>
+                <p className="mt-1 truncate text-sm text-white/70">
+                  {(preview.bytes / (1024 * 1024)).toFixed(1)} MB · Listo para aplicar
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPreview(null)}
+                  disabled={pickState === "applying"}
+                  className="flex-1 rounded-2xl border border-white/10 py-3 text-xs font-bold uppercase tracking-[0.18em] text-white/70 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmApply}
+                  disabled={pickState === "applying"}
+                  className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-electric-blue to-galaxy-purple py-3 text-xs font-bold uppercase tracking-[0.18em] text-white shadow-lg shadow-electric-blue/30 disabled:opacity-60"
+                >
+                  {pickState === "applying" ? (
+                    "Aplicando..."
+                  ) : (
+                    <>
+                      <Check className="size-4" strokeWidth={3} />
+                      Aplicar como fondo 3D
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }
