@@ -23,6 +23,7 @@ public class AetherXVideoWallpaperService extends WallpaperService {
         public void onSurfaceCreated(SurfaceHolder holder) {
             super.onSurfaceCreated(holder);
             surfaceHolder = holder;
+            visible = isVisible();
             startOrResume();
         }
 
@@ -30,6 +31,7 @@ public class AetherXVideoWallpaperService extends WallpaperService {
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
             surfaceHolder = holder;
+            visible = isVisible();
             startOrResume();
         }
 
