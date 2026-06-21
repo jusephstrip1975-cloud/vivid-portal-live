@@ -29,6 +29,33 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const hero = WALLPAPERS[0];
   const trending = WALLPAPERS.slice(1, 5);
+  const [pickState, setPickState] = useState<"idle" | "loading">("idle");
+  const [pickToast, setPickToast] = useState<string | null>(null);
+
+  async function handlePickDeviceVideo() {
+    if (!(await isNative())) {
+      setPickToast("Solo disponible en la app de Android");
+      setTimeout(() => setPickToast(null), 2400);
+      return;
+    }
+    setPickState("loading");
+    const result = await pickAndApplyDeviceVideo();
+    setPickState("idle");
+    if (!result.ok) {
+      if (result.reason !== "cancelled") {
+        setPickToast("No se pudo abrir el explorador de archivos");
+        setTimeout(() => setPickToast(null), 2400);
+      }
+      return;
+    }
+    setPickToast(
+      result.needsPicker
+        ? "✓ Pulsa Aplicar y elige Pantalla de inicio"
+        : "✓ Fondo animado aplicado",
+    );
+    setTimeout(() => setPickToast(null), 2800);
+  }
+
 
   return (
     <div className="relative">
