@@ -8,9 +8,9 @@ export interface AetherXLiveWallpaperPlugin {
     fileName?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
-  applyHome(): Promise<{ applied: boolean; verified: boolean }>;
+  applyHome(): Promise<{ applied: boolean; verified: boolean; openedPicker?: boolean; needsConfirmation?: boolean }>;
   applyLock(): Promise<{ applied: boolean }>;
-  applyBoth(): Promise<{ applied: boolean; homeVerified: boolean; lockApplied: boolean }>;
+  applyBoth(): Promise<{ applied: boolean; homeVerified: boolean; lockApplied: boolean; openedPicker?: boolean; needsConfirmation?: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
   isAvailable(): Promise<{ available: boolean; hasVideo: boolean }>;
   checkCompatibility(): Promise<{

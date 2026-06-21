@@ -13,26 +13,42 @@ public class AetherXVideoWallpaperService extends WallpaperService {
 
     private class VideoEngine extends Engine {
         private MediaPlayer mediaPlayer;
+        private SurfaceHolder surfaceHolder;
+        private boolean visible = false;
+        private boolean prepared = false;
+        private long loadedLastModified = -1L;
+        private long loadedLength = -1L;
 
         @Override
         public void onSurfaceCreated(SurfaceHolder holder) {
             super.onSurfaceCreated(holder);
-            startVideo(holder);
+            surfaceHolder = holder;
+            visible = isVisible();
+            startOrResume();
+        }
+
+        @Override
+        public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            super.onSurfaceChanged(holder, format, width, height);
+            surfaceHolder = holder;
+            visible = isVisible();
+            startOrResume();
         }
 
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
+            surfaceHolder = null;
             stopVideo();
             super.onSurfaceDestroyed(holder);
         }
 
         @Override
         public void onVisibilityChanged(boolean visible) {
-            if (mediaPlayer == null) return;
+            this.visible = visible;
             if (visible) {
-                mediaPlayer.start();
+                startOrResume();
             } else {
-                mediaPlayer.pause();
+                pauseVideo();
             }
         }
 
@@ -42,36 +58,77 @@ public class AetherXVideoWallpaperService extends WallpaperService {
             super.onDestroy();
         }
 
-        private void startVideo(SurfaceHolder holder) {
-            stopVideo();
+        private void startOrResume() {
+            if (!visible || surfaceHolder == null || !surfaceHolder.getSurface().isValid()) return;
             File file = new File(getApplicationContext().getFilesDir(), AetherXLiveWallpaperPlugin.VIDEO_FILE);
             if (!file.exists() || file.length() == 0) return;
 
+            boolean changed = file.lastModified() != loadedLastModified || file.length() != loadedLength;
+            if (mediaPlayer == null || changed) {
+                startVideo(surfaceHolder, file);
+                return;
+            }
+
+            if (prepared) {
+                try {
+                    if (!mediaPlayer.isPlaying()) mediaPlayer.start();
+                } catch (Exception ignored) {}
+            }
+        }
+
+        private void startVideo(SurfaceHolder holder, File file) {
+            stopVideo();
+
             try {
-                mediaPlayer = new MediaPlayer();
-                mediaPlayer.setDataSource(file.getAbsolutePath());
-                mediaPlayer.setSurface(holder.getSurface());
-                mediaPlayer.setLooping(true);
-                mediaPlayer.setVolume(0f, 0f);
-                mediaPlayer.setOnCompletionListener(mp -> {
+                MediaPlayer player = new MediaPlayer();
+                mediaPlayer = player;
+                prepared = false;
+                player.setDataSource(file.getAbsolutePath());
+                player.setSurface(holder.getSurface());
+                player.setLooping(true);
+                player.setVolume(0f, 0f);
+                player.setScreenOnWhilePlaying(false);
+                player.setOnErrorListener((mp, what, extra) -> {
+                    stopVideo();
+                    return true;
+                });
+                player.setOnCompletionListener(mp -> {
                     try {
                         mp.seekTo(0);
-                        mp.start();
+                        if (visible) mp.start();
                     } catch (Exception ignored) {}
                 });
-                mediaPlayer.setOnPreparedListener(MediaPlayer::start);
-                mediaPlayer.prepareAsync();
+                player.setOnPreparedListener(mp -> {
+                    if (mediaPlayer != mp) return;
+                    prepared = true;
+                    loadedLastModified = file.lastModified();
+                    loadedLength = file.length();
+                    if (visible) {
+                        try { mp.start(); } catch (Exception ignored) {}
+                    }
+                });
+                player.prepareAsync();
             } catch (Exception e) {
                 stopVideo();
             }
         }
 
+        private void pauseVideo() {
+            if (mediaPlayer == null || !prepared) return;
+            try {
+                if (mediaPlayer.isPlaying()) mediaPlayer.pause();
+            } catch (Exception ignored) {}
+        }
+
         private void stopVideo() {
             if (mediaPlayer == null) return;
+            prepared = false;
             try {
                 mediaPlayer.stop();
             } catch (Exception ignored) {}
-            mediaPlayer.release();
+            try {
+                mediaPlayer.release();
+            } catch (Exception ignored) {}
             mediaPlayer = null;
         }
     }
