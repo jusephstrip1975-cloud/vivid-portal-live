@@ -151,11 +151,18 @@ export function resolveDownloadUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
 
   const browserOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const capacitorBridge =
+    typeof window !== "undefined"
+      ? (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+      : undefined;
+  const isNativeWebView = capacitorBridge?.isNativePlatform?.() === true;
   const canServeAssets =
+    !isNativeWebView &&
     /^https?:\/\//i.test(browserOrigin) &&
     !browserOrigin.includes("localhost") &&
     !browserOrigin.includes("127.0.0.1");
   const isLocalWebPreview =
+    !isNativeWebView &&
     typeof window !== "undefined" &&
     (browserOrigin.includes("localhost") || browserOrigin.includes("127.0.0.1"));
   const origin = canServeAssets
