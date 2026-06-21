@@ -219,16 +219,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 return;
             }
 
-            boolean openedPicker = false;
-            if (isSamsungDevice()) {
-                openedPicker = launchLiveWallpaperPreview(service);
-            } else {
-                try {
-                    manager.setWallpaperComponent(service);
-                } catch (Throwable ignored) {
-                    openedPicker = launchLiveWallpaperPreview(service);
-                }
-            }
+            boolean openedPicker = launchLiveWallpaperPreview(service);
 
             boolean verified = isCurrentLiveWallpaper(manager, service);
             if (!verified && !openedPicker) {
@@ -289,16 +280,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 return;
             }
 
-            boolean openedPicker = false;
-            if (isSamsungDevice()) {
-                openedPicker = launchLiveWallpaperPreview(service);
-            } else {
-                try {
-                    manager.setWallpaperComponent(service);
-                } catch (Throwable ignored) {
-                    openedPicker = launchLiveWallpaperPreview(service);
-                }
-            }
+            boolean openedPicker = launchLiveWallpaperPreview(service);
 
             boolean lockApplied = false;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
