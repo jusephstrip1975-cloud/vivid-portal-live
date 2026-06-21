@@ -20,7 +20,18 @@ interface LiveWallpaperPlugin {
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string }>;
 }
 
-export async function pickAndApplyDeviceVideo(): Promise<SaveResult> {
+export interface PickedDeviceVideo {
+  path: string;
+  bytes: number;
+  sourceUri: string;
+  /** URL usable directamente en un <video> dentro del WebView. */
+  previewUrl: string;
+}
+
+/** Abre el explorador y copia el vídeo elegido; NO lo aplica todavía. */
+export async function pickDeviceVideo(): Promise<
+  { ok: true; video: PickedDeviceVideo } | { ok: false; reason: string }
+> {
   if (!(await isNative())) return { ok: false, reason: "web" };
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
@@ -28,25 +39,45 @@ export async function pickAndApplyDeviceVideo(): Promise<SaveResult> {
       return { ok: false, reason: "unsupported-platform" };
     }
     const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-    await LiveWallpaper.pickVideoFromDevice();
+    const picked = await LiveWallpaper.pickVideoFromDevice();
+    const previewUrl = Capacitor.convertFileSrc(picked.path);
+    return { ok: true, video: { ...picked, previewUrl } };
+  } catch (err) {
+    const reason = String(err);
+    if (reason.includes("pick-video-cancelled")) return { ok: false, reason: "cancelled" };
+    console.error("pickDeviceVideo failed", err);
+    return { ok: false, reason };
+  }
+}
+
+/** Aplica el último vídeo guardado en filesDir como live wallpaper. */
+export async function applyPickedVideo(): Promise<SaveResult> {
+  if (!(await isNative())) return { ok: false, reason: "web" };
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (Capacitor.getPlatform() !== "android") return { ok: false, reason: "unsupported-platform" };
+    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
     try {
       const applied = await LiveWallpaper.applyHome();
       if (applied.applied && applied.verified) {
         return { ok: true, reason: "android-home-applied" };
       }
     } catch (err) {
-      console.warn("applyHome failed after picking device video", err);
+      console.warn("applyHome failed; opening picker", err);
     }
     await LiveWallpaper.openPicker();
     return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
   } catch (err) {
-    const reason = String(err);
-    if (reason.includes("pick-video-cancelled")) {
-      return { ok: false, reason: "cancelled" };
-    }
-    console.error("pickAndApplyDeviceVideo failed", err);
-    return { ok: false, reason };
+    console.error("applyPickedVideo failed", err);
+    return { ok: false, reason: String(err) };
   }
+}
+
+/** Compatibilidad: pick + apply en un solo paso (sin preview). */
+export async function pickAndApplyDeviceVideo(): Promise<SaveResult> {
+  const picked = await pickDeviceVideo();
+  if (!picked.ok) return { ok: false, reason: picked.reason };
+  return applyPickedVideo();
 }
 
 const PUBLISHED_ASSET_ORIGIN = "https://vivid-portal-live.lovable.app";
