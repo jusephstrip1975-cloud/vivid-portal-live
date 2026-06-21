@@ -334,6 +334,74 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         call.resolve(result);
     }
 
+    @PluginMethod
+    public void checkCompatibility(PluginCall call) {
+        JSObject result = new JSObject();
+        boolean liveWallpaperSupported = getContext()
+            .getPackageManager()
+            .hasSystemFeature("android.software.live_wallpaper");
+        WallpaperManager wm = WallpaperManager.getInstance(getContext());
+        boolean wallpaperSupported = wm.isWallpaperSupported();
+        boolean setWallpaperAllowed = true;
+        try {
+            setWallpaperAllowed = wm.isSetWallpaperAllowed();
+        } catch (Throwable ignored) {}
+
+        String manufacturer = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER;
+        boolean isSamsung = manufacturer.toLowerCase().contains("samsung");
+        int sdk = Build.VERSION.SDK_INT;
+        File file = new File(getContext().getFilesDir(), VIDEO_FILE);
+        boolean hasVideo = file.exists() && file.length() > 0;
+
+        boolean serviceRegistered = false;
+        try {
+            ComponentName cn = new ComponentName(
+                getContext(),
+                AetherXVideoWallpaperService.class
+            );
+            serviceRegistered = getContext()
+                .getPackageManager()
+                .getServiceInfo(cn, 0) != null;
+        } catch (Throwable ignored) {}
+
+        boolean canApplyHome = liveWallpaperSupported && wallpaperSupported && setWallpaperAllowed && serviceRegistered;
+
+        String reason = "ok";
+        String message = "Compatible";
+        if (!liveWallpaperSupported) {
+            reason = "no-live-wallpaper-feature";
+            message = "Tu dispositivo no admite fondos animados (Live Wallpaper).";
+        } else if (!wallpaperSupported) {
+            reason = "wallpaper-not-supported";
+            message = "Este dispositivo no permite cambiar el fondo de pantalla.";
+        } else if (!setWallpaperAllowed) {
+            reason = "wallpaper-blocked";
+            message = "Tu administrador o sistema ha bloqueado el cambio de fondo.";
+        } else if (!serviceRegistered) {
+            reason = "service-missing";
+            message = "El servicio de AetherX Live Wallpaper no está registrado.";
+        } else if (!hasVideo) {
+            reason = "no-video";
+            message = "Primero descarga o selecciona un vídeo.";
+        } else if (isSamsung) {
+            message = "Compatible. En Samsung, elige \"Pantalla de inicio\" en el selector.";
+        }
+
+        result.put("canApplyHome", canApplyHome);
+        result.put("canApplyLock", wallpaperSupported && setWallpaperAllowed);
+        result.put("liveWallpaperSupported", liveWallpaperSupported);
+        result.put("wallpaperSupported", wallpaperSupported);
+        result.put("setWallpaperAllowed", setWallpaperAllowed);
+        result.put("serviceRegistered", serviceRegistered);
+        result.put("hasVideo", hasVideo);
+        result.put("isSamsung", isSamsung);
+        result.put("manufacturer", manufacturer);
+        result.put("sdk", sdk);
+        result.put("reason", reason);
+        result.put("message", message);
+        call.resolve(result);
+    }
+
     private void resolveSaved(PluginCall call, File file, int bytes, String galleryUri) {
         JSObject result = new JSObject();
         result.put("path", file.getAbsolutePath());
