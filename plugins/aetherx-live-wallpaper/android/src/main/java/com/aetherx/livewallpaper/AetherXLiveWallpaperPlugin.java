@@ -7,6 +7,8 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.media.MediaMetadataRetriever;
@@ -33,6 +35,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.List;
 
 @CapacitorPlugin(name = "AetherXLiveWallpaper")
 public class AetherXLiveWallpaperPlugin extends Plugin {
@@ -209,18 +212,24 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 }
             }
 
-            ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
-            boolean openedPicker = false;
-            try {
-                manager.setWallpaperComponent(service);
-            } catch (Throwable ignored) {
-                openedPicker = launchLiveWallpaperPreview(service);
+            ComponentName service = getLiveWallpaperComponent();
+            if (!isLiveWallpaperServiceRegistered(service)) {
+                call.reject("live-wallpaper-service-not-registered");
+                return;
             }
 
-            WallpaperInfo info = manager.getWallpaperInfo();
-            boolean verified = info != null
-                && getContext().getPackageName().equals(info.getPackageName())
-                && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
+            boolean openedPicker = false;
+            if (isSamsungDevice()) {
+                openedPicker = launchLiveWallpaperPreview(service);
+            } else {
+                try {
+                    manager.setWallpaperComponent(service);
+                } catch (Throwable ignored) {
+                    openedPicker = launchLiveWallpaperPreview(service);
+                }
+            }
+
+            boolean verified = isCurrentLiveWallpaper(manager, service);
             if (!verified && !openedPicker) {
                 openedPicker = launchLiveWallpaperPreview(service);
             }
@@ -273,12 +282,21 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 return;
             }
             WallpaperManager manager = WallpaperManager.getInstance(getContext());
-            ComponentName service = new ComponentName(getContext(), AetherXVideoWallpaperService.class);
+            ComponentName service = getLiveWallpaperComponent();
+            if (!isLiveWallpaperServiceRegistered(service)) {
+                call.reject("live-wallpaper-service-not-registered");
+                return;
+            }
+
             boolean openedPicker = false;
-            try {
-                manager.setWallpaperComponent(service);
-            } catch (Throwable ignored) {
+            if (isSamsungDevice()) {
                 openedPicker = launchLiveWallpaperPreview(service);
+            } else {
+                try {
+                    manager.setWallpaperComponent(service);
+                } catch (Throwable ignored) {
+                    openedPicker = launchLiveWallpaperPreview(service);
+                }
             }
 
             boolean lockApplied = false;
@@ -294,10 +312,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 }
             }
 
-            WallpaperInfo info = manager.getWallpaperInfo();
-            boolean verifiedHome = info != null
-                && getContext().getPackageName().equals(info.getPackageName())
-                && AetherXVideoWallpaperService.class.getName().equals(info.getServiceName());
+            boolean verifiedHome = isCurrentLiveWallpaper(manager, service);
             if (!verifiedHome && !openedPicker) {
                 openedPicker = launchLiveWallpaperPreview(service);
             }
