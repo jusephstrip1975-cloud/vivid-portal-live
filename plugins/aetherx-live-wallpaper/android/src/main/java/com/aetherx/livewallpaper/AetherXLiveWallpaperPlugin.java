@@ -36,6 +36,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     static final String VIDEO_FILE = "aetherx-live-wallpaper.mp4";
     private static final String DEFAULT_MP4_MIME = "video/mp4";
     private static final String CAMERA_GALLERY_PATH = Environment.DIRECTORY_DCIM + "/Camera/";
+    private static final String DOWNLOADS_GALLERY_PATH = Environment.DIRECTORY_DOWNLOADS + "/AetherX/";
     private static final String AETHERX_GALLERY_PATH = Environment.DIRECTORY_MOVIES + "/AetherX/";
 
     @PluginMethod
@@ -285,7 +286,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             Uri uri = insertGalleryVideo(source, visibleName, mimeType, CAMERA_GALLERY_PATH, metadata);
-            // Secondary indexed copy: some Android/Samsung pickers read the Video album, others prioritize Camera/DCIM.
+            // Secondary indexed copies: Samsung's wallpaper "Seleccionar elemento" can read from
+            // Recientes/Descargas while Gallery reads DCIM/Camera or Movies.
+            try {
+                insertDownloadCopy(source, visibleName, mimeType, metadata);
+            } catch (Exception ignored) {}
             try {
                 insertGalleryVideo(source, "AetherX-" + visibleName, mimeType, AETHERX_GALLERY_PATH, metadata);
             } catch (Exception ignored) {}
@@ -299,6 +304,16 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         try (FileOutputStream output = new FileOutputStream(destination, false)) {
             copyFile(source, output);
         }
+
+        try {
+            File downloadsDir = Environment.getExternalStoragePublicDirectory(DOWNLOADS_GALLERY_PATH);
+            if (!downloadsDir.exists()) downloadsDir.mkdirs();
+            File downloadsCopy = new File(downloadsDir, visibleName);
+            try (FileOutputStream output = new FileOutputStream(downloadsCopy, false)) {
+                copyFile(source, output);
+            }
+            MediaScannerConnection.scanFile(getContext(), new String[] { downloadsCopy.getAbsolutePath() }, new String[] { mimeType }, null);
+        } catch (Exception ignored) {}
 
         MediaScannerConnection.scanFile(
             getContext(),
@@ -351,9 +366,61 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         values.put(MediaStore.Video.Media.SIZE, metadata.size);
         values.put(MediaStore.Video.Media.DURATION, metadata.durationMs);
         resolver.update(uri, values, null, null);
+        publishMedia(uri, relativePath, fileName, mimeType);
+        return uri;
+    }
+
+    private Uri insertDownloadCopy(File source, String fileName, String mimeType, VideoMetadata metadata) throws Exception {
+        final long nowMillis = System.currentTimeMillis();
+        final long nowSeconds = nowMillis / 1000;
+        ContentResolver resolver = getContext().getContentResolver();
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
+        values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH, DOWNLOADS_GALLERY_PATH);
+        values.put(MediaStore.MediaColumns.SIZE, metadata.size);
+        values.put(MediaStore.MediaColumns.DATE_ADDED, nowSeconds);
+        values.put(MediaStore.MediaColumns.DATE_MODIFIED, nowSeconds);
+        values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+
+        Uri uri = resolver.insert(MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
+        if (uri == null) throw new IllegalStateException("downloads-insert-failed");
+
+        try (OutputStream output = resolver.openOutputStream(uri, "w")) {
+            if (output == null) throw new IllegalStateException("downloads-output-failed");
+            copyFile(source, output);
+            output.flush();
+        } catch (Exception e) {
+            resolver.delete(uri, null, null);
+            throw e;
+        }
+
+        values.clear();
+        values.put(MediaStore.MediaColumns.IS_PENDING, 0);
+        values.put(MediaStore.MediaColumns.SIZE, metadata.size);
+        values.put(MediaStore.MediaColumns.DATE_ADDED, nowSeconds);
+        values.put(MediaStore.MediaColumns.DATE_MODIFIED, nowSeconds);
+        resolver.update(uri, values, null, null);
+        publishMedia(uri, DOWNLOADS_GALLERY_PATH, fileName, mimeType);
+        return uri;
+    }
+
+    private void publishMedia(Uri uri, String relativePath, String fileName, String mimeType) {
+        ContentResolver resolver = getContext().getContentResolver();
         resolver.notifyChange(uri, null);
         getContext().sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri));
-        return uri;
+
+        try {
+            File physicalFile = new File(Environment.getExternalStorageDirectory(), relativePath + fileName);
+            MediaScannerConnection.scanFile(
+                getContext(),
+                new String[] { physicalFile.getAbsolutePath() },
+                new String[] { mimeType },
+                (path, scannedUri) -> {
+                    if (scannedUri != null) resolver.notifyChange(scannedUri, null);
+                }
+            );
+        } catch (Exception ignored) {}
     }
 
     private String getDisplayName(ContentResolver resolver, Uri uri) {
