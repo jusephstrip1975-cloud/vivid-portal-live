@@ -22,6 +22,9 @@ function assertLocalBundle() {
   if (/https:\/\/aetherx\.org|server\.url|loadUrl\(/i.test(index)) {
     throw new Error("public/dist/index.html contains a forbidden remote startup reference.");
   }
+  if (!index.includes("aetherx-native-fallback")) {
+    throw new Error("public/dist/index.html is missing the native boot fallback.");
+  }
 }
 
 function normalizeHtmlOutput() {

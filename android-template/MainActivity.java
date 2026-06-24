@@ -6,7 +6,9 @@ import android.os.Bundle;
 import android.os.Message;
 import android.util.Log;
 import android.webkit.ConsoleMessage;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.aetherx.livewallpaper.AetherXLiveWallpaperPlugin;
@@ -77,6 +79,24 @@ public class MainActivity extends BridgeActivity {
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 Log.i(TAG, "onPageStarted: " + url);
                 super.onPageStarted(view, url, favicon);
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                Uri uri = request != null ? request.getUrl() : null;
+                boolean mainFrame = request != null && request.isForMainFrame();
+                CharSequence description = error != null ? error.getDescription() : "unknown";
+                int code = error != null ? error.getErrorCode() : 0;
+                Log.e(TAG, "onReceivedError url=" + uri + " mainFrame=" + mainFrame + " code=" + code + " description=" + description);
+                super.onReceivedError(view, request, error);
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                Uri uri = request != null ? request.getUrl() : null;
+                int status = errorResponse != null ? errorResponse.getStatusCode() : 0;
+                Log.e(TAG, "onReceivedHttpError url=" + uri + " mainFrame=" + (request != null && request.isForMainFrame()) + " status=" + status);
+                super.onReceivedHttpError(view, request, errorResponse);
             }
 
             @Override
@@ -164,4 +184,5 @@ public class MainActivity extends BridgeActivity {
         String host = uri.getHost().toLowerCase();
         return host.equals("localhost") || host.equals("127.0.0.1") || host.equals("0.0.0.0");
     }
+
 }
