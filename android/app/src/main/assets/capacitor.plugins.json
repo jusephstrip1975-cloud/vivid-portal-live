@@ -1,0 +1,10 @@
+[
+	{
+		"pkg": "@capacitor/filesystem",
+		"classpath": "com.capacitorjs.plugins.filesystem.FilesystemPlugin"
+	},
+	{
+		"pkg": "aetherx-live-wallpaper",
+		"classpath": "com.aetherx.livewallpaper.AetherXLiveWallpaperPlugin"
+	}
+]

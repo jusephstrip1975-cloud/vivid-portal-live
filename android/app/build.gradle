@@ -44,6 +44,38 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
+tasks.register('verifyAetherXLocalCapacitorAssets') {
+    doLast {
+        def assetsDir = file("$projectDir/src/main/assets")
+        def indexFile = file("$projectDir/src/main/assets/public/index.html")
+        def configFile = file("$projectDir/src/main/assets/capacitor.config.json")
+
+        if (!assetsDir.exists()) {
+            throw new GradleException('Missing android/app/src/main/assets. Run: bun run build && npx cap sync android')
+        }
+        if (!indexFile.exists()) {
+            throw new GradleException('Missing android/app/src/main/assets/public/index.html. Run: bun run build && npx cap sync android')
+        }
+        if (!configFile.exists()) {
+            throw new GradleException('Missing android/app/src/main/assets/capacitor.config.json. Run: bun run build && npx cap sync android')
+        }
+
+        def indexText = indexFile.getText('UTF-8')
+        def configText = configFile.getText('UTF-8')
+
+        if (configText.contains('"server"') || configText.contains('aetherx.org') || configText.contains('server.url')) {
+            throw new GradleException('Forbidden remote Capacitor startup config found. capacitor.config.json must not contain server.url or aetherx.org')
+        }
+        if (indexText.contains('https://aetherx.org') || indexText.contains('loadUrl(') || indexText.contains('Browser.open') || indexText.contains('window.open')) {
+            throw new GradleException('Forbidden external startup reference found in local index.html')
+        }
+    }
+}
+
+tasks.named('preBuild') {
+    dependsOn 'verifyAetherXLocalCapacitorAssets'
+}
+
 try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {

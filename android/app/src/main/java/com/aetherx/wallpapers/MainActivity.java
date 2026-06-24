@@ -37,7 +37,7 @@ public class MainActivity extends BridgeActivity {
                 Log.i(TAG, "BOOT_AUDIT OK: no ACTION_VIEW at boot; no external Chrome/Browser launch path triggered");
             }
         }
-        Log.i(TAG, "BOOT_AUDIT MainActivity will NEVER call startActivity(ACTION_VIEW) or Browser.open — verified by static audit");
+        Log.i(TAG, "BOOT_AUDIT MainActivity has no external browser launch path — verified by static audit");
         registerPlugin(AetherXLiveWallpaperPlugin.class);
         super.onCreate(savedInstanceState);
 
@@ -101,7 +101,7 @@ public class MainActivity extends BridgeActivity {
 
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
-                Log.w(TAG, "Blocked new WebView/window.open. isDialog=" + isDialog + " userGesture=" + isUserGesture);
+                Log.w(TAG, "Blocked new WebView popup request. isDialog=" + isDialog + " userGesture=" + isUserGesture);
                 return false;
             }
         });
@@ -112,12 +112,19 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onNewIntent(android.content.Intent intent) {
-        super.onNewIntent(intent);
         Uri data = intent != null ? intent.getData() : null;
         Log.d(TAG, "onNewIntent action=" + (intent != null ? intent.getAction() : null) + " data=" + data);
         if (data != null && isHttpLike(data)) {
             Log.w(TAG, "Blocked incoming external URL intent; staying in local app: " + data);
+            android.content.Intent cleanIntent = new android.content.Intent(this, MainActivity.class);
+            cleanIntent.setAction(android.content.Intent.ACTION_MAIN);
+            cleanIntent.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
+            setIntent(cleanIntent);
+            super.onNewIntent(cleanIntent);
+            return;
         }
+        setIntent(intent);
+        super.onNewIntent(intent);
     }
 
     private boolean handleNavigation(Uri uri, boolean isMainFrame, String source) {
