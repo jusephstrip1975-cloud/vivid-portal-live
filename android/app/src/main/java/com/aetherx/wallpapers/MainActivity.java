@@ -23,7 +23,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.i(TAG, "onCreate: local Capacitor boot; no server.url and no remote loadUrl");
+        Log.i(TAG, "onCreate: local Capacitor boot; no server.url and no forced remote URL");
         registerPlugin(AetherXLiveWallpaperPlugin.class);
         super.onCreate(savedInstanceState);
 
@@ -93,7 +93,7 @@ public class MainActivity extends BridgeActivity {
         });
 
         Log.i(TAG, "LOCAL_CAPACITOR_BOOT appUrl=" + getBridge().getAppUrl() + " currentUrl=" + webView.getUrl());
-        Log.i(TAG, "NO_REMOTE_BOOT_URL: MainActivity never calls loadUrl(https://aetherx.org)");
+        Log.i(TAG, "NO_REMOTE_BOOT_URL: MainActivity never forces a remote WebView URL");
     }
 
     @Override
