@@ -24,7 +24,7 @@ if (!rootElement) {
 }
 
 if (window.location.pathname.endsWith("/index.html")) {
-  window.history.replaceState(null, document.title, "./#/ ".trim());
+  window.history.replaceState(null, document.title, "./#/");
 }
 
 bootLog("mounting local hash router", window.location.href);
