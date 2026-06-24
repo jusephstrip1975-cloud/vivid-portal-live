@@ -131,8 +131,8 @@ function WallpaperDetail() {
             a.click();
             a.remove();
           } catch {
-            // Fallback 2: misma pestaña; sin abrir navegador externo.
-            window.location.assign(downloadUrl);
+            // Fallback final: evitamos window.location en Android/WebView para no disparar navegador externo.
+            console.warn("No se pudo iniciar la descarga directa", downloadUrl);
           }
         }
         setToast("✓ MP4 descargado");

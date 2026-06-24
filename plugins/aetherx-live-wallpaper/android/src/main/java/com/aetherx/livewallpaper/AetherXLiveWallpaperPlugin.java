@@ -22,6 +22,7 @@ import android.provider.OpenableColumns;
 import android.provider.MediaStore;
 import android.service.wallpaper.WallpaperService;
 import android.util.Base64;
+import android.util.Log;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -40,11 +41,42 @@ import java.util.List;
 
 @CapacitorPlugin(name = "AetherXLiveWallpaper")
 public class AetherXLiveWallpaperPlugin extends Plugin {
+    private static final String TAG = "AetherXLiveWallpaper";
     static final String VIDEO_FILE = "aetherx-live-wallpaper.mp4";
     private static final String DEFAULT_MP4_MIME = "video/mp4";
     private static final String CAMERA_GALLERY_PATH = Environment.DIRECTORY_DCIM + "/Camera/";
     private static final String DOWNLOADS_GALLERY_PATH = Environment.DIRECTORY_DOWNLOADS + "/AetherX/";
     private static final String AETHERX_GALLERY_PATH = Environment.DIRECTORY_MOVIES + "/AetherX/";
+
+    /**
+     * Capacitor llama a este hook ANTES de aplicar su política por defecto.
+     * Si devolvemos null, Capacitor puede ejecutar Intent.ACTION_VIEW para URLs
+     * fuera de su máscara y eso abre Chrome. Aquí forzamos que cualquier http/https
+     * continúe dentro del WebView y bloqueamos esquemas externos como intent:// o market://.
+     */
+    @Override
+    public Boolean shouldOverrideLoad(Uri url) {
+        if (url == null) {
+            Log.w(TAG, "Navigation blocked: null url");
+            return true;
+        }
+
+        String scheme = url.getScheme();
+        String rawUrl = url.toString();
+        Log.d(TAG, "Navigation request from Capacitor bridge: " + rawUrl);
+
+        if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+            Log.d(TAG, "Navigation kept inside WebView: " + rawUrl);
+            return false;
+        }
+
+        if ("data".equalsIgnoreCase(scheme) || "blob".equalsIgnoreCase(scheme) || "about".equalsIgnoreCase(scheme)) {
+            return false;
+        }
+
+        Log.w(TAG, "External Android launch blocked: " + rawUrl);
+        return true;
+    }
 
     @PluginMethod
     public void saveVideoFromUrl(PluginCall call) {
