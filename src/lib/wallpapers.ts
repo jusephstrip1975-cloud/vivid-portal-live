@@ -327,6 +327,8 @@ export interface Wallpaper {
 export const CATEGORIES: { id: Category | "todos"; label: string }[] = [
   { id: "todos", label: "Todos" },
   { id: "universo", label: "Universo" },
+  { id: "supernova", label: "Supernova" },
+  { id: "dinosaurios", label: "Dinosaurios" },
   { id: "oceano", label: "Océano" },
   { id: "naturaleza", label: "Naturaleza" },
   { id: "clima", label: "Clima" },
