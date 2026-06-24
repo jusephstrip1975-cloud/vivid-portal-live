@@ -123,16 +123,21 @@ function WallpaperDetail() {
           a.remove();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
         } catch {
-          // Fallback: el navegador descarga directamente desde el CDN, siguiendo
-          // cualquier redirección sin chocar con CORS.
-          const a = document.createElement("a");
-          a.href = downloadUrl;
-          a.download = fileName;
-          a.rel = "noopener";
-          a.target = "_self";
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
+          // Fallback 1: anchor directo siguiendo redirecciones sin CORS.
+          try {
+            const a = document.createElement("a");
+            a.href = downloadUrl;
+            a.download = fileName;
+            a.rel = "noopener";
+            a.target = "_self";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          } catch {
+            // Fallback 2 (iOS Safari): abrir en nueva pestaña para que el
+            // usuario pueda guardarlo manualmente.
+            window.open(downloadUrl, "_blank", "noopener");
+          }
         }
         setToast("✓ MP4 descargado");
       }
