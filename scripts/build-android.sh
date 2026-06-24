@@ -5,9 +5,9 @@ echo "=========================================="
 echo "  AetherX — Android Build Script"
 echo "=========================================="
 
-# 1. Build the web app
+# 1. Build the local web app bundle used by Capacitor
 echo ""
-echo "🔨  Step 1/5: Building web app..."
+echo "🔨  Step 1/5: Building local web app into public/dist..."
 bun run build
 
 # 2. Add Android platform if missing
@@ -20,7 +20,8 @@ else
   echo "    Android platform already present."
 fi
 
-# 3. Sync Capacitor with Android
+# 3. Sync Capacitor with Android. This copies public/dist into
+#    android/app/src/main/assets/public for true local APK startup.
 echo ""
 echo "🔄  Step 3/5: Syncing Capacitor + Android..."
 bunx cap sync android
@@ -37,6 +38,7 @@ if [ -f "android-template/strings.xml" ]; then
 fi
 echo "    ✓ MainActivity.java actualizado."
 echo "    ✓ strings.xml actualizado."
+echo "    ✓ WebView arranca desde assets locales, sin server.url remoto."
 
 # 5. Open Android Studio
 echo ""

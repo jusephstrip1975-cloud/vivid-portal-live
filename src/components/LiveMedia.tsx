@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { resolveDownloadUrl } from "@/lib/native-wallpaper";
 
 interface Props {
   src: string;
@@ -87,7 +88,7 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
       {active && (
         <video
           ref={videoRef}
-          src={src}
+          src={resolveDownloadUrl(src)}
           poster={poster}
           aria-hidden
           autoPlay
