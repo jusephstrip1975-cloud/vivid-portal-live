@@ -548,7 +548,7 @@ function generate3DWallpapers(): Wallpaper[] {
       const sizeMb = Math.round((10 + (i % 12) + ((i * 7) % 10) * 0.4) * 10) / 10;
       result.push({
         id: `3d-${cat.slug}-${String(i + 1).padStart(2, "0")}`,
-        title: cat.titles[i],
+        title: titles[i],
         subtitle: cat.subtitle,
         category: cat.id,
         src: pool.src,
