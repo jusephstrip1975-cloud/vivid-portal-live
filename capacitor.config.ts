@@ -6,10 +6,12 @@ const config: CapacitorConfig = {
   webDir: "public",
   backgroundColor: "#02040a",
   server: {
-    url: "https://vivid-portal-live.lovable.app",
+    url: "https://aetherx.org",
     cleartext: false,
     androidScheme: "https",
     allowNavigation: [
+      "aetherx.org",
+      "www.aetherx.org",
       "*.lovable.app",
       "vivid-portal-live.lovable.app",
       "*.supabase.co",

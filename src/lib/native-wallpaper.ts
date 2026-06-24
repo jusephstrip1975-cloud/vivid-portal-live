@@ -16,7 +16,7 @@ interface LiveWallpaperPlugin {
     fileName?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
   applyHome(): Promise<{ applied: boolean; verified?: boolean; openedPicker?: boolean; needsConfirmation?: boolean }>;
-  applyLock(): Promise<{ applied: boolean }>;
+  applyLock(): Promise<{ applied: boolean; openedPicker?: boolean; needsConfirmation?: boolean }>;
   applyBoth(): Promise<{ applied: boolean; homeVerified: boolean; lockApplied: boolean; openedPicker?: boolean; needsConfirmation?: boolean }>;
   openPicker(): Promise<{ opened: boolean }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
@@ -98,11 +98,14 @@ export async function applyPickedVideo(
       try {
         const res = await LiveWallpaper.applyLock();
         if (res.applied) return { ok: true, reason: "android-lock-applied" };
+        if (res.openedPicker || res.needsConfirmation) {
+          return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
+        }
       } catch (err) {
         console.warn("applyLock failed", err);
-        return { ok: false, reason: String(err) };
       }
-      return { ok: false, reason: "lock-apply-failed" };
+      await LiveWallpaper.openPicker();
+      return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
     }
 
     if (target === "both") {
@@ -149,7 +152,7 @@ export async function pickAndApplyDeviceVideo(
   return applyPickedVideo(target);
 }
 
-const PUBLISHED_ASSET_ORIGIN = "https://vivid-portal-live.lovable.app";
+const PUBLISHED_ASSET_ORIGIN = "https://aetherx.org";
 const PREVIEW_ASSET_ORIGIN = "https://id-preview--86067037-aec8-403d-b7be-5af9e39ce44c.lovable.app";
 
 export async function isNative(): Promise<boolean> {
