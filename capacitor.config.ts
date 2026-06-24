@@ -37,9 +37,13 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      backgroundColor: "#02040a",
-      showSpinner: false,
+      // Sin logo nativo: arranque 100% negro y el logo "AetherX · La disciplina
+      // lo es todo" aparece dentro de la app a 1s (componente BootIntro).
+      launchShowDuration: 0,
       launchAutoHide: true,
+      backgroundColor: "#000000",
+      showSpinner: false,
+      androidSplashResourceName: "splash_black",
     },
   },
 };
