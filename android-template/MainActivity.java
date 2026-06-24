@@ -1,10 +1,13 @@
 package com.aetherx.wallpapers;
 
 import android.os.Bundle;
+import android.net.Uri;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
 import com.aetherx.livewallpaper.AetherXLiveWallpaperPlugin;
 
 /**
@@ -23,12 +26,12 @@ import com.aetherx.livewallpaper.AetherXLiveWallpaperPlugin;
  *      · Cache estándar, sin viewport override.
  *      · UserAgent estándar de Android WebView (el sitio detecta móvil).
  *
- *  - NO sobreescribe shouldOverrideUrlLoading: Capacitor ya gestiona las
- *    redirecciones contra la lista `server.allowNavigation` definida en
- *    capacitor.config.ts. Cualquier dominio que esté allí se queda dentro
- *    del WebView; cualquier otro se abre en el navegador externo.
+ *  - Sobreescribe shouldOverrideUrlLoading para impedir Chrome externo:
+ *    http/https siempre se queda dentro del WebView; intent:, market:, etc. se bloquean.
  */
 public class MainActivity extends BridgeActivity {
+    private static final String AETHERX_URL = "https://aetherx.org";
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // Registrar plugin nativo antes de inicializar el bridge.
@@ -47,6 +50,25 @@ public class MainActivity extends BridgeActivity {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
             settings.setAllowFileAccess(true);
             settings.setAllowContentAccess(true);
+            settings.setJavaScriptCanOpenWindowsAutomatically(false);
+            settings.setSupportMultipleWindows(false);
+
+            getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                    Uri uri = request.getUrl();
+                    String scheme = uri != null ? uri.getScheme() : null;
+                    if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                        return false;
+                    }
+                    return !("data".equalsIgnoreCase(scheme) || "blob".equalsIgnoreCase(scheme));
+                }
+            });
+
+            String currentUrl = webView.getUrl();
+            if (currentUrl == null || currentUrl.length() == 0 || currentUrl.startsWith("capacitor://")) {
+                webView.loadUrl(AETHERX_URL);
+            }
         }
     }
 }

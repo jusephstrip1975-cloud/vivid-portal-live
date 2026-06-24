@@ -131,9 +131,8 @@ function WallpaperDetail() {
             a.click();
             a.remove();
           } catch {
-            // Fallback 2 (iOS Safari): abrir en nueva pestaña para que el
-            // usuario pueda guardarlo manualmente.
-            window.open(downloadUrl, "_blank", "noopener");
+            // Fallback 2: misma pestaña; sin abrir navegador externo.
+            window.location.assign(downloadUrl);
           }
         }
         setToast("✓ MP4 descargado");
