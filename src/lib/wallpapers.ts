@@ -232,6 +232,59 @@ import threeDVoronoiVid from "@/assets/wp-3d-voronoi.mp4.asset.json";
 import threeDRibbonVid from "@/assets/wp-3d-ribbon.mp4.asset.json";
 import threeDPlasmaVid from "@/assets/wp-3d-plasma.mp4.asset.json";
 
+// New batch: 25 wallpapers (Universo, Supernova, Aurora, Dinosaurios, Realistas, 3D extra)
+import carina from "@/assets/wp-carina.jpg";
+import milkyway from "@/assets/wp-milkyway.jpg";
+import eclipse from "@/assets/wp-eclipse.jpg";
+import blackholeJet from "@/assets/wp-blackhole-jet.jpg";
+import starCluster from "@/assets/wp-star-cluster.jpg";
+import kepler from "@/assets/wp-kepler.jpg";
+import crab from "@/assets/wp-crab.jpg";
+import hypernova from "@/assets/wp-hypernova.jpg";
+import auroraIceland from "@/assets/wp-aurora-iceland.jpg";
+import auroraNorway from "@/assets/wp-aurora-norway.jpg";
+import auroraAlaska from "@/assets/wp-aurora-alaska.jpg";
+import auroraViolet from "@/assets/wp-aurora-violet.jpg";
+import trex from "@/assets/wp-trex.jpg";
+import raptors from "@/assets/wp-raptors.jpg";
+import brachiosaurus from "@/assets/wp-brachiosaurus.jpg";
+import pteranodon from "@/assets/wp-pteranodon.jpg";
+import triceratops from "@/assets/wp-triceratops.jpg";
+import icelandFalls from "@/assets/wp-iceland-falls.jpg";
+import namib from "@/assets/wp-namib.jpg";
+import patagonia from "@/assets/wp-patagonia.jpg";
+import supercell from "@/assets/wp-supercell.jpg";
+import milkyMountain from "@/assets/wp-milky-mountain.jpg";
+import liquidGold from "@/assets/wp-liquid-gold.jpg";
+import fractalInfinite from "@/assets/wp-fractal-infinite.jpg";
+import neonPlasma from "@/assets/wp-neon-plasma.jpg";
+
+import carinaVid from "@/assets/wp-carina.mp4.asset.json";
+import milkywayVid from "@/assets/wp-milkyway.mp4.asset.json";
+import eclipseVid from "@/assets/wp-eclipse.mp4.asset.json";
+import blackholeJetVid from "@/assets/wp-blackhole-jet.mp4.asset.json";
+import starClusterVid from "@/assets/wp-star-cluster.mp4.asset.json";
+import keplerVid from "@/assets/wp-kepler.mp4.asset.json";
+import crabVid from "@/assets/wp-crab.mp4.asset.json";
+import hypernovaVid from "@/assets/wp-hypernova.mp4.asset.json";
+import auroraIcelandVid from "@/assets/wp-aurora-iceland.mp4.asset.json";
+import auroraNorwayVid from "@/assets/wp-aurora-norway.mp4.asset.json";
+import auroraAlaskaVid from "@/assets/wp-aurora-alaska.mp4.asset.json";
+import auroraVioletVid from "@/assets/wp-aurora-violet.mp4.asset.json";
+import trexVid from "@/assets/wp-trex.mp4.asset.json";
+import raptorsVid from "@/assets/wp-raptors.mp4.asset.json";
+import brachiosaurusVid from "@/assets/wp-brachiosaurus.mp4.asset.json";
+import pteranodonVid from "@/assets/wp-pteranodon.mp4.asset.json";
+import triceratopsVid from "@/assets/wp-triceratops.mp4.asset.json";
+import icelandFallsVid from "@/assets/wp-iceland-falls.mp4.asset.json";
+import namibVid from "@/assets/wp-namib.mp4.asset.json";
+import patagoniaVid from "@/assets/wp-patagonia.mp4.asset.json";
+import supercellVid from "@/assets/wp-supercell.mp4.asset.json";
+import milkyMountainVid from "@/assets/wp-milky-mountain.mp4.asset.json";
+import liquidGoldVid from "@/assets/wp-liquid-gold.mp4.asset.json";
+import fractalInfiniteVid from "@/assets/wp-fractal-infinite.mp4.asset.json";
+import neonPlasmaVid from "@/assets/wp-neon-plasma.mp4.asset.json";
+
 export type Category =
   | "universo"
   | "oceano"
