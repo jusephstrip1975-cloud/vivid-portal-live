@@ -163,11 +163,8 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
           autoPlay
           loop
           muted
-          defaultMuted
           playsInline
-          // @ts-expect-error iOS-specific attribute
-          webkit-playsinline="true"
-          x5-playsinline="true"
+          {...({ "webkit-playsinline": "true", "x5-playsinline": "true" } as Record<string, string>)}
           preload="metadata"
           disablePictureInPicture
           disableRemotePlayback
