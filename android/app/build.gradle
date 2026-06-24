@@ -66,8 +66,17 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         if (configText.contains('"server"') || configText.contains('aetherx.org') || configText.contains('server.url')) {
             throw new GradleException('Forbidden remote Capacitor startup config found. capacitor.config.json must not contain server.url or aetherx.org')
         }
+        if (!configText.contains('"webDir"') || !configText.contains('"public/dist"')) {
+            throw new GradleException('Unexpected Capacitor config. Expected webDir public/dist from capacitor.config.ts before sync')
+        }
         if (indexText.contains('https://aetherx.org') || indexText.contains('loadUrl(') || indexText.contains('Browser.open') || indexText.contains('window.open')) {
             throw new GradleException('Forbidden external startup reference found in local index.html')
+        }
+        if (!indexText.contains('src="./assets/') || !indexText.contains('href="./assets/')) {
+            throw new GradleException('Local index.html must use relative ./assets references for APK startup')
+        }
+        if (!indexText.contains('aetherx-native-fallback')) {
+            throw new GradleException('Local index.html is missing the native boot fallback; Android would show black if JS fails')
         }
     }
 }
