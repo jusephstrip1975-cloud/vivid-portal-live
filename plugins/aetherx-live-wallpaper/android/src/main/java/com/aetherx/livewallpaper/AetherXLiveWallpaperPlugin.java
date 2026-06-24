@@ -66,8 +66,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         Log.d(TAG, "Navigation request from Capacitor bridge: " + rawUrl);
 
         if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
-            Log.d(TAG, "Navigation kept inside WebView: " + rawUrl);
-            return false;
+            if (isAllowedWebHost(url)) {
+                Log.i(TAG, "Allowed WebView navigation, no external browser: " + rawUrl);
+                return false;
+            }
+            Log.w(TAG, "Blocked external web navigation before Android ACTION_VIEW: " + rawUrl);
+            return true;
         }
 
         if ("data".equalsIgnoreCase(scheme) || "blob".equalsIgnoreCase(scheme) || "about".equalsIgnoreCase(scheme)) {
@@ -76,6 +80,19 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
         Log.w(TAG, "External Android launch blocked: " + rawUrl);
         return true;
+    }
+
+    private boolean isAllowedWebHost(Uri uri) {
+        if (uri == null || uri.getHost() == null) return false;
+        String host = uri.getHost().toLowerCase();
+        return host.equals("aetherx.org")
+            || host.equals("www.aetherx.org")
+            || host.endsWith(".aetherx.org")
+            || host.equals("vivid-portal-live.lovable.app")
+            || host.endsWith(".lovable.app")
+            || host.endsWith(".lovableproject.com")
+            || host.endsWith(".supabase.co")
+            || host.endsWith(".supabase.in");
     }
 
     @PluginMethod

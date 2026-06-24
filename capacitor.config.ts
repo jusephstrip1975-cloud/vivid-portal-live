@@ -5,7 +5,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * DENTRO del WebView nativo (no abre Chrome externo).
  *
  * Reglas clave:
- *  - server.url apunta al dominio público.
+ *  - NO usamos server.url para evitar que Capacitor intente abrir la web
+ *    antes de que MainActivity instale el WebViewClient protegido.
  *  - server.androidScheme = "https" para evitar mixed-content y permitir cookies seguras.
  *  - allowNavigation incluye el dominio raíz, www y subdominios + previews de Lovable
  *    para que cualquier redirección quede dentro del WebView en lugar de abrirse
@@ -13,8 +14,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
  *  - cleartext: false (todo es HTTPS).
  *  - allowMixedContent: false (no mezclamos http en https).
  *
- * MainActivity bloquea cualquier esquema externo para
- * evitar que Android abra Chrome fuera del WebView.
+ * MainActivity carga https://aetherx.org explícitamente dentro del WebView
+ * y bloquea cualquier esquema externo para evitar Chrome fuera de la app.
  */
 const config: CapacitorConfig = {
   appId: "com.aetherx.wallpapers",
@@ -22,7 +23,6 @@ const config: CapacitorConfig = {
   webDir: "public",
   backgroundColor: "#02040a",
   server: {
-    url: "https://aetherx.org",
     cleartext: false,
     androidScheme: "https",
     allowNavigation: [

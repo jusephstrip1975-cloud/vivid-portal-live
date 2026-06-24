@@ -51,6 +51,7 @@ public class MainActivity extends BridgeActivity {
 
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
         if (webView != null) {
+            WebView.setWebContentsDebuggingEnabled(true);
             WebSettings settings = webView.getSettings();
             settings.setJavaScriptEnabled(true);
             settings.setDomStorageEnabled(true);
@@ -139,10 +140,11 @@ public class MainActivity extends BridgeActivity {
             String currentUrl = webView.getUrl();
             String bridgeUrl = getBridge().getAppUrl();
             Log.d(TAG, "Configured bridge appUrl=" + bridgeUrl + " currentWebViewUrl=" + currentUrl);
-            if (currentUrl == null || currentUrl.length() == 0 || currentUrl.startsWith("capacitor://") || currentUrl.startsWith("http://")) {
-                Log.d(TAG, "Forcing initial WebView load: " + AETHERX_URL);
-                webView.post(() -> webView.loadUrl(AETHERX_URL));
-            }
+            Log.i(TAG, "FORCE_LOAD_WEBVIEW_URL=" + AETHERX_URL);
+            webView.post(() -> {
+                Log.i(TAG, "bridge.getWebView().loadUrl(" + AETHERX_URL + ")");
+                webView.loadUrl(AETHERX_URL);
+            });
         } else {
             Log.e(TAG, "onCreate: WebView is null; cannot load " + AETHERX_URL);
         }
@@ -173,14 +175,12 @@ public class MainActivity extends BridgeActivity {
         Log.d(TAG, "Navigation request from " + source + ": " + url + " mainFrame=" + isMainFrame);
 
         if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
-            String current = view != null ? view.getUrl() : null;
-            if (view != null && (current == null || !current.equals(url))) {
-                Log.d(TAG, "Forcing http(s) navigation inside WebView: " + url);
-                view.loadUrl(url);
-                return true;
+            if (isAllowedWebHost(uri)) {
+                Log.i(TAG, "Allowed WebView navigation, returning false so WebView handles it: " + url);
+                return false;
             }
-            Log.d(TAG, "Allowing current http(s) navigation inside WebView: " + url);
-            return false;
+            Log.w(TAG, "Blocked external http(s) navigation, no Chrome launch: " + url);
+            return true;
         }
 
         if ("data".equalsIgnoreCase(scheme) || "blob".equalsIgnoreCase(scheme) || "about".equalsIgnoreCase(scheme)
@@ -190,6 +190,19 @@ public class MainActivity extends BridgeActivity {
 
         Log.w(TAG, "Blocked external Android intent/scheme: " + url);
         return true;
+    }
+
+    private boolean isAllowedWebHost(Uri uri) {
+        if (uri == null || uri.getHost() == null) return false;
+        String host = uri.getHost().toLowerCase();
+        return host.equals("aetherx.org")
+            || host.equals("www.aetherx.org")
+            || host.endsWith(".aetherx.org")
+            || host.equals("vivid-portal-live.lovable.app")
+            || host.endsWith(".lovable.app")
+            || host.endsWith(".lovableproject.com")
+            || host.endsWith(".supabase.co")
+            || host.endsWith(".supabase.in");
     }
 
     private String describeIntent(Intent intent) {
