@@ -13,7 +13,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  *  - cleartext: false (todo es HTTPS).
  *  - allowMixedContent: false (no mezclamos http en https).
  *
- * MainActivity bloquea intent://, market:// y cualquier esquema externo para
+ * MainActivity bloquea cualquier esquema externo para
  * evitar que Android abra Chrome fuera del WebView.
  */
 const config: CapacitorConfig = {

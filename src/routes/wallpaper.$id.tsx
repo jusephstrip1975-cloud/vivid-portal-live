@@ -131,7 +131,7 @@ function WallpaperDetail() {
             a.click();
             a.remove();
           } catch {
-            // Fallback 2: misma pestaña; nunca window.open/Chrome externo.
+            // Fallback 2: misma pestaña; sin abrir navegador externo.
             window.location.assign(downloadUrl);
           }
         }
