@@ -8,20 +8,73 @@ interface Props {
 }
 
 /**
- * Preview en tiempo real con bucle suave:
- * - El vídeo SOLO se carga y reproduce cuando entra en viewport (IntersectionObserver).
- * - Mientras tanto se muestra el póster en alta, sin descargar el mp4.
- * - Al estar listo, crossfade del póster al vídeo (sin "pop").
- * - Al salir de pantalla se pausa y se libera memoria de decoder.
- * Esto evita los tirones al haber decenas de tiles a la vez.
+ * Preview en tiempo real con bucle suave + compatibilidad móvil:
+ * - El vídeo solo se monta cuando entra en viewport.
+ * - Limitador global: máx N vídeos reproduciéndose a la vez (en móvil los
+ *   decoders de hardware fallan si hay >3-4 vídeos simultáneos).
+ * - Atributos playsInline + webkit-playsinline para iOS.
+ * - Tras el primer tap del usuario reintenta autoplay (desbloquea iOS Low Power).
  */
+
+// ---- Limitador global de vídeos concurrentes ----
+const isMobile =
+  typeof navigator !== "undefined" &&
+  (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches));
+
+const MAX_CONCURRENT = isMobile ? 3 : 8;
+const playing = new Set<HTMLVideoElement>();
+const waiters: Array<() => void> = [];
+
+function acquireSlot(v: HTMLVideoElement): boolean {
+  if (playing.has(v)) return true;
+  if (playing.size < MAX_CONCURRENT) {
+    playing.add(v);
+    return true;
+  }
+  return false;
+}
+
+function releaseSlot(v: HTMLVideoElement) {
+  if (playing.delete(v)) {
+    const next = waiters.shift();
+    if (next) next();
+  }
+}
+
+function waitSlot(v: HTMLVideoElement): Promise<void> {
+  return new Promise((resolve) => {
+    const tryAcquire = () => {
+      if (acquireSlot(v)) resolve();
+      else waiters.push(tryAcquire);
+    };
+    tryAcquire();
+  });
+}
+
+// Tap-to-unlock global (iOS): tras la primera interacción, dispara play en
+// todos los vídeos visibles.
+let userInteracted = false;
+const interactionListeners: Array<() => void> = [];
+function onFirstInteraction() {
+  if (userInteracted) return;
+  userInteracted = true;
+  for (const cb of interactionListeners.splice(0)) cb();
+}
+if (typeof window !== "undefined") {
+  const opts = { once: true, passive: true } as AddEventListenerOptions;
+  window.addEventListener("touchstart", onFirstInteraction, opts);
+  window.addEventListener("click", onFirstInteraction, opts);
+  window.addEventListener("keydown", onFirstInteraction, opts);
+}
+
 export function LiveMedia({ src, poster, alt, className = "" }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [active, setActive] = useState(false);
   const [ready, setReady] = useState(false);
 
-  // Observa visibilidad para activar/pausar el vídeo.
+  // Visibilidad en viewport
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -29,31 +82,63 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
       (entries) => {
         for (const e of entries) setActive(e.isIntersecting);
       },
-      { rootMargin: "200px 0px", threshold: 0.15 },
+      { rootMargin: "150px 0px", threshold: 0.1 },
     );
     io.observe(el);
     return () => io.disconnect();
   }, []);
 
-  // Reproduce / pausa según visibilidad y visibilidad de la pestaña.
+  // Gestiona play/pause con limitador global
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (active && document.visibilityState === "visible") {
-      v.play().catch(() => {});
+    let cancelled = false;
+
+    const tryPlay = async () => {
+      if (cancelled) return;
+      if (document.visibilityState !== "visible") return;
+      await waitSlot(v);
+      if (cancelled) {
+        releaseSlot(v);
+        return;
+      }
+      try {
+        await v.play();
+      } catch {
+        // Autoplay bloqueado: reintenta tras primera interacción
+        if (!userInteracted) {
+          interactionListeners.push(() => {
+            v.play().catch(() => {});
+          });
+        }
+      }
+    };
+
+    if (active) {
+      tryPlay();
     } else {
       v.pause();
+      releaseSlot(v);
+      setReady(false);
     }
+
+    return () => {
+      cancelled = true;
+      v.pause();
+      releaseSlot(v);
+    };
   }, [active]);
 
+  // Pausa al ocultar pestaña
   useEffect(() => {
     const onVis = () => {
       const v = videoRef.current;
       if (!v) return;
       if (document.visibilityState === "visible" && active) {
-        v.play().catch(() => {});
+        waitSlot(v).then(() => v.play().catch(() => {}));
       } else {
         v.pause();
+        releaseSlot(v);
       }
     };
     document.addEventListener("visibilitychange", onVis);
@@ -62,7 +147,6 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
 
   return (
     <div ref={wrapRef} className={`relative overflow-hidden ${className}`}>
-      {/* Póster: siempre montado, sirve de placeholder y de fallback si autoplay falla */}
       <img
         src={poster}
         alt={alt}
@@ -80,8 +164,11 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
           loop
           muted
           playsInline
-          preload="auto"
+          {...({ "webkit-playsinline": "true", "x5-playsinline": "true" } as Record<string, string>)}
+          preload="metadata"
           disablePictureInPicture
+          disableRemotePlayback
+          controls={false}
           onCanPlay={() => setReady(true)}
           onPlaying={() => setReady(true)}
           className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${
