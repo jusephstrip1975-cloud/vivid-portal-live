@@ -1,58 +1,37 @@
 #!/usr/bin/env node
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
-const distClient = join(root, "dist", "client");
 const publicDist = join(root, "public", "dist");
 
 function cleanPublicDist() {
   rmSync(publicDist, { recursive: true, force: true });
 }
 
-function findAsset(prefix, suffix) {
-  const assetsDir = join(distClient, "assets");
-  const match = readdirSync(assetsDir).find(
-    (name) => name.startsWith(prefix) && name.endsWith(suffix),
-  );
-  if (!match) throw new Error(`Missing ${prefix}*${suffix} in dist/client/assets`);
-  return `./assets/${match}`;
-}
-
-function writeLocalIndex() {
-  const entry = findAsset("index-", ".js");
-  const styles = findAsset("styles-", ".css");
-  const html = `<!doctype html>
-<html lang="es" class="dark">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-    <meta name="theme-color" content="#02040a" />
-    <title>AetherX</title>
-    <link rel="stylesheet" href="${styles}" />
-    <script type="module" crossorigin src="${entry}"></script>
-    <style>
-      html, body { margin: 0; min-height: 100%; background: #02040a; color: #f8fafc; }
-      body::before { content: "AetherX"; position: fixed; inset: 0; display: grid; place-items: center; font: 800 22px system-ui, sans-serif; letter-spacing: .18em; color: rgba(248,250,252,.72); background: radial-gradient(circle at 50% 10%, rgba(14,165,233,.22), transparent 42%), #02040a; z-index: -1; }
-    </style>
-  </head>
-  <body>
-    <script>console.info("[AetherX Android] Booting from packaged Capacitor local assets", location.href);</script>
-  </body>
-</html>
-`;
-  writeFileSync(join(distClient, "index.html"), html, "utf8");
+function assertLocalBundle() {
+  const indexPath = join(publicDist, "index.html");
+  if (!existsSync(indexPath)) {
+    throw new Error("Missing public/dist/index.html after Capacitor SPA build.");
+  }
+  const index = readFileSync(indexPath, "utf8");
+  if (!index.includes("/assets/") && !index.includes("./assets/")) {
+    throw new Error("public/dist/index.html does not reference bundled local assets.");
+  }
+  if (/https:\/\/aetherx\.org|server\.url|loadUrl\(/i.test(index)) {
+    throw new Error("public/dist/index.html contains a forbidden remote startup reference.");
+  }
 }
 
 function prepare() {
-  if (!existsSync(distClient)) {
-    throw new Error("dist/client does not exist. Run `bun run build` before Capacitor sync.");
-  }
-  writeLocalIndex();
   cleanPublicDist();
-  mkdirSync(publicDist, { recursive: true });
-  cpSync(distClient, publicDist, { recursive: true });
-  console.log("Prepared local Android bundle at public/dist with local index.html");
+  execFileSync("bunx", ["vite", "build", "--config", "vite.capacitor.config.ts"], {
+    cwd: root,
+    stdio: "inherit",
+  });
+  assertLocalBundle();
+  console.log("Prepared Capacitor SPA at public/dist/index.html for 100% local APK startup");
 }
 
 const args = new Set(process.argv.slice(2));
