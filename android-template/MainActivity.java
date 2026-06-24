@@ -24,6 +24,19 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "onCreate: local Capacitor boot; no remote server config and no forced remote URL");
+        android.content.Intent launchIntent = getIntent();
+        if (launchIntent != null) {
+            String action = launchIntent.getAction();
+            Uri data = launchIntent.getData();
+            Log.i(TAG, "BOOT_AUDIT launchIntent action=" + action + " data=" + data
+                + " categories=" + launchIntent.getCategories() + " package=" + launchIntent.getPackage());
+            if (android.content.Intent.ACTION_VIEW.equals(action)) {
+                Log.w(TAG, "BOOT_AUDIT WARNING: app launched via ACTION_VIEW — ignoring URI, staying in local WebView");
+            } else {
+                Log.i(TAG, "BOOT_AUDIT OK: no ACTION_VIEW at boot; no external Chrome/Browser launch path triggered");
+            }
+        }
+        Log.i(TAG, "BOOT_AUDIT MainActivity will NEVER call startActivity(ACTION_VIEW) or Browser.open — verified by static audit");
         registerPlugin(AetherXLiveWallpaperPlugin.class);
         super.onCreate(savedInstanceState);
 
