@@ -8,7 +8,6 @@ import android.os.Message;
 import android.util.Log;
 import android.webkit.ConsoleMessage;
 import android.webkit.RenderProcessGoneDetail;
-import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
