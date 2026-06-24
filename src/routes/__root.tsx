@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppStateProvider } from "@/lib/app-state";
 import { BottomNav } from "@/components/BottomNav";
 import { AppliedHalo } from "@/components/AppliedHalo";
+import { BootIntro } from "@/components/BootIntro";
 
 function NotFoundComponent() {
   return (
