@@ -140,10 +140,11 @@ public class MainActivity extends BridgeActivity {
             String currentUrl = webView.getUrl();
             String bridgeUrl = getBridge().getAppUrl();
             Log.d(TAG, "Configured bridge appUrl=" + bridgeUrl + " currentWebViewUrl=" + currentUrl);
-            if (currentUrl == null || currentUrl.length() == 0 || currentUrl.startsWith("capacitor://") || currentUrl.startsWith("http://")) {
-                Log.d(TAG, "Forcing initial WebView load: " + AETHERX_URL);
-                webView.post(() -> webView.loadUrl(AETHERX_URL));
-            }
+            Log.i(TAG, "FORCE_LOAD_WEBVIEW_URL=" + AETHERX_URL);
+            webView.post(() -> {
+                Log.i(TAG, "bridge.getWebView().loadUrl(" + AETHERX_URL + ")");
+                webView.loadUrl(AETHERX_URL);
+            });
         } else {
             Log.e(TAG, "onCreate: WebView is null; cannot load " + AETHERX_URL);
         }
