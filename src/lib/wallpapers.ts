@@ -563,6 +563,44 @@ function generate3DWallpapers(): Wallpaper[] {
   return result;
 }
 
+// Nueva tanda: 25 wallpapers (Universo, Supernova, Aurora, Dinosaurios, Realistas, 3D extra)
+const GOLD = "rgba(250, 204, 21, 0.45)";
+const RED = "rgba(239, 68, 68, 0.5)";
+const GREEN = "rgba(34, 197, 94, 0.45)";
+
+WALLPAPERS.push(
+  { id: "carina-nebula", title: "Nebulosa Carina", subtitle: "Pilares cósmicos en magenta y turquesa", category: "universo", src: carina, video: carinaVid.url, resolution: "4K", sizeMb: 16.4, fps: 60, premium: true, sound: false, accent: PINK },
+  { id: "milky-way", title: "Vía Láctea", subtitle: "Núcleo galáctico sobre montaña silueta", category: "universo", src: milkyway, video: milkywayVid.url, resolution: "4K", sizeMb: 17.1, fps: 30, premium: true, sound: false, accent: PURPLE },
+  { id: "solar-eclipse", title: "Eclipse Solar", subtitle: "Anillo de diamante en corona blanca", category: "universo", src: eclipse, video: eclipseVid.url, resolution: "4K", sizeMb: 12.6, fps: 60, premium: true, sound: false, accent: GOLD },
+  { id: "blackhole-jet", title: "Jet Relativista", subtitle: "Agujero negro lanzando plasma cósmico", category: "universo", src: blackholeJet, video: blackholeJetVid.url, resolution: "4K", sizeMb: 18.0, fps: 60, premium: true, sound: true, accent: ORANGE },
+  { id: "star-cluster", title: "Cúmulo Globular", subtitle: "Miles de estrellas doradas titilando", category: "universo", src: starCluster, video: starClusterVid.url, resolution: "4K", sizeMb: 14.5, fps: 30, premium: false, sound: false, accent: GOLD },
+
+  { id: "kepler-snr", title: "Remanente Kepler", subtitle: "Supernova expandiéndose en plasma", category: "supernova", src: kepler, video: keplerVid.url, resolution: "4K", sizeMb: 17.9, fps: 60, premium: true, sound: true, accent: ORANGE },
+  { id: "crab-nebula", title: "Nebulosa del Cangrejo", subtitle: "Pulsar latiendo en cian y magenta", category: "supernova", src: crab, video: crabVid.url, resolution: "4K", sizeMb: 16.2, fps: 60, premium: true, sound: false, accent: PINK },
+  { id: "blue-hypernova", title: "Hipernova Azul", subtitle: "Supergigante explotando en onda expansiva", category: "supernova", src: hypernova, video: hypernovaVid.url, resolution: "4K", sizeMb: 18.7, fps: 60, premium: true, sound: true, accent: BLUE },
+
+  { id: "aurora-iceland", title: "Aurora Islandia", subtitle: "Cintas verdes y violetas sobre glaciar", category: "aurora", src: auroraIceland, video: auroraIcelandVid.url, resolution: "4K", sizeMb: 15.3, fps: 60, premium: true, sound: true, accent: GREEN },
+  { id: "aurora-norway", title: "Aurora Noruega", subtitle: "Reflejo esmeralda sobre fiordo helado", category: "aurora", src: auroraNorway, video: auroraNorwayVid.url, resolution: "4K", sizeMb: 15.8, fps: 60, premium: true, sound: true, accent: GREEN },
+  { id: "aurora-alaska", title: "Aurora Alaska", subtitle: "Luces rosadas sobre cabaña en pinar", category: "aurora", src: auroraAlaska, video: auroraAlaskaVid.url, resolution: "4K", sizeMb: 14.9, fps: 30, premium: true, sound: true, accent: PINK },
+  { id: "aurora-violet", title: "Aurora Violeta", subtitle: "Cortinas púrpura sobre cielo estrellado", category: "aurora", src: auroraViolet, video: auroraVioletVid.url, resolution: "4K", sizeMb: 13.6, fps: 30, premium: false, sound: false, accent: PURPLE },
+
+  { id: "trex-jungle", title: "T-Rex Tormenta", subtitle: "Tiranosaurio rugiendo bajo relámpagos", category: "dinosaurios", src: trex, video: trexVid.url, resolution: "4K", sizeMb: 17.4, fps: 60, premium: true, sound: true, accent: RED },
+  { id: "raptor-pack", title: "Manada Velociraptor", subtitle: "Raptores corriendo en bosque brumoso", category: "dinosaurios", src: raptors, video: raptorsVid.url, resolution: "4K", sizeMb: 16.0, fps: 60, premium: true, sound: true, accent: TEAL },
+  { id: "brachiosaurus-lake", title: "Brachiosaurus", subtitle: "Cuello largo bebiendo al atardecer", category: "dinosaurios", src: brachiosaurus, video: brachiosaurusVid.url, resolution: "4K", sizeMb: 14.8, fps: 30, premium: true, sound: false, accent: ORANGE },
+  { id: "pteranodon-cliffs", title: "Pteranodon", subtitle: "Reptil volador sobre acantilados volcánicos", category: "dinosaurios", src: pteranodon, video: pteranodonVid.url, resolution: "4K", sizeMb: 14.2, fps: 60, premium: true, sound: false, accent: ORANGE },
+  { id: "triceratops-plains", title: "Triceratops", subtitle: "Pastando en llanura cretácica al ocaso", category: "dinosaurios", src: triceratops, video: triceratopsVid.url, resolution: "4K", sizeMb: 15.1, fps: 30, premium: false, sound: true, accent: ORANGE },
+
+  { id: "iceland-falls", title: "Cascada Islandia", subtitle: "Salto basáltico con arcoíris en bruma", category: "naturaleza", src: icelandFalls, video: icelandFallsVid.url, resolution: "4K", sizeMb: 14.6, fps: 60, premium: true, sound: true, accent: TEAL },
+  { id: "namib-desert", title: "Desierto Namib", subtitle: "Dunas rojas al amanecer con acacia", category: "naturaleza", src: namib, video: namibVid.url, resolution: "4K", sizeMb: 12.9, fps: 30, premium: false, sound: false, accent: ORANGE },
+  { id: "patagonia-glacier", title: "Glaciar Patagonia", subtitle: "Hielo turquesa cayendo a lago alpino", category: "naturaleza", src: patagonia, video: patagoniaVid.url, resolution: "4K", sizeMb: 15.4, fps: 30, premium: true, sound: true, accent: CYAN },
+  { id: "supercell-storm", title: "Supercélula", subtitle: "Tormenta masiva con rayos múltiples", category: "clima", src: supercell, video: supercellVid.url, resolution: "4K", sizeMb: 16.7, fps: 60, premium: true, sound: true, accent: PURPLE },
+  { id: "milky-mountain", title: "Pico Galáctico", subtitle: "Vía Láctea sobre cumbre nevada", category: "naturaleza", src: milkyMountain, video: milkyMountainVid.url, resolution: "4K", sizeMb: 16.3, fps: 30, premium: true, sound: false, accent: PURPLE },
+
+  { id: "liquid-gold", title: "Oro Líquido", subtitle: "Metal fundido fluyendo en cámara lenta", category: "3d-liquido", src: liquidGold, video: liquidGoldVid.url, resolution: "4K", sizeMb: 13.8, fps: 60, premium: true, sound: false, accent: GOLD },
+  { id: "fractal-infinite", title: "Fractal Infinito", subtitle: "Mandelbrot zoom hipnótico cian y rosa", category: "3d-fractal", src: fractalInfinite, video: fractalInfiniteVid.url, resolution: "4K", sizeMb: 14.0, fps: 60, premium: true, sound: false, accent: PINK },
+  { id: "neon-plasma-ball", title: "Plasma Neón", subtitle: "Esfera eléctrica con arcos violeta", category: "3d-abstracto", src: neonPlasma, video: neonPlasmaVid.url, resolution: "4K", sizeMb: 13.5, fps: 60, premium: true, sound: true, accent: PURPLE },
+);
+
 WALLPAPERS.push(...generate3DWallpapers());
 
 // Catálogo limpio: cada wallpaper usa un asset único (sin remix duplicado).
