@@ -150,49 +150,6 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
-  useEffect(() => {
-    const capacitor = (window as Window & {
-      Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
-    }).Capacitor;
-    const isAndroidNative =
-      capacitor?.isNativePlatform?.() === true && capacitor?.getPlatform?.() === "android";
-    if (!isAndroidNative) return;
-
-    const originalOpen = window.open.bind(window);
-    const isExternalScheme = (url: string) => /^(intent|market|googlechrome|android-app):/i.test(url);
-    const keepInWebView = (url: string) => {
-      if (!url || isExternalScheme(url)) return;
-      if (/^https?:\/\//i.test(url) || url.startsWith("/")) {
-        window.location.assign(url);
-      }
-    };
-
-    window.open = ((url?: string | URL, target?: string, features?: string) => {
-      const nextUrl = url ? String(url) : "";
-      console.warn("AetherX Android blocked window.open", nextUrl, target);
-      keepInWebView(nextUrl);
-      return null;
-    }) as typeof window.open;
-
-    const onClick = (event: MouseEvent) => {
-      const target = event.target as Element | null;
-      const link = target?.closest?.("a[href]") as HTMLAnchorElement | null;
-      if (!link) return;
-      const href = link.getAttribute("href") ?? "";
-      if (link.target === "_blank" || isExternalScheme(href)) {
-        event.preventDefault();
-        console.warn("AetherX Android blocked external link target", href, link.target);
-        keepInWebView(link.href || href);
-      }
-    };
-
-    document.addEventListener("click", onClick, true);
-    return () => {
-      window.open = originalOpen;
-      document.removeEventListener("click", onClick, true);
-    };
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <AppStateProvider>
