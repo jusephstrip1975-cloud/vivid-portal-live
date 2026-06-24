@@ -107,18 +107,33 @@ function WallpaperDetail() {
             : successMsg,
         );
       } else {
-        // Navegador: descarga clásica del video
-        const res = await fetch(resolveDownloadUrl(wp.video), { mode: "cors" });
-        if (!res.ok) throw new Error("download-failed");
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        // Navegador: descarga directa vía <a download>. Evita fetch/CORS para
+        // que funcione aunque el origen publicado redirija al dominio custom.
+        const downloadUrl = resolveDownloadUrl(wp.video);
+        try {
+          const res = await fetch(downloadUrl, { mode: "cors" });
+          if (!res.ok) throw new Error("download-failed");
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+          // Fallback: el navegador descarga directamente desde el CDN, siguiendo
+          // cualquier redirección sin chocar con CORS.
+          const a = document.createElement("a");
+          a.href = downloadUrl;
+          a.download = fileName;
+          a.rel = "noopener";
+          a.target = "_self";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
         setToast("✓ MP4 descargado");
       }
 
