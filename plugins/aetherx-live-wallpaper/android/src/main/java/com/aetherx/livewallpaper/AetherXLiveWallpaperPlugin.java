@@ -56,29 +56,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         String fileName = normalizeFileName(call.getString("fileName"));
 
         execute(() -> {
-            HttpURLConnection connection = null;
             try {
-                connection = (HttpURLConnection) new URL(url).openConnection();
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(30000);
-                connection.connect();
-
-                int responseCode = connection.getResponseCode();
-                if (responseCode < 200 || responseCode >= 300) {
-                    call.reject("video-download-failed-" + responseCode);
-                    return;
-                }
-
                 File file = new File(getContext().getFilesDir(), VIDEO_FILE);
-                int total = 0;
-                byte[] buffer = new byte[8192];
-                try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(file, false)) {
-                    int read;
-                    while ((read = input.read(buffer)) != -1) {
-                        output.write(buffer, 0, read);
-                        total += read;
-                    }
-                }
+                int total = downloadVideo(url, file);
 
                 assertPlayableVideo(file);
 
@@ -86,10 +66,54 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 resolveSaved(call, file, total, galleryUri);
             } catch (Exception e) {
                 call.reject("video-download-save-failed", e);
+            }
+        });
+    }
+
+    private int downloadVideo(String initialUrl, File destination) throws Exception {
+        String currentUrl = initialUrl;
+        for (int redirect = 0; redirect <= 6; redirect++) {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(currentUrl);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setInstanceFollowRedirects(false);
+                connection.setConnectTimeout(20000);
+                connection.setReadTimeout(60000);
+                connection.setRequestProperty("Accept", "video/mp4,video/*,*/*");
+                connection.setRequestProperty("User-Agent", "AetherX-Android-LiveWallpaper/1.0");
+                connection.connect();
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode >= 300 && responseCode < 400) {
+                    String location = connection.getHeaderField("Location");
+                    if (location == null || location.length() == 0) {
+                        throw new IllegalStateException("video-redirect-missing-location-" + responseCode);
+                    }
+                    currentUrl = new URL(url, location).toString();
+                    continue;
+                }
+                if (responseCode < 200 || responseCode >= 300) {
+                    throw new IllegalStateException("video-download-failed-" + responseCode);
+                }
+
+                int total = 0;
+                byte[] buffer = new byte[8192];
+                try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(destination, false)) {
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, read);
+                        total += read;
+                    }
+                    output.flush();
+                }
+                if (total <= 0) throw new IllegalStateException("empty-video-download");
+                return total;
             } finally {
                 if (connection != null) connection.disconnect();
             }
-        });
+        }
+        throw new IllegalStateException("too-many-video-redirects");
     }
 
     @PluginMethod
@@ -384,9 +408,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             intent.putExtra("SET_LOCKSCREEN_WALLPAPER", false);
             Activity activity = getActivity();
             if (activity != null) {
+                if (intent.resolveActivity(activity.getPackageManager()) == null) {
+                    return launchLiveWallpaperChooser();
+                }
                 activity.startActivity(intent);
             } else {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                if (intent.resolveActivity(getContext().getPackageManager()) == null) {
+                    return launchLiveWallpaperChooser();
+                }
                 getContext().startActivity(intent);
             }
             return true;

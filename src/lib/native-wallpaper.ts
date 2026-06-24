@@ -149,7 +149,7 @@ export async function pickAndApplyDeviceVideo(
   return applyPickedVideo(target);
 }
 
-const PUBLISHED_ASSET_ORIGIN = "https://vivid-portal-live.lovable.app";
+const PUBLISHED_ASSET_ORIGIN = "https://aetherx.org";
 const PREVIEW_ASSET_ORIGIN = "https://id-preview--86067037-aec8-403d-b7be-5af9e39ce44c.lovable.app";
 
 export async function isNative(): Promise<boolean> {
