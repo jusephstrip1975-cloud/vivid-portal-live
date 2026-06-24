@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -30,6 +30,10 @@ function normalizeHtmlOutput() {
   if (existsSync(nestedIndex) && !existsSync(rootIndex)) {
     renameSync(nestedIndex, rootIndex);
     rmSync(join(publicDist, "src"), { recursive: true, force: true });
+  }
+  if (existsSync(rootIndex)) {
+    const normalized = readFileSync(rootIndex, "utf8").replaceAll("../assets/", "./assets/");
+    writeFileSync(rootIndex, normalized, "utf8");
   }
 }
 
