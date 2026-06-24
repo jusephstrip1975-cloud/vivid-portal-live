@@ -1,31 +1,147 @@
 package com.aetherx.wallpapers;
 
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Message;
 import android.util.Log;
+import android.webkit.ConsoleMessage;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.aetherx.livewallpaper.AetherXLiveWallpaperPlugin;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebChromeClient;
+import com.getcapacitor.BridgeWebViewClient;
 
 /**
  * MainActivity de AetherX.
- * Carga la app localmente desde assets (dist/client).
+ * Carga la app localmente desde assets empaquetados por Capacitor.
  */
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "AetherXMainActivity";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.d(TAG, "onCreate: registering native live wallpaper plugin");
+        Log.i(TAG, "onCreate: local Capacitor boot; no server.url and no remote loadUrl");
         registerPlugin(AetherXLiveWallpaperPlugin.class);
         super.onCreate(savedInstanceState);
-        
-        // El WebView de Capacitor cargará automáticamente el contenido de dist/client
-        // definido en capacitor.config.ts (webDir).
-        
+
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
-        if (webView != null) {
-            // Habilitar depuración para facilitar inspección local
-            WebView.setWebContentsDebuggingEnabled(true);
+        if (webView == null) {
+            Log.e(TAG, "WebView is null during local boot");
+            return;
         }
+
+        WebView.setWebContentsDebuggingEnabled(true);
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setBlockNetworkLoads(false);
+        settings.setBlockNetworkImage(false);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
+        settings.setSupportMultipleWindows(false);
+
+        BridgeWebViewClient guardedClient = new BridgeWebViewClient(getBridge()) {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri = request != null ? request.getUrl() : null;
+                boolean mainFrame = request != null && request.isForMainFrame();
+                return handleNavigation(uri, mainFrame, "request");
+            }
+
+            @Override
+            @SuppressWarnings("deprecation")
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return handleNavigation(url == null ? null : Uri.parse(url), true, "legacy");
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                Log.i(TAG, "onPageStarted: " + url);
+                super.onPageStarted(view, url, favicon);
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                Log.i(TAG, "onPageFinished: " + url + " progress=" + (view != null ? view.getProgress() : -1));
+                super.onPageFinished(view, url);
+            }
+        };
+        getBridge().setWebViewClient(guardedClient);
+        webView.setWebViewClient(guardedClient);
+
+        webView.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+                if (consoleMessage != null) {
+                    Log.d(TAG, "Web console: " + consoleMessage.message()
+                        + " @" + consoleMessage.sourceId() + ":" + consoleMessage.lineNumber());
+                }
+                return super.onConsoleMessage(consoleMessage);
+            }
+
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                Log.w(TAG, "Blocked new WebView/window.open. isDialog=" + isDialog + " userGesture=" + isUserGesture);
+                return false;
+            }
+        });
+
+        Log.i(TAG, "LOCAL_CAPACITOR_BOOT appUrl=" + getBridge().getAppUrl() + " currentUrl=" + webView.getUrl());
+        Log.i(TAG, "NO_REMOTE_BOOT_URL: MainActivity never calls loadUrl(https://aetherx.org)");
+    }
+
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        Uri data = intent != null ? intent.getData() : null;
+        Log.d(TAG, "onNewIntent action=" + (intent != null ? intent.getAction() : null) + " data=" + data);
+        if (data != null && isHttpLike(data)) {
+            Log.w(TAG, "Blocked incoming external URL intent; staying in local app: " + data);
+        }
+    }
+
+    private boolean handleNavigation(Uri uri, boolean isMainFrame, String source) {
+        if (uri == null) {
+            Log.w(TAG, "Blocked null navigation from " + source);
+            return true;
+        }
+
+        String url = uri.toString();
+        String scheme = uri.getScheme();
+        Log.d(TAG, "Navigation from " + source + ": " + url + " mainFrame=" + isMainFrame);
+
+        if (isHttpLike(uri)) {
+            if (!isMainFrame || isLocalCapacitorHost(uri)) {
+                return false;
+            }
+            Log.w(TAG, "Blocked remote main-frame navigation. No Chrome launch: " + url);
+            return true;
+        }
+
+        if ("data".equalsIgnoreCase(scheme) || "blob".equalsIgnoreCase(scheme) || "about".equalsIgnoreCase(scheme)
+            || "file".equalsIgnoreCase(scheme) || "capacitor".equalsIgnoreCase(scheme)) {
+            return false;
+        }
+
+        Log.w(TAG, "Blocked external Android scheme: " + url);
+        return true;
+    }
+
+    private boolean isHttpLike(Uri uri) {
+        if (uri == null) return false;
+        String scheme = uri.getScheme();
+        return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+    }
+
+    private boolean isLocalCapacitorHost(Uri uri) {
+        if (uri == null || uri.getHost() == null) return false;
+        String host = uri.getHost().toLowerCase();
+        return host.equals("localhost") || host.equals("127.0.0.1") || host.equals("0.0.0.0");
     }
 }

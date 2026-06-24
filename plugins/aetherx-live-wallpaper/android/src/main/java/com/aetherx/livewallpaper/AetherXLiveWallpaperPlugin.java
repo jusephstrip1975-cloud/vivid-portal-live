@@ -51,8 +51,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     /**
      * Capacitor llama a este hook ANTES de aplicar su política por defecto.
      * Si devolvemos null, Capacitor puede ejecutar Intent.ACTION_VIEW para URLs
-     * fuera de su máscara y eso abre Chrome. Aquí forzamos que cualquier http/https
-     * continúe dentro del WebView y bloqueamos esquemas externos como intent:// o market://.
+     * fuera de su máscara y eso abre Chrome. El APK inicia desde assets locales,
+     * así que bloqueamos navegación remota main-frame desde el bridge.
      */
     @Override
     public Boolean shouldOverrideLoad(Uri url) {
@@ -66,11 +66,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         Log.d(TAG, "Navigation request from Capacitor bridge: " + rawUrl);
 
         if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
-            if (isAllowedWebHost(url)) {
-                Log.i(TAG, "Allowed WebView navigation, no external browser: " + rawUrl);
+            if (isLocalCapacitorHost(url)) {
+                Log.i(TAG, "Allowed local Capacitor WebView navigation: " + rawUrl);
                 return false;
             }
-            Log.w(TAG, "Blocked external web navigation before Android ACTION_VIEW: " + rawUrl);
+            Log.w(TAG, "Blocked remote navigation before Android ACTION_VIEW/Chrome: " + rawUrl);
             return true;
         }
 
@@ -82,17 +82,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         return true;
     }
 
-    private boolean isAllowedWebHost(Uri uri) {
+    private boolean isLocalCapacitorHost(Uri uri) {
         if (uri == null || uri.getHost() == null) return false;
         String host = uri.getHost().toLowerCase();
-        return host.equals("aetherx.org")
-            || host.equals("www.aetherx.org")
-            || host.endsWith(".aetherx.org")
-            || host.equals("vivid-portal-live.lovable.app")
-            || host.endsWith(".lovable.app")
-            || host.endsWith(".lovableproject.com")
-            || host.endsWith(".supabase.co")
-            || host.endsWith(".supabase.in");
+        return host.equals("localhost") || host.equals("127.0.0.1") || host.equals("0.0.0.0");
     }
 
     @PluginMethod
