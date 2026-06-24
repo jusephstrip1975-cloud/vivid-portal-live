@@ -25,6 +25,9 @@ function assertLocalBundle() {
   if (!index.includes("aetherx-native-fallback")) {
     throw new Error("public/dist/index.html is missing the native boot fallback.");
   }
+  if (!index.includes("AetherX cargando local") || !index.includes("window.onerror")) {
+    throw new Error("public/dist/index.html is missing visible Android boot diagnostics.");
+  }
 }
 
 function normalizeHtmlOutput() {

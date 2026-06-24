@@ -8,7 +8,7 @@
     />
     <meta name="theme-color" content="#02040a" />
     <title>AetherX</title>
-    <script type="module" crossorigin src="./assets/index-BUNedds-.js"></script>
+    <script type="module" crossorigin src="./assets/index-qm07hWoj.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/styles-DOLk957M.css">
   </head>
   <body>
@@ -16,7 +16,8 @@
       <main class="aetherx-native-fallback" aria-label="AetherX iniciando">
         <div>
           <strong>AetherX</strong>
-          <span>Iniciando app local…</span>
+          <span>AetherX cargando local</span>
+          <pre id="aetherx-boot-error" hidden></pre>
         </div>
       </main>
     </div>
@@ -52,8 +53,41 @@
         color: rgba(248, 250, 252, 0.62);
         font-size: 13px;
       }
+      #aetherx-boot-error {
+        box-sizing: border-box;
+        max-width: min(88vw, 520px);
+        margin: 10px 0 0;
+        padding: 14px;
+        border: 1px solid rgba(239, 68, 68, 0.55);
+        border-radius: 14px;
+        background: rgba(127, 29, 29, 0.28);
+        color: #fecaca;
+        white-space: pre-wrap;
+        text-align: left;
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
     </style>
     <script>
+      (function () {
+        function showBootError(kind, value, source, line, column) {
+          var node = document.getElementById("aetherx-boot-error");
+          if (!node) return;
+          var message = value && value.stack ? value.stack : value && value.message ? value.message : String(value || "Error desconocido");
+          node.hidden = false;
+          node.textContent = kind + "\n" + message + (source ? "\n" + source + ":" + line + ":" + column : "");
+          document.documentElement.dataset.aetherxBootError = "true";
+        }
+        window.__aetherxShowBootError = showBootError;
+        window.onerror = function (message, source, line, column, error) {
+          console.error("[AetherX Android] window.onerror", message, source, line, column, error);
+          showBootError("window.onerror", error || message, source, line, column);
+          return false;
+        };
+        window.onunhandledrejection = function (event) {
+          console.error("[AetherX Android] onunhandledrejection", event && event.reason);
+          showBootError("unhandledrejection", event && event.reason);
+        };
+      })();
       console.info(
         "[AetherX Android] Booting SPA from packaged Capacitor local assets",
         location.href,

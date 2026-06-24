@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.Message;
 import android.util.Log;
 import android.webkit.ConsoleMessage;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -15,6 +16,7 @@ import com.aetherx.livewallpaper.AetherXLiveWallpaperPlugin;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
 import com.getcapacitor.BridgeWebViewClient;
+import com.getcapacitor.ServerPath;
 
 /**
  * MainActivity de AetherX.
@@ -35,12 +37,14 @@ public class MainActivity extends BridgeActivity {
                 + " categories=" + launchIntent.getCategories() + " package=" + launchIntent.getPackage());
             if (android.content.Intent.ACTION_VIEW.equals(action)) {
                 Log.w(TAG, "BOOT_AUDIT WARNING: app launched via ACTION_VIEW — ignoring URI, staying in local WebView");
+                setIntent(createCleanLauncherIntent());
             } else {
                 Log.i(TAG, "BOOT_AUDIT OK: no ACTION_VIEW at boot; no external Chrome/Browser launch path triggered");
             }
         }
-        Log.i(TAG, "BOOT_AUDIT MainActivity has no external browser launch path — verified by static audit");
+        Log.i(TAG, "BOOT_AUDIT MainActivity has no external browser launch path — forcing assets/public before Bridge load");
         registerPlugin(AetherXLiveWallpaperPlugin.class);
+        bridgeBuilder.setServerPath(new ServerPath(ServerPath.PathType.ASSET_PATH, "public"));
         super.onCreate(savedInstanceState);
 
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
@@ -90,6 +94,9 @@ public class MainActivity extends BridgeActivity {
                 int code = error != null ? error.getErrorCode() : 0;
                 Log.e(TAG, "onReceivedError url=" + uri + " mainFrame=" + mainFrame + " code=" + code + " description=" + description);
                 super.onReceivedError(view, request, error);
+                if (mainFrame) {
+                    showNativeBootError(view, "WebView main-frame error " + code + ": " + description + "\nURL: " + uri);
+                }
             }
 
             @Override
@@ -98,6 +105,16 @@ public class MainActivity extends BridgeActivity {
                 int status = errorResponse != null ? errorResponse.getStatusCode() : 0;
                 Log.e(TAG, "onReceivedHttpError url=" + uri + " mainFrame=" + (request != null && request.isForMainFrame()) + " status=" + status);
                 super.onReceivedHttpError(view, request, errorResponse);
+                if (request != null && request.isForMainFrame()) {
+                    showNativeBootError(view, "WebView main-frame HTTP error " + status + "\nURL: " + uri);
+                }
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                Log.e(TAG, "WebView render process gone. didCrash=" + (detail != null && detail.didCrash()));
+                showNativeBootError(view, "WebView render process gone. didCrash=" + (detail != null && detail.didCrash()));
+                return true;
             }
 
             @Override
@@ -136,9 +153,7 @@ public class MainActivity extends BridgeActivity {
         Log.d(TAG, "onNewIntent action=" + (intent != null ? intent.getAction() : null) + " data=" + data);
         if (data != null && isHttpLike(data)) {
             Log.w(TAG, "Blocked incoming external URL intent; staying in local app: " + data);
-            android.content.Intent cleanIntent = new android.content.Intent(this, MainActivity.class);
-            cleanIntent.setAction(android.content.Intent.ACTION_MAIN);
-            cleanIntent.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
+            android.content.Intent cleanIntent = createCleanLauncherIntent();
             setIntent(cleanIntent);
             super.onNewIntent(cleanIntent);
             return;
@@ -184,6 +199,29 @@ public class MainActivity extends BridgeActivity {
         if (uri == null || uri.getHost() == null) return false;
         String host = uri.getHost().toLowerCase();
         return host.equals("localhost") || host.equals("127.0.0.1") || host.equals("0.0.0.0");
+    }
+
+    private android.content.Intent createCleanLauncherIntent() {
+        android.content.Intent cleanIntent = new android.content.Intent(this, MainActivity.class);
+        cleanIntent.setAction(android.content.Intent.ACTION_MAIN);
+        cleanIntent.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
+        cleanIntent.setPackage(getPackageName());
+        cleanIntent.setData(null);
+        return cleanIntent;
+    }
+
+    private void showNativeBootError(WebView view, String message) {
+        if (view == null) return;
+        String safeMessage = message == null ? "Error desconocido" : message
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;");
+        String html = "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            + "<style>html,body{margin:0;min-height:100%;background:#02040a;color:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,sans-serif}"
+            + "main{min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 30% 20%,rgba(14,165,233,.24),transparent 38%),#02040a}"
+            + "section{max-width:560px}h1{font-size:28px;margin:0 0 8px;letter-spacing:.08em}p{color:rgba(248,250,252,.7)}pre{white-space:pre-wrap;color:#fecaca;background:rgba(127,29,29,.28);border:1px solid rgba(239,68,68,.55);border-radius:14px;padding:14px;font:12px/1.45 monospace}</style></head>"
+            + "<body><main><section><h1>AetherX</h1><p>AetherX cargando local</p><pre>" + safeMessage + "</pre></section></main></body></html>";
+        view.post(() -> view.loadDataWithBaseURL("https://localhost/", html, "text/html", "UTF-8", null));
     }
 
 }

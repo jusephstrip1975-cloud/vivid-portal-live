@@ -49,6 +49,7 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         def assetsDir = file("$projectDir/src/main/assets")
         def indexFile = file("$projectDir/src/main/assets/public/index.html")
         def configFile = file("$projectDir/src/main/assets/capacitor.config.json")
+        def mainActivityFile = file("$projectDir/src/main/java/com/aetherx/wallpapers/MainActivity.java")
 
         if (!assetsDir.exists()) {
             throw new GradleException('Missing android/app/src/main/assets. Run: bun run build && npx cap sync android')
@@ -59,9 +60,13 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         if (!configFile.exists()) {
             throw new GradleException('Missing android/app/src/main/assets/capacitor.config.json. Run: bun run build && npx cap sync android')
         }
+        if (!mainActivityFile.exists()) {
+            throw new GradleException('Missing real android/app MainActivity.java')
+        }
 
         def indexText = indexFile.getText('UTF-8')
         def configText = configFile.getText('UTF-8')
+        def mainActivityText = mainActivityFile.getText('UTF-8')
 
         if (configText.contains('"server"') || configText.contains('aetherx.org') || configText.contains('server.url')) {
             throw new GradleException('Forbidden remote Capacitor startup config found. capacitor.config.json must not contain server.url or aetherx.org')
@@ -77,6 +82,15 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         }
         if (!indexText.contains('aetherx-native-fallback')) {
             throw new GradleException('Local index.html is missing the native boot fallback; Android would show black if JS fails')
+        }
+        if (!indexText.contains('AetherX cargando local') || !indexText.contains('window.onerror')) {
+            throw new GradleException('Local index.html must show visible boot diagnostics and capture JS startup errors')
+        }
+        if (!mainActivityText.contains('new ServerPath(ServerPath.PathType.ASSET_PATH, "public")')) {
+            throw new GradleException('MainActivity must force Capacitor to serve android/app/src/main/assets/public before first WebView load')
+        }
+        if (mainActivityText.contains('loadUrl("https://aetherx.org') || mainActivityText.contains('Intent.ACTION_VIEW, Uri.parse') || mainActivityText.contains('Browser.open')) {
+            throw new GradleException('MainActivity contains a forbidden external browser or remote load path')
         }
     }
 }
