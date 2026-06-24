@@ -13,9 +13,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
  *  - cleartext: false (todo es HTTPS).
  *  - allowMixedContent: false (no mezclamos http en https).
  *
- * Si necesitas que enlaces externos (no aetherx.org) se abran fuera de la app,
- * usa <a target="_blank"> — el plugin @capacitor/browser o el override de
- * MainActivity los redirige a Chrome. Todo lo que sea aetherx.org se queda dentro.
+ * MainActivity bloquea intent://, market:// y cualquier esquema externo para
+ * evitar que Android abra Chrome fuera del WebView.
  */
 const config: CapacitorConfig = {
   appId: "com.aetherx.wallpapers",
