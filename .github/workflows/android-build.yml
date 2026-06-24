@@ -34,9 +34,6 @@ jobs:
       - name: Build web app
         run: bun run build
 
-      - name: Generate Capacitor fallback index.html
-        run: node scripts/generate-capacitor-index.mjs
-
       - name: Add Android platform
         run: bunx cap add android || echo "Android platform already exists"
 
