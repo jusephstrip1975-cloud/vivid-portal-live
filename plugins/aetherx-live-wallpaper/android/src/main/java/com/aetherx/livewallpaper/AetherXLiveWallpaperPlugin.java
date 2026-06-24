@@ -269,20 +269,34 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 call.reject("missing-saved-video");
                 return;
             }
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-                call.reject("lock-screen-not-supported");
-                return;
-            }
-            Bitmap frame = extractFirstFrame(file);
-            if (frame == null) {
-                call.reject("lock-frame-extract-failed");
-                return;
-            }
             WallpaperManager manager = WallpaperManager.getInstance(getContext());
-            manager.setBitmap(frame, null, true, WallpaperManager.FLAG_LOCK);
-            frame.recycle();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!manager.isWallpaperSupported()) {
+                    call.reject("wallpaper-not-supported");
+                    return;
+                }
+                if (!manager.isSetWallpaperAllowed()) {
+                    call.reject("set-wallpaper-not-allowed");
+                    return;
+                }
+            }
+
+            ComponentName service = getLiveWallpaperComponent();
+            if (!isLiveWallpaperServiceRegistered(service)) {
+                call.reject("live-wallpaper-service-not-registered");
+                return;
+            }
+
+            boolean openedPicker = launchLiveWallpaperPreview(service);
+            boolean verified = isCurrentLiveWallpaper(manager, service);
+            if (!verified && !openedPicker) {
+                openedPicker = launchLiveWallpaperPreview(service);
+            }
+
             JSObject result = new JSObject();
-            result.put("applied", true);
+            result.put("applied", verified);
+            result.put("openedPicker", openedPicker);
+            result.put("needsConfirmation", openedPicker && !verified);
             call.resolve(result);
         } catch (Exception e) {
             call.reject("lock-wallpaper-apply-failed", e);
@@ -391,7 +405,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
             intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, service);
             intent.putExtra("android.service.wallpaper.extra.FROM_FOREGROUND_APP", true);
-            intent.putExtra("SET_LOCKSCREEN_WALLPAPER", false);
             Activity activity = getActivity();
             if (activity != null) {
                 if (intent.resolveActivity(activity.getPackageManager()) == null) {
