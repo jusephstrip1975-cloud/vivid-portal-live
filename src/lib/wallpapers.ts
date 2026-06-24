@@ -538,7 +538,9 @@ const THREE_D_CATS: { id: Category; slug: string; label: string; titles: string[
 function generate3DWallpapers(): Wallpaper[] {
   const result: Wallpaper[] = [];
   for (const cat of THREE_D_CATS) {
-    for (let i = 0; i < cat.titles.length; i++) {
+    // Limitamos a POOL_3D.length para que cada asset 3D aparezca UNA sola vez por categoría (sin duplicados).
+    const titles = cat.titles.slice(0, POOL_3D.length);
+    for (let i = 0; i < titles.length; i++) {
       const pool = POOL_3D[i % POOL_3D.length];
       const isPremium = i % 3 !== 0;
       const fps: 30 | 60 = i % 2 === 0 ? 60 : 30;
@@ -546,7 +548,7 @@ function generate3DWallpapers(): Wallpaper[] {
       const sizeMb = Math.round((10 + (i % 12) + ((i * 7) % 10) * 0.4) * 10) / 10;
       result.push({
         id: `3d-${cat.slug}-${String(i + 1).padStart(2, "0")}`,
-        title: cat.titles[i],
+        title: titles[i],
         subtitle: cat.subtitle,
         category: cat.id,
         src: pool.src,
