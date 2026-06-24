@@ -258,6 +258,27 @@ import milkyMountain from "@/assets/wp-milky-mountain.jpg";
 import liquidGold from "@/assets/wp-liquid-gold.jpg";
 import fractalInfinite from "@/assets/wp-fractal-infinite.jpg";
 import neonPlasma from "@/assets/wp-neon-plasma.jpg";
+import galCruiser from "@/assets/wp-galactica-cruiser.jpg";
+import galXfighters from "@/assets/wp-galactica-xfighters.jpg";
+import galTwinsuns from "@/assets/wp-galactica-twinsuns.jpg";
+import galSaberduel from "@/assets/wp-galactica-saberduel.jpg";
+import galDeathstation from "@/assets/wp-galactica-deathstation.jpg";
+import galWalkers from "@/assets/wp-galactica-walkers.jpg";
+import galHyperspace from "@/assets/wp-galactica-hyperspace.jpg";
+import galBattle from "@/assets/wp-galactica-battle.jpg";
+import galFreighter from "@/assets/wp-galactica-freighter.jpg";
+import galForestmoon from "@/assets/wp-galactica-forestmoon.jpg";
+
+import galCruiserVid from "@/assets/wp-galactica-cruiser.mp4.asset.json";
+import galXfightersVid from "@/assets/wp-galactica-xfighters.mp4.asset.json";
+import galTwinsunsVid from "@/assets/wp-galactica-twinsuns.mp4.asset.json";
+import galSaberduelVid from "@/assets/wp-galactica-saberduel.mp4.asset.json";
+import galDeathstationVid from "@/assets/wp-galactica-deathstation.mp4.asset.json";
+import galWalkersVid from "@/assets/wp-galactica-walkers.mp4.asset.json";
+import galHyperspaceVid from "@/assets/wp-galactica-hyperspace.mp4.asset.json";
+import galBattleVid from "@/assets/wp-galactica-battle.mp4.asset.json";
+import galFreighterVid from "@/assets/wp-galactica-freighter.mp4.asset.json";
+import galForestmoonVid from "@/assets/wp-galactica-forestmoon.mp4.asset.json";
 
 import carinaVid from "@/assets/wp-carina.mp4.asset.json";
 import milkywayVid from "@/assets/wp-milkyway.mp4.asset.json";
@@ -303,6 +324,7 @@ export type Category =
   | "tropical"
   | "urbano"
   | "dinosaurios"
+  | "galactica"
   | "3d-abstracto"
   | "3d-geometrico"
   | "3d-liquido"
@@ -329,6 +351,7 @@ export const CATEGORIES: { id: Category | "todos"; label: string }[] = [
   { id: "universo", label: "Universo" },
   { id: "supernova", label: "Supernova" },
   { id: "dinosaurios", label: "Dinosaurios" },
+  { id: "galactica", label: "Galáctica" },
   { id: "oceano", label: "Océano" },
   { id: "naturaleza", label: "Naturaleza" },
   { id: "clima", label: "Clima" },
@@ -601,6 +624,20 @@ WALLPAPERS.push(
   { id: "liquid-gold", title: "Oro Líquido", subtitle: "Metal fundido fluyendo en cámara lenta", category: "3d-liquido", src: liquidGold, video: liquidGoldVid.url, resolution: "4K", sizeMb: 13.8, fps: 60, premium: true, sound: false, accent: GOLD },
   { id: "fractal-infinite", title: "Fractal Infinito", subtitle: "Mandelbrot zoom hipnótico cian y rosa", category: "3d-fractal", src: fractalInfinite, video: fractalInfiniteVid.url, resolution: "4K", sizeMb: 14.0, fps: 60, premium: true, sound: false, accent: PINK },
   { id: "neon-plasma-ball", title: "Plasma Neón", subtitle: "Esfera eléctrica con arcos violeta", category: "3d-abstracto", src: neonPlasma, video: neonPlasmaVid.url, resolution: "4K", sizeMb: 13.5, fps: 60, premium: true, sound: true, accent: PURPLE },
+);
+
+// GALACTICA — saga de las galaxias (10)
+WALLPAPERS.push(
+  { id: "gal-cruiser", title: "Crucero Imperial", subtitle: "Nave de mando sobrevolando planeta desierto", category: "galactica", src: galCruiser, video: galCruiserVid.url, resolution: "4K", sizeMb: 17.8, fps: 60, premium: true, sound: true, accent: ORANGE },
+  { id: "gal-xfighters", title: "Escuadrón Caza-X", subtitle: "Cazas estelares cruzando campo de asteroides", category: "galactica", src: galXfighters, video: galXfightersVid.url, resolution: "4K", sizeMb: 16.5, fps: 60, premium: true, sound: true, accent: BLUE },
+  { id: "gal-twinsuns", title: "Soles Gemelos", subtitle: "Atardecer doble sobre dunas del desierto", category: "galactica", src: galTwinsuns, video: galTwinsunsVid.url, resolution: "4K", sizeMb: 12.4, fps: 30, premium: true, sound: false, accent: ORANGE },
+  { id: "gal-saberduel", title: "Duelo de Sables", subtitle: "Hojas de plasma chocando entre chispas", category: "galactica", src: galSaberduel, video: galSaberduelVid.url, resolution: "4K", sizeMb: 14.7, fps: 60, premium: true, sound: true, accent: RED },
+  { id: "gal-deathstation", title: "Estación Esfera", subtitle: "Estación de combate en órbita lunar", category: "galactica", src: galDeathstation, video: galDeathstationVid.url, resolution: "4K", sizeMb: 18.3, fps: 30, premium: true, sound: true, accent: GREEN },
+  { id: "gal-walkers", title: "Caminantes de Hielo", subtitle: "Caminantes blindados sobre planicie nevada", category: "galactica", src: galWalkers, video: galWalkersVid.url, resolution: "4K", sizeMb: 15.9, fps: 30, premium: true, sound: true, accent: SKY },
+  { id: "gal-hyperspace", title: "Salto Hiperespacial", subtitle: "Estrellas estiradas a velocidad de la luz", category: "galactica", src: galHyperspace, video: galHyperspaceVid.url, resolution: "4K", sizeMb: 13.6, fps: 60, premium: true, sound: true, accent: BLUE },
+  { id: "gal-battle", title: "Batalla Orbital", subtitle: "Flotas chocando con láseres sobre el planeta", category: "galactica", src: galBattle, video: galBattleVid.url, resolution: "4K", sizeMb: 18.9, fps: 60, premium: true, sound: true, accent: RED },
+  { id: "gal-freighter", title: "Carguero Rebelde", subtitle: "Nave corsaria escapando por cañón rojo", category: "galactica", src: galFreighter, video: galFreighterVid.url, resolution: "4K", sizeMb: 15.2, fps: 60, premium: true, sound: true, accent: ORANGE },
+  { id: "gal-forestmoon", title: "Luna del Bosque", subtitle: "Gigante gaseoso sobre templo en jungla", category: "galactica", src: galForestmoon, video: galForestmoonVid.url, resolution: "4K", sizeMb: 13.4, fps: 30, premium: false, sound: true, accent: GOLD },
 );
 
 WALLPAPERS.push(...generate3DWallpapers());
