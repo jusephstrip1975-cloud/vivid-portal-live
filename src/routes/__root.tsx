@@ -161,6 +161,7 @@ function RootComponent() {
           </main>
           <BottomNav />
         </div>
+        <BootIntro />
       </AppStateProvider>
     </QueryClientProvider>
   );
