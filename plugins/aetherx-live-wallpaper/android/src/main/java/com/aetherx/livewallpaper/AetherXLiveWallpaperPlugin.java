@@ -305,29 +305,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
 
             boolean openedPicker = launchLiveWallpaperPreview(service);
-
-            boolean lockApplied = false;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                Bitmap frame = extractFirstFrame(file);
-                if (frame != null) {
-                    try {
-                        manager.setBitmap(frame, null, true, WallpaperManager.FLAG_LOCK);
-                        lockApplied = true;
-                    } finally {
-                        frame.recycle();
-                    }
-                }
-            }
-
             boolean verifiedHome = isCurrentLiveWallpaper(manager, service);
             if (!verifiedHome && !openedPicker) {
                 openedPicker = launchLiveWallpaperPreview(service);
             }
 
             JSObject result = new JSObject();
-            result.put("applied", verifiedHome || lockApplied || openedPicker);
+            result.put("applied", verifiedHome || openedPicker);
             result.put("homeVerified", verifiedHome);
-            result.put("lockApplied", lockApplied);
+            result.put("lockApplied", false);
             result.put("openedPicker", openedPicker);
             result.put("needsConfirmation", openedPicker && !verifiedHome);
             call.resolve(result);
