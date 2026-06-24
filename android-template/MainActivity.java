@@ -111,12 +111,19 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onNewIntent(android.content.Intent intent) {
-        super.onNewIntent(intent);
         Uri data = intent != null ? intent.getData() : null;
         Log.d(TAG, "onNewIntent action=" + (intent != null ? intent.getAction() : null) + " data=" + data);
         if (data != null && isHttpLike(data)) {
             Log.w(TAG, "Blocked incoming external URL intent; staying in local app: " + data);
+            android.content.Intent cleanIntent = new android.content.Intent(this, MainActivity.class);
+            cleanIntent.setAction(android.content.Intent.ACTION_MAIN);
+            cleanIntent.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
+            setIntent(cleanIntent);
+            super.onNewIntent(cleanIntent);
+            return;
         }
+        setIntent(intent);
+        super.onNewIntent(intent);
     }
 
     private boolean handleNavigation(Uri uri, boolean isMainFrame, String source) {
