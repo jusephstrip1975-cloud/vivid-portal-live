@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "prebuild": "node scripts/prepare-android-local.mjs --clean",
     "build": "vite build",
+    "postbuild": "node scripts/prepare-android-local.mjs --prepare",
     "build:android": "bash scripts/build-android.sh",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
