@@ -4,7 +4,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * Capacitor config — APK local.
  *
  * Android arranca desde `public/dist/index.html`, empaquetado dentro del APK.
- * No usamos `server.url`, no hay carga remota inicial y MainActivity no fuerza
+ * No hay configuración remota de servidor, no hay carga remota inicial y MainActivity no fuerza
  * ninguna URL web remota.
  */
 const config: CapacitorConfig = {

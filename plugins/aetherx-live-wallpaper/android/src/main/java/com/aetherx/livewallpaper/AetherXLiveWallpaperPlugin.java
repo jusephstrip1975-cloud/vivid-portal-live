@@ -50,9 +50,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     /**
      * Capacitor llama a este hook ANTES de aplicar su política por defecto.
-     * Si devolvemos null, Capacitor puede ejecutar Intent.ACTION_VIEW para URLs
-     * fuera de su máscara y eso abre Chrome. El APK inicia desde assets locales,
-     * así que bloqueamos navegación remota main-frame desde el bridge.
+     * Si devolvemos null, Capacitor puede delegar URLs fuera de su máscara al
+     * navegador externo. El APK inicia desde assets locales, así que bloqueamos
+     * navegación remota main-frame desde el bridge.
      */
     @Override
     public Boolean shouldOverrideLoad(Uri url) {
@@ -70,7 +70,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 Log.i(TAG, "Allowed local Capacitor WebView navigation: " + rawUrl);
                 return false;
             }
-            Log.w(TAG, "Blocked remote navigation before Android ACTION_VIEW/Chrome: " + rawUrl);
+            Log.w(TAG, "Blocked remote navigation before external browser delegation: " + rawUrl);
             return true;
         }
 

@@ -23,7 +23,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.i(TAG, "onCreate: local Capacitor boot; no server.url and no forced remote URL");
+        Log.i(TAG, "onCreate: local Capacitor boot; no remote server config and no forced remote URL");
         registerPlugin(AetherXLiveWallpaperPlugin.class);
         super.onCreate(savedInstanceState);
 
