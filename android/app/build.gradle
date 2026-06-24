@@ -78,6 +78,9 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         if (!indexText.contains('aetherx-native-fallback')) {
             throw new GradleException('Local index.html is missing the native boot fallback; Android would show black if JS fails')
         }
+        if (!indexText.contains('AetherX cargando local') || !indexText.contains('window.onerror')) {
+            throw new GradleException('Local index.html must show visible boot diagnostics and capture JS startup errors')
+        }
     }
 }
 
