@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -24,12 +24,22 @@ function assertLocalBundle() {
   }
 }
 
+function normalizeHtmlOutput() {
+  const nestedIndex = join(publicDist, "src", "capacitor-index.html");
+  const rootIndex = join(publicDist, "index.html");
+  if (existsSync(nestedIndex) && !existsSync(rootIndex)) {
+    renameSync(nestedIndex, rootIndex);
+    rmSync(join(publicDist, "src"), { recursive: true, force: true });
+  }
+}
+
 function prepare() {
   cleanPublicDist();
   execFileSync("bunx", ["vite", "build", "--config", "vite.capacitor.config.ts"], {
     cwd: root,
     stdio: "inherit",
   });
+  normalizeHtmlOutput();
   assertLocalBundle();
   console.log("Prepared Capacitor SPA at public/dist/index.html for 100% local APK startup");
 }

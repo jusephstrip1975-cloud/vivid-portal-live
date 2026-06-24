@@ -6,6 +6,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   appType: "spa",
+  base: "./",
   publicDir: false,
   plugins: [react(), tailwindcss(), tsconfigPaths()],
   build: {
