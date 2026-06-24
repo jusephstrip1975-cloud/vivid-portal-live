@@ -287,6 +287,7 @@ import neonPlasmaVid from "@/assets/wp-neon-plasma.mp4.asset.json";
 
 export type Category =
   | "universo"
+  | "supernova"
   | "oceano"
   | "naturaleza"
   | "clima"
@@ -301,6 +302,7 @@ export type Category =
   | "noche"
   | "tropical"
   | "urbano"
+  | "dinosaurios"
   | "3d-abstracto"
   | "3d-geometrico"
   | "3d-liquido"
