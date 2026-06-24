@@ -11,6 +11,10 @@ if (!rootElement) {
   throw new Error("AetherX Capacitor root element not found");
 }
 
+if (window.location.pathname.endsWith("/index.html")) {
+  window.history.replaceState(null, document.title, "./");
+}
+
 const router = getRouter();
 
 startTransition(() => {
