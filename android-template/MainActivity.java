@@ -15,6 +15,7 @@ import com.aetherx.livewallpaper.AetherXLiveWallpaperPlugin;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
 import com.getcapacitor.BridgeWebViewClient;
+import com.getcapacitor.ServerPath;
 
 /**
  * MainActivity de AetherX.
@@ -34,12 +35,14 @@ public class MainActivity extends BridgeActivity {
                 + " categories=" + launchIntent.getCategories() + " package=" + launchIntent.getPackage());
             if (android.content.Intent.ACTION_VIEW.equals(action)) {
                 Log.w(TAG, "BOOT_AUDIT WARNING: app launched via ACTION_VIEW — ignoring URI, staying in local WebView");
+                setIntent(createCleanLauncherIntent());
             } else {
                 Log.i(TAG, "BOOT_AUDIT OK: no ACTION_VIEW at boot; no external Chrome/Browser launch path triggered");
             }
         }
-        Log.i(TAG, "BOOT_AUDIT MainActivity has no external browser launch path — verified by static audit");
+        Log.i(TAG, "BOOT_AUDIT MainActivity has no external browser launch path — forcing assets/public before Bridge load");
         registerPlugin(AetherXLiveWallpaperPlugin.class);
+        bridgeBuilder.setServerPath(new ServerPath(ServerPath.PathType.ASSET_PATH, "public"));
         super.onCreate(savedInstanceState);
 
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
@@ -135,9 +138,7 @@ public class MainActivity extends BridgeActivity {
         Log.d(TAG, "onNewIntent action=" + (intent != null ? intent.getAction() : null) + " data=" + data);
         if (data != null && isHttpLike(data)) {
             Log.w(TAG, "Blocked incoming external URL intent; staying in local app: " + data);
-            android.content.Intent cleanIntent = new android.content.Intent(this, MainActivity.class);
-            cleanIntent.setAction(android.content.Intent.ACTION_MAIN);
-            cleanIntent.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
+            android.content.Intent cleanIntent = createCleanLauncherIntent();
             setIntent(cleanIntent);
             super.onNewIntent(cleanIntent);
             return;
@@ -183,6 +184,15 @@ public class MainActivity extends BridgeActivity {
         if (uri == null || uri.getHost() == null) return false;
         String host = uri.getHost().toLowerCase();
         return host.equals("localhost") || host.equals("127.0.0.1") || host.equals("0.0.0.0");
+    }
+
+    private android.content.Intent createCleanLauncherIntent() {
+        android.content.Intent cleanIntent = new android.content.Intent(this, MainActivity.class);
+        cleanIntent.setAction(android.content.Intent.ACTION_MAIN);
+        cleanIntent.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
+        cleanIntent.setPackage(getPackageName());
+        cleanIntent.setData(null);
+        return cleanIntent;
     }
 
 }
