@@ -77,15 +77,8 @@ function WallpaperDetail() {
         // Verificación previa de compatibilidad (solo bloquea si el destino requiere Live Wallpaper)
         const compat = await checkWallpaperCompatibility();
         if (compat) {
-          const needsLive = target === "home" || target === "both";
+          const needsLive = target === "home" || target === "lock" || target === "both";
           if (needsLive && !compat.canApplyHome && compat.reason !== "no-video") {
-            setDownloadState("idle");
-            setActiveTarget(null);
-            setToast(`⚠ ${compat.message}`);
-            setTimeout(() => setToast(null), 3600);
-            return;
-          }
-          if (target === "lock" && !compat.canApplyLock) {
             setDownloadState("idle");
             setActiveTarget(null);
             setToast(`⚠ ${compat.message}`);
@@ -103,7 +96,11 @@ function WallpaperDetail() {
               : "✓ Fondo animado aplicado en Inicio";
         setToast(
           result.needsPicker
-            ? "✓ Pulsa Aplicar y elige Pantalla de inicio"
+            ? target === "lock"
+              ? "✓ Pulsa Aplicar y elige Pantalla de bloqueo si aparece"
+              : target === "both"
+                ? "✓ Pulsa Aplicar y elige Inicio y bloqueo si aparece"
+                : "✓ Pulsa Aplicar y elige Pantalla de inicio"
             : successMsg,
         );
       } else {
@@ -283,11 +280,11 @@ function WallpaperDetail() {
             Cómo ponerlo de fondo
           </p>
           <ol className="space-y-1.5 list-decimal pl-5 text-white/65">
-            <li>Pulsa <strong className="text-white">Aplicar en Inicio</strong>.</li>
+            <li>Pulsa el destino que quieras: <strong className="text-white">Inicio</strong>, <strong className="text-white">Bloqueo</strong> o <strong className="text-white">Inicio y bloqueo</strong>.</li>
             <li>El video MP4 también queda guardado en <strong className="text-white">Galería/Fotos</strong>.</li>
             <li>Se abre <strong className="text-white">AetherX Live Wallpaper</strong> para aplicarlo animado.</li>
             <li>
-              En la pantalla de Android pulsa <strong className="text-white">Aplicar</strong> y elige <strong className="text-white">Pantalla de inicio</strong>.
+              En Android pulsa <strong className="text-white">Aplicar</strong> y elige el destino que tu móvil muestre.
             </li>
           </ol>
         </div>
