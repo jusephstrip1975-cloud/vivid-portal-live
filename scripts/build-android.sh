@@ -7,12 +7,12 @@ echo "=========================================="
 
 # 1. Build the web app
 echo ""
-echo "🔨  Step 1/4: Building web app..."
+echo "🔨  Step 1/5: Building web app..."
 bun run build
 
 # 2. Add Android platform if missing
 echo ""
-echo "📱  Step 2/4: Checking Android platform..."
+echo "📱  Step 2/5: Checking Android platform..."
 if [ ! -d "android" ]; then
   echo "    Android platform not found. Adding it now..."
   bunx cap add android
@@ -22,17 +22,31 @@ fi
 
 # 3. Sync Capacitor with Android
 echo ""
-echo "🔄  Step 3/4: Syncing Capacitor + Android..."
+echo "🔄  Step 3/5: Syncing Capacitor + Android..."
 bunx cap sync android
 
-# 4. Open Android Studio
+# 4. Sobrescribir MainActivity y strings con la plantilla AetherX
 echo ""
-echo "🚀  Step 4/4: Opening Android Studio..."
-bunx cap open android
+echo "🧩  Step 4/5: Inyectando MainActivity personalizado..."
+MAIN_ACTIVITY_DIR="android/app/src/main/java/com/aetherx/wallpapers"
+STRINGS_FILE="android/app/src/main/res/values/strings.xml"
+mkdir -p "$MAIN_ACTIVITY_DIR"
+cp android-template/MainActivity.java "$MAIN_ACTIVITY_DIR/MainActivity.java"
+if [ -f "android-template/strings.xml" ]; then
+  cp android-template/strings.xml "$STRINGS_FILE"
+fi
+echo "    ✓ MainActivity.java actualizado."
+echo "    ✓ strings.xml actualizado."
 
+# 5. Open Android Studio
 echo ""
-echo "=========================================="
-echo "  Done! Android Studio is launching."
-echo "  Build the APK from Studio and install"
-echo "  on your device to test live wallpapers."
+echo "🚀  Step 5/5: Listo. Para compilar el APK ejecuta:"
+echo ""
+echo "    cd android"
+echo "    ./gradlew clean assembleDebug      # Linux/macOS"
+echo "    .\\gradlew.bat clean assembleDebug  # Windows"
+echo ""
+echo "    El APK quedará en android/app/build/outputs/apk/debug/app-debug.apk"
+echo ""
+echo "    O abre Android Studio con: bunx cap open android"
 echo "=========================================="
