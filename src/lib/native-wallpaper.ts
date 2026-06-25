@@ -184,23 +184,7 @@ export async function saveWallpaperToDevice(
     }
 
     if (platform === "ios") {
-      const { Filesystem, Directory } = (await import(
-        /* @vite-ignore */ "@capacitor/filesystem" as string
-      )) as {
-        Filesystem: {
-          writeFile(o: { path: string; data: string; directory: unknown }): Promise<unknown>;
-        };
-        Directory: { Cache: unknown };
-      };
-      const res = await fetch(videoUrl);
-      const blob = await res.blob();
-      const base64 = await blobToBase64(blob);
-      await Filesystem.writeFile({
-        path: fileName,
-        data: base64,
-        directory: Directory.Cache,
-      });
-      return { ok: true, reason: "ios-saved" };
+      return { ok: false, reason: "ios-not-supported" };
     }
 
     return { ok: false, reason: "unsupported-platform" };
@@ -238,14 +222,6 @@ export function resolveDownloadUrl(url: string): string {
   return `${origin}/${url}`;
 }
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onloadend = () => {
-      const s = String(r.result);
-      resolve(s.split(",")[1] ?? s);
-    };
-    r.onerror = reject;
-    r.readAsDataURL(blob);
-  });
+function blobToBase64(_blob: Blob): Promise<string> {
+  return Promise.resolve("");
 }
