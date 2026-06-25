@@ -22,11 +22,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    applicationVariants.all { variant ->
-        variant.outputs.all { output ->
-            if (variant.buildType.name == 'debug') {
-                outputFileName = 'app-aetherx-localfinal-debug.apk'
-            }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType('debug')) { variant ->
+        variant.outputs.each { output ->
+            output.outputFileName.set('app-aetherx-localfinal-debug.apk')
         }
     }
 }
