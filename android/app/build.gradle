@@ -135,8 +135,8 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
                 throw new GradleException("Forbidden deep-link/browser manifest entry found: ${forbidden}")
             }
         }
-        if ((manifestText =~ /android:scheme\s*=\s*["']https?["']/).find() || (manifestText =~ /android:host\s*=/).find()) {
-            throw new GradleException('AndroidManifest.xml must not declare http/https schemes, hosts, app links, or deep links')
+        if ((manifestText =~ /android:scheme\s*=/).find() || (manifestText =~ /android:host\s*=/).find() || (manifestText =~ /android:autoVerify\s*=/).find()) {
+            throw new GradleException('AndroidManifest.xml must not declare URL schemes, hosts, app links, or deep links')
         }
         if (cordovaConfigText.contains('<allow-intent') || cordovaConfigText.contains('<allow-navigation')) {
             throw new GradleException('Cordova config.xml must not contain allow-intent or allow-navigation entries')
@@ -149,6 +149,66 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
 
 tasks.named('preBuild') {
     dependsOn 'verifyAetherXLocalCapacitorAssets'
+}
+
+tasks.register('verifyAetherXMergedManifest') {
+    doLast {
+        def manifestRoots = [
+            file("$buildDir/intermediates/merged_manifest"),
+            file("$buildDir/intermediates/merged_manifests"),
+            file("$buildDir/intermediates/packaged_manifests")
+        ]
+        def manifests = []
+        manifestRoots.each { root ->
+            if (root.exists()) {
+                root.eachFileRecurse { candidate ->
+                    if (candidate.name == 'AndroidManifest.xml') manifests << candidate
+                }
+            }
+        }
+
+        if (manifests.isEmpty()) {
+            logger.lifecycle('No merged AndroidManifest.xml found yet; source manifest guard already passed.')
+            return
+        }
+
+        def countMatches = { String text, String pattern ->
+            def matcher = text =~ pattern
+            def count = 0
+            while (matcher.find()) { count++ }
+            return count
+        }
+
+        manifests.each { manifest ->
+            def text = manifest.getText('UTF-8').replaceAll(/(?s)<!--.*?-->/, '')
+            if (countMatches(text, /<activity\b/) != 1) {
+                throw new GradleException("Merged manifest ${manifest} must declare exactly one Activity")
+            }
+            if ((text =~ /<activity-alias\b/).find()) {
+                throw new GradleException("Merged manifest ${manifest} must not declare activity-alias entries")
+            }
+            if (!text.contains('android:name="com.aetherx.wallpapers.MainActivity"')) {
+                throw new GradleException("Merged manifest ${manifest} must keep MainActivity as the single Activity")
+            }
+            if (countMatches(text, /android\.intent\.action\.MAIN/) != 1 || countMatches(text, /android\.intent\.category\.LAUNCHER/) != 1) {
+                throw new GradleException("Merged manifest ${manifest} must contain exactly one MAIN action and exactly one LAUNCHER category")
+            }
+            ['android.intent.action.VIEW', 'android.intent.category.BROWSABLE'].each { forbidden ->
+                if (text.contains(forbidden)) {
+                    throw new GradleException("Forbidden deep-link/browser entry found in merged manifest ${manifest}: ${forbidden}")
+                }
+            }
+            if ((text =~ /android:scheme\s*=/).find() || (text =~ /android:host\s*=/).find() || (text =~ /android:autoVerify\s*=/).find()) {
+                throw new GradleException("Merged manifest ${manifest} must not contain URL schemes, hosts, app links, or deep links")
+            }
+        }
+    }
+}
+
+afterEvaluate {
+    tasks.matching { task -> task.name ==~ /process.*MainManifest/ }.configureEach {
+        finalizedBy tasks.named('verifyAetherXMergedManifest')
+    }
 }
 
 try {
