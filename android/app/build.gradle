@@ -213,13 +213,12 @@ tasks.register('verifyAetherXFinalDebugApk') {
     }
 }
 
-tasks.named('assembleDebug') {
-    finalizedBy tasks.named('verifyAetherXFinalDebugApk')
-}
-
 afterEvaluate {
     tasks.matching { task -> task.name ==~ /process.*MainManifest/ }.configureEach {
         finalizedBy tasks.named('verifyAetherXMergedManifest')
+    }
+    tasks.matching { task -> task.name == 'assembleDebug' }.configureEach {
+        finalizedBy tasks.named('verifyAetherXFinalDebugApk')
     }
 }
 
