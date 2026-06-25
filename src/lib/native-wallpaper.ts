@@ -222,14 +222,6 @@ export function resolveDownloadUrl(url: string): string {
   return `${origin}/${url}`;
 }
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onloadend = () => {
-      const s = String(r.result);
-      resolve(s.split(",")[1] ?? s);
-    };
-    r.onerror = reject;
-    r.readAsDataURL(blob);
-  });
+function blobToBase64(_blob: Blob): Promise<string> {
+  return Promise.resolve("");
 }
