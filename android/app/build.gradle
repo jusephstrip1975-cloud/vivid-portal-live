@@ -31,6 +31,36 @@ android {
     }
 }
 
+// Hard guarantee: after assembleDebug runs, ensure the APK is named
+// app-aetherx-local-final-debug.apk on disk regardless of AGP variant config.
+afterEvaluate {
+    tasks.matching { it.name == 'assembleDebug' }.configureEach { assembleTask ->
+        assembleTask.doLast {
+            def outDir = file("$buildDir/outputs/apk/debug")
+            if (!outDir.exists()) {
+                throw new GradleException("Expected APK output dir not found: ${outDir}")
+            }
+            def target = new File(outDir, 'app-aetherx-local-final-debug.apk')
+            def candidates = outDir.listFiles({ f -> f.name.endsWith('.apk') } as FileFilter) ?: []
+            // Remove any stale generic app-debug.apk so only the renamed APK remains.
+            candidates.each { apk ->
+                if (apk.name != target.name) {
+                    def copied = new File(outDir, target.name)
+                    if (copied.exists()) copied.delete()
+                    if (!apk.renameTo(copied)) {
+                        copied.bytes = apk.bytes
+                        apk.delete()
+                    }
+                }
+            }
+            if (!target.exists()) {
+                throw new GradleException("Failed to produce ${target}. Files: ${outDir.list()?.join(', ')}")
+            }
+            logger.lifecycle("✅ APK final: ${target}")
+        }
+    }
+}
+
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
