@@ -13,6 +13,7 @@
     <div id="root">
       <main class="aetherx-native-fallback" aria-label="AetherX iniciando">
         <div>
+          <strong>APP LOCAL AETHERX VERSION FINAL</strong>
           <strong>AetherX</strong>
           <span>AetherX cargando local</span>
           <pre id="aetherx-boot-error" hidden></pre>
@@ -46,6 +47,10 @@
       .aetherx-native-fallback strong {
         font-size: 28px;
         letter-spacing: 0.08em;
+      }
+      .aetherx-native-fallback strong:first-child {
+        font-size: 18px;
+        color: #67e8f9;
       }
       .aetherx-native-fallback span {
         color: rgba(248, 250, 252, 0.62);
@@ -88,10 +93,10 @@
       })();
       console.info(
         "[AetherX Android] Booting SPA from packaged Capacitor local assets",
-        location.href,
+        location.pathname + location.search + location.hash,
       );
       window.addEventListener("DOMContentLoaded", function () {
-        console.info("[AetherX Android] DOMContentLoaded", location.href);
+        console.info("[AetherX Android] DOMContentLoaded", location.pathname + location.search + location.hash);
       });
     </script>
     <script type="module" src="/src/capacitor-client.tsx"></script>

@@ -161,56 +161,6 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
     }
 
-    @Override
-    public void startActivity(android.content.Intent intent) {
-        if (blockExternalActivity(intent, "startActivity")) return;
-        super.startActivity(intent);
-    }
-
-    @Override
-    public void startActivity(android.content.Intent intent, Bundle options) {
-        if (blockExternalActivity(intent, "startActivityWithOptions")) return;
-        super.startActivity(intent, options);
-    }
-
-    @Override
-    @SuppressWarnings("deprecation")
-    public void startActivityForResult(android.content.Intent intent, int requestCode) {
-        if (blockExternalActivity(intent, "startActivityForResult")) return;
-        super.startActivityForResult(intent, requestCode);
-    }
-
-    @Override
-    @SuppressWarnings("deprecation")
-    public void startActivityForResult(android.content.Intent intent, int requestCode, Bundle options) {
-        if (blockExternalActivity(intent, "startActivityForResultWithOptions")) return;
-        super.startActivityForResult(intent, requestCode, options);
-    }
-
-    private boolean blockExternalActivity(android.content.Intent intent, String source) {
-        if (intent == null) return false;
-
-        Uri data = intent.getData();
-        String packageName = intent.getPackage();
-        String componentName = intent.getComponent() != null ? intent.getComponent().flattenToShortString() : null;
-        String target = ((packageName == null ? "" : packageName) + " "
-            + (componentName == null ? "" : componentName)).toLowerCase();
-
-        if (data != null && isHttpLike(data)) {
-            Log.w(TAG, "Blocked external Activity URL launch from " + source + ": action="
-                + intent.getAction() + " data=" + data + " target=" + target);
-            return true;
-        }
-
-        if (target.contains("chrome") || target.contains("browser") || target.contains("customtabs")) {
-            Log.w(TAG, "Blocked external browser Activity launch from " + source + ": action="
-                + intent.getAction() + " data=" + data + " target=" + target);
-            return true;
-        }
-
-        return false;
-    }
-
     private boolean handleNavigation(Uri uri, boolean isMainFrame, String source) {
         if (uri == null) {
             Log.w(TAG, "Blocked null navigation from " + source);
@@ -269,7 +219,7 @@ public class MainActivity extends BridgeActivity {
             + "<style>html,body{margin:0;min-height:100%;background:#02040a;color:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,sans-serif}"
             + "main{min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box;background:radial-gradient(circle at 30% 20%,rgba(14,165,233,.24),transparent 38%),#02040a}"
             + "section{max-width:560px}h1{font-size:28px;margin:0 0 8px;letter-spacing:.08em}p{color:rgba(248,250,252,.7)}pre{white-space:pre-wrap;color:#fecaca;background:rgba(127,29,29,.28);border:1px solid rgba(239,68,68,.55);border-radius:14px;padding:14px;font:12px/1.45 monospace}</style></head>"
-            + "<body><main><section><h1>AetherX</h1><p>AetherX cargando local</p><pre>" + safeMessage + "</pre></section></main></body></html>";
+            + "<body><main><section><h1>APP LOCAL AETHERX VERSION FINAL</h1><p>AetherX cargando local</p><pre>" + safeMessage + "</pre></section></main></body></html>";
         view.post(() -> view.loadDataWithBaseURL("https://localhost/", html, "text/html", "UTF-8", null));
     }
 

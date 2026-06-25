@@ -28,6 +28,9 @@ function assertLocalBundle() {
   if (!index.includes("AetherX cargando local") || !index.includes("window.onerror")) {
     throw new Error("public/dist/index.html is missing visible Android boot diagnostics.");
   }
+  if (!index.includes("APP LOCAL AETHERX VERSION FINAL")) {
+    throw new Error("public/dist/index.html is missing the final local APK marker text.");
+  }
 }
 
 function normalizeHtmlOutput() {

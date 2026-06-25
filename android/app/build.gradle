@@ -22,6 +22,13 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            if (variant.buildType.name == 'debug') {
+                outputFileName = 'app-aetherx-local-final-debug.apk'
+            }
+        }
+    }
 }
 
 repositories {
@@ -54,6 +61,7 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         def cordovaConfigFile = file("$projectDir/src/main/res/xml/config.xml")
         def pluginsFile = file("$projectDir/src/main/assets/capacitor.plugins.json")
         def packageFile = file("$rootDir/../package.json")
+        def liveWallpaperPluginFile = file("$rootDir/../plugins/aetherx-live-wallpaper/android/src/main/java/com/aetherx/livewallpaper/AetherXLiveWallpaperPlugin.java")
 
         if (!assetsDir.exists()) {
             throw new GradleException('Missing android/app/src/main/assets. Run: bun run build && npx cap sync android')
@@ -78,6 +86,7 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         def cordovaConfigText = cordovaConfigFile.exists() ? cordovaConfigFile.getText('UTF-8') : ''
         def pluginsText = pluginsFile.exists() ? pluginsFile.getText('UTF-8') : ''
         def packageText = packageFile.exists() ? packageFile.getText('UTF-8') : ''
+        def liveWallpaperPluginText = liveWallpaperPluginFile.exists() ? liveWallpaperPluginFile.getText('UTF-8') : ''
 
         def countMatches = { String text, String pattern ->
             def matcher = text =~ pattern
@@ -92,7 +101,7 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         if (!configText.contains('"webDir"') || !configText.contains('"public/dist"')) {
             throw new GradleException('Unexpected Capacitor config. Expected webDir public/dist from capacitor.config.ts before sync')
         }
-        if (indexText.contains('https://aetherx.org') || indexText.contains('loadUrl(') || indexText.contains('Browser.open') || indexText.contains('window.open')) {
+        if (indexText.contains('https://aetherx.org') || indexText.contains('loadUrl(') || indexText.contains('Browser.open') || indexText.contains('window.open') || indexText.contains('location.href') || indexText.contains('location.replace') || indexText.contains('target="_blank"') || indexText.contains("target='_blank'")) {
             throw new GradleException('Forbidden external startup reference found in local index.html')
         }
         if (!indexText.contains('src="./assets/') || !indexText.contains('href="./assets/')) {
@@ -104,11 +113,17 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         if (!indexText.contains('AetherX cargando local') || !indexText.contains('window.onerror')) {
             throw new GradleException('Local index.html must show visible boot diagnostics and capture JS startup errors')
         }
+        if (!indexText.contains('APP LOCAL AETHERX VERSION FINAL')) {
+            throw new GradleException('Local index.html must show APP LOCAL AETHERX VERSION FINAL on first screen')
+        }
         if (!mainActivityText.contains('new ServerPath(ServerPath.PathType.ASSET_PATH, "public")')) {
             throw new GradleException('MainActivity must force Capacitor to serve android/app/src/main/assets/public before first WebView load')
         }
-        if (mainActivityText.contains('ACTION_VIEW') || mainActivityText.contains('loadUrl("http') || mainActivityText.contains('Intent.ACTION_VIEW, Uri.parse') || mainActivityText.contains('Browser.open') || mainActivityText.contains('CustomTabsIntent')) {
+        if (mainActivityText.contains('ACTION_VIEW') || mainActivityText.contains('loadUrl("http') || mainActivityText.contains('Intent.ACTION_VIEW, Uri.parse') || mainActivityText.contains('Browser.open') || mainActivityText.contains('CustomTabsIntent') || mainActivityText.contains('startActivity(') || mainActivityText.contains('startActivityForResult(')) {
             throw new GradleException('MainActivity contains a forbidden external browser or remote load path')
+        }
+        if (liveWallpaperPluginText.contains('ACTION_VIEW') || liveWallpaperPluginText.contains('Intent.ACTION_VIEW') || liveWallpaperPluginText.contains('Browser.open') || liveWallpaperPluginText.contains('CustomTabsIntent') || liveWallpaperPluginText.contains('startActivity(') || liveWallpaperPluginText.contains('startActivityForResult(')) {
+            throw new GradleException('Live wallpaper plugin contains a forbidden Activity/browser launch path')
         }
         if (countMatches(manifestText, /<activity\b/) != 1) {
             throw new GradleException('AndroidManifest.xml must declare exactly one Activity: com.aetherx.wallpapers.MainActivity')

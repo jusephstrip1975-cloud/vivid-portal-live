@@ -9,6 +9,7 @@
     "build": "vite build",
     "postbuild": "node scripts/prepare-android-local.mjs --prepare",
     "build:android": "bash scripts/build-android.sh",
+    "capacitor:sync:before": "node scripts/prepare-android-local.mjs --prepare",
     "capacitor:sync:after": "node scripts/lock-android-no-browser.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
