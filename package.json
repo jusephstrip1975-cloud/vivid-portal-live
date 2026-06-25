@@ -5,11 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "prebuild": "node scripts/prepare-android-local.mjs --clean",
     "build": "vite build",
-    "postbuild": "node scripts/prepare-android-local.mjs --prepare",
+    "build:capacitor": "vite build --config vite.capacitor.config.ts",
     "build:android": "bash scripts/build-android.sh",
-    "capacitor:sync:before": "node scripts/prepare-android-local.mjs --prepare",
     "capacitor:sync:after": "node scripts/lock-android-local-final.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
