@@ -5,9 +5,9 @@ echo "=========================================="
 echo "  AetherX Local Final — Android Build Script"
 echo "=========================================="
 
-# 1. Prepare the static local fallback asset. The debug APK itself is native.
+# 1. Build the full AetherX SPA (galería 3D + rutas) into public/dist
 echo ""
-echo "🔨  Step 1/5: Preparing local final marker..."
+echo "🔨  Step 1/5: Building full AetherX SPA for Capacitor (hash router, offline)..."
 node scripts/prepare-android-local.mjs --prepare
 
 # 2. Add Android platform if missing
