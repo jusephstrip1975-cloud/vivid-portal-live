@@ -184,7 +184,16 @@ export async function saveWallpaperToDevice(
     }
 
     if (platform === "ios") {
-      return { ok: false, reason: "ios-not-supported" };
+      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+      const res = await fetch(videoUrl);
+      const blob = await res.blob();
+      const base64 = await blobToBase64(blob);
+      await Filesystem.writeFile({
+        path: fileName,
+        data: base64,
+        directory: Directory.Cache,
+      });
+      return { ok: true, reason: "ios-saved" };
     }
 
     return { ok: false, reason: "unsupported-platform" };
