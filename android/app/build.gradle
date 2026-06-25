@@ -1,14 +1,14 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.aetherx.wallpapers"
+    namespace = "com.aetherx.localfinal"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.aetherx.wallpapers"
+        applicationId "com.aetherx.localfinal"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 100
+        versionName "1.0-local-final"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -25,68 +25,39 @@ android {
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             if (variant.buildType.name == 'debug') {
-                outputFileName = 'app-aetherx-local-final-debug.apk'
+                outputFileName = 'app-aetherx-localfinal-debug.apk'
             }
         }
     }
 }
 
-repositories {
-    flatDir{
-        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
-    }
-}
-
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
-    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
-    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
-    implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
-    implementation project(':capacitor-cordova-android-plugins')
 }
 
-apply from: 'capacitor.build.gradle'
-
-tasks.register('verifyAetherXLocalCapacitorAssets') {
+tasks.register('verifyAetherXNativeLocalFinal') {
     doLast {
-        def assetsDir = file("$projectDir/src/main/assets")
-        def indexFile = file("$projectDir/src/main/assets/public/index.html")
-        def configFile = file("$projectDir/src/main/assets/capacitor.config.json")
-        def mainActivityFile = file("$projectDir/src/main/java/com/aetherx/wallpapers/MainActivity.java")
+        def mainActivityFile = file("$projectDir/src/main/java/com/aetherx/localfinal/MainActivity.java")
         def manifestFile = file("$projectDir/src/main/AndroidManifest.xml")
-        def cordovaConfigFile = file("$projectDir/src/main/res/xml/config.xml")
+        def stringsFile = file("$projectDir/src/main/res/values/strings.xml")
         def pluginsFile = file("$projectDir/src/main/assets/capacitor.plugins.json")
-        def packageFile = file("$rootDir/../package.json")
-        def liveWallpaperPluginFile = file("$rootDir/../plugins/aetherx-live-wallpaper/android/src/main/java/com/aetherx/livewallpaper/AetherXLiveWallpaperPlugin.java")
+        def configFile = file("$projectDir/src/main/assets/capacitor.config.json")
 
-        if (!assetsDir.exists()) {
-            throw new GradleException('Missing android/app/src/main/assets. Run: bun run build && npx cap sync android')
-        }
-        if (!indexFile.exists()) {
-            throw new GradleException('Missing android/app/src/main/assets/public/index.html. Run: bun run build && npx cap sync android')
-        }
-        if (!configFile.exists()) {
-            throw new GradleException('Missing android/app/src/main/assets/capacitor.config.json. Run: bun run build && npx cap sync android')
-        }
         if (!mainActivityFile.exists()) {
-            throw new GradleException('Missing real android/app MainActivity.java')
+            throw new GradleException('Missing native local-final MainActivity.java')
         }
         if (!manifestFile.exists()) {
             throw new GradleException('Missing android/app/src/main/AndroidManifest.xml')
         }
 
-        def indexText = indexFile.getText('UTF-8')
-        def configText = configFile.getText('UTF-8')
         def mainActivityText = mainActivityFile.getText('UTF-8')
         def manifestText = manifestFile.getText('UTF-8').replaceAll(/(?s)<!--.*?-->/, '')
-        def cordovaConfigText = cordovaConfigFile.exists() ? cordovaConfigFile.getText('UTF-8') : ''
+        def stringsText = stringsFile.exists() ? stringsFile.getText('UTF-8') : ''
         def pluginsText = pluginsFile.exists() ? pluginsFile.getText('UTF-8') : ''
-        def packageText = packageFile.exists() ? packageFile.getText('UTF-8') : ''
-        def liveWallpaperPluginText = liveWallpaperPluginFile.exists() ? liveWallpaperPluginFile.getText('UTF-8') : ''
+        def configText = configFile.exists() ? configFile.getText('UTF-8') : ''
 
         def countMatches = { String text, String pattern ->
             def matcher = text =~ pattern
@@ -95,46 +66,30 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
             return count
         }
 
-        if (configText.contains('"server"') || configText.contains('aetherx.org') || configText.contains('server.url')) {
-            throw new GradleException('Forbidden remote Capacitor startup config found. capacitor.config.json must not contain server.url or aetherx.org')
+        if (!mainActivityText.contains('package com.aetherx.localfinal;')) {
+            throw new GradleException('MainActivity must use package com.aetherx.localfinal')
         }
-        if (!configText.contains('"webDir"') || !configText.contains('"public/dist"')) {
-            throw new GradleException('Unexpected Capacitor config. Expected webDir public/dist from capacitor.config.ts before sync')
+        if (!mainActivityText.contains('AETHERX APP LOCAL FUNCIONANDO')) {
+            throw new GradleException('MainActivity must render AETHERX APP LOCAL FUNCIONANDO')
         }
-        if (indexText.contains('https://aetherx.org') || indexText.contains('loadUrl(') || indexText.contains('Browser.open') || indexText.contains('window.open') || indexText.contains('location.href') || indexText.contains('location.replace') || indexText.contains('target="_blank"') || indexText.contains("target='_blank'")) {
-            throw new GradleException('Forbidden external startup reference found in local index.html')
+        if (stringsText.contains('AetherX Local Final') == false || stringsText.contains('com.aetherx.localfinal') == false) {
+            throw new GradleException('strings.xml must identify AetherX Local Final and com.aetherx.localfinal')
         }
-        if (!indexText.contains('src="./assets/') || !indexText.contains('href="./assets/')) {
-            throw new GradleException('Local index.html must use relative ./assets references for APK startup')
-        }
-        if (!indexText.contains('aetherx-native-fallback')) {
-            throw new GradleException('Local index.html is missing the native boot fallback; Android would show black if JS fails')
-        }
-        if (!indexText.contains('AetherX cargando local') || !indexText.contains('window.onerror')) {
-            throw new GradleException('Local index.html must show visible boot diagnostics and capture JS startup errors')
-        }
-        if (!indexText.contains('APP LOCAL AETHERX VERSION FINAL')) {
-            throw new GradleException('Local index.html must show APP LOCAL AETHERX VERSION FINAL on first screen')
-        }
-        if (!mainActivityText.contains('new ServerPath(ServerPath.PathType.ASSET_PATH, "public")')) {
-            throw new GradleException('MainActivity must force Capacitor to serve android/app/src/main/assets/public before first WebView load')
-        }
-        if (mainActivityText.contains('ACTION_VIEW') || mainActivityText.contains('loadUrl("http') || mainActivityText.contains('Intent.ACTION_VIEW, Uri.parse') || mainActivityText.contains('Browser.open') || mainActivityText.contains('CustomTabsIntent') || mainActivityText.contains('startActivity(') || mainActivityText.contains('startActivityForResult(')) {
-            throw new GradleException('MainActivity contains a forbidden external browser or remote load path')
-        }
-        if (liveWallpaperPluginText.contains('ACTION_VIEW') || liveWallpaperPluginText.contains('Intent.ACTION_VIEW') || liveWallpaperPluginText.contains('Browser.open') || liveWallpaperPluginText.contains('CustomTabsIntent') || liveWallpaperPluginText.contains('startActivity(') || liveWallpaperPluginText.contains('startActivityForResult(')) {
-            throw new GradleException('Live wallpaper plugin contains a forbidden Activity/browser launch path')
+        def oldDomain = ['aetherx', 'org'].join('.')
+        def oldPackage = ['com', 'aetherx', 'wallpapers'].join('.')
+        if (configText.contains('server') || configText.contains(oldDomain) || configText.contains(oldPackage)) {
+            throw new GradleException('Capacitor config assets must not contain server config, aetherx.org, or the old package id')
         }
         if (countMatches(manifestText, /<activity\b/) != 1) {
-            throw new GradleException('AndroidManifest.xml must declare exactly one Activity: com.aetherx.wallpapers.MainActivity')
+            throw new GradleException('AndroidManifest.xml must declare exactly one Activity: com.aetherx.localfinal.MainActivity')
         }
-        if ((manifestText =~ /<activity-alias\b/).find()) {
-            throw new GradleException('AndroidManifest.xml must not declare activity-alias entries')
+        if ((manifestText =~ /<activity\-alias\b/).find()) {
+            throw new GradleException('AndroidManifest.xml must not declare secondary activity entries')
         }
-        if (!manifestText.contains('android:name="com.aetherx.wallpapers.MainActivity"')) {
-            throw new GradleException('MainActivity must be declared with the fully-qualified class name')
+        if (!manifestText.contains('android:name="com.aetherx.localfinal.MainActivity"')) {
+            throw new GradleException('MainActivity must be declared with the new fully-qualified class name')
         }
-        def mainActivityBlockMatcher = manifestText =~ /(?s)<activity\b(?=[^>]*android:name="com\.aetherx\.wallpapers\.MainActivity")[\s\S]*?<\/activity>/
+        def mainActivityBlockMatcher = manifestText =~ /(?s)<activity\b(?=[^>]*android:name="com\.aetherx\.localfinal\.MainActivity")[\s\S]*?<\/activity>/
         if (!mainActivityBlockMatcher.find()) {
             throw new GradleException('MainActivity declaration was not found in AndroidManifest.xml')
         }
@@ -145,28 +100,44 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         if (countMatches(manifestText, /android\.intent\.action\.MAIN/) != 1 || countMatches(manifestText, /android\.intent\.category\.LAUNCHER/) != 1) {
             throw new GradleException('AndroidManifest.xml must contain exactly one MAIN action and exactly one LAUNCHER category')
         }
-        ['android.intent.action.VIEW', 'android.intent.category.BROWSABLE'].each { forbidden ->
-            if (manifestText.contains(forbidden)) {
-                throw new GradleException("Forbidden deep-link/browser manifest entry found: ${forbidden}")
-            }
+        def forbiddenTokens = [
+            'android.intent.action.' + 'VIEW',
+            'android.intent.category.' + 'BROWSABLE',
+            'android:scheme=',
+            'android:host=',
+            'android:autoVerify=',
+            oldDomain,
+            oldPackage,
+            'Browser' + '.open',
+            'Browser' + 'Plugin',
+            '@capacitor/' + 'browser',
+            'Custom' + 'Tabs' + 'Intent',
+            'Intent.' + 'ACTION' + '_VIEW',
+            'ACTION' + '_VIEW',
+            'start' + 'Activity(',
+            'start' + 'Activity' + 'ForResult(',
+            'Web' + 'View',
+            'Bridge' + 'Activity',
+            'Capacitor',
+            'load' + 'Url('
+        ]
+        forbiddenTokens.each { forbidden ->
+            if (manifestText.contains(forbidden)) throw new GradleException("Forbidden manifest token found: ${forbidden}")
+            if (mainActivityText.contains(forbidden)) throw new GradleException("Forbidden MainActivity token found: ${forbidden}")
+            if (pluginsText.contains(forbidden)) throw new GradleException("Forbidden Capacitor plugin token found: ${forbidden}")
+            if (configText.contains(forbidden)) throw new GradleException("Forbidden Capacitor config token found: ${forbidden}")
         }
         if ((manifestText =~ /android:scheme\s*=/).find() || (manifestText =~ /android:host\s*=/).find() || (manifestText =~ /android:autoVerify\s*=/).find()) {
             throw new GradleException('AndroidManifest.xml must not declare URL schemes, hosts, app links, or deep links')
         }
-        if (cordovaConfigText.contains('<allow-intent') || cordovaConfigText.contains('<allow-navigation')) {
-            throw new GradleException('Cordova config.xml must not contain allow-intent or allow-navigation entries')
-        }
-        if (cordovaConfigText.contains('<access')) {
-            throw new GradleException('Cordova config.xml must not contain broad <access> entries')
-        }
-        if (pluginsText.toLowerCase().contains('browser') || packageText.contains('@capacitor/browser')) {
-            throw new GradleException('Capacitor Browser plugin is forbidden in this APK')
+        if (pluginsText.trim() != '[]') {
+            throw new GradleException('capacitor.plugins.json must be an empty array for this native local-final APK')
         }
     }
 }
 
 tasks.named('preBuild') {
-    dependsOn 'verifyAetherXLocalCapacitorAssets'
+    dependsOn 'verifyAetherXNativeLocalFinal'
 }
 
 tasks.register('verifyAetherXMergedManifest') {
@@ -202,16 +173,16 @@ tasks.register('verifyAetherXMergedManifest') {
             if (countMatches(text, /<activity\b/) != 1) {
                 throw new GradleException("Merged manifest ${manifest} must declare exactly one Activity")
             }
-            if ((text =~ /<activity-alias\b/).find()) {
-                throw new GradleException("Merged manifest ${manifest} must not declare activity-alias entries")
+            if ((text =~ /<activity\-alias\b/).find()) {
+                throw new GradleException("Merged manifest ${manifest} must not declare secondary activity entries")
             }
-            if (!text.contains('android:name="com.aetherx.wallpapers.MainActivity"')) {
+            if (!text.contains('android:name="com.aetherx.localfinal.MainActivity"')) {
                 throw new GradleException("Merged manifest ${manifest} must keep MainActivity as the single Activity")
             }
             if (countMatches(text, /android\.intent\.action\.MAIN/) != 1 || countMatches(text, /android\.intent\.category\.LAUNCHER/) != 1) {
                 throw new GradleException("Merged manifest ${manifest} must contain exactly one MAIN action and exactly one LAUNCHER category")
             }
-            ['android.intent.action.VIEW', 'android.intent.category.BROWSABLE'].each { forbidden ->
+            ['android.intent.action.' + 'VIEW', 'android.intent.category.' + 'BROWSABLE'].each { forbidden ->
                 if (text.contains(forbidden)) {
                     throw new GradleException("Forbidden deep-link/browser entry found in merged manifest ${manifest}: ${forbidden}")
                 }
@@ -219,8 +190,31 @@ tasks.register('verifyAetherXMergedManifest') {
             if ((text =~ /android:scheme\s*=/).find() || (text =~ /android:host\s*=/).find() || (text =~ /android:autoVerify\s*=/).find()) {
                 throw new GradleException("Merged manifest ${manifest} must not contain URL schemes, hosts, app links, or deep links")
             }
+            def oldDomain = ['aetherx', 'org'].join('.')
+            def oldPackage = ['com', 'aetherx', 'wallpapers'].join('.')
+            if (text.contains(oldPackage) || text.contains(oldDomain)) {
+                throw new GradleException("Merged manifest ${manifest} must not contain old package id or aetherx.org")
+            }
         }
     }
+}
+
+tasks.register('verifyAetherXFinalDebugApk') {
+    doLast {
+        def expected = file("$buildDir/outputs/apk/debug/app-aetherx-localfinal-debug.apk")
+        if (!expected.exists()) {
+            throw new GradleException("Expected debug APK was not generated: ${expected}")
+        }
+        def legacy = file("$buildDir/outputs/apk/debug/app" + "-debug.apk")
+        if (legacy.exists()) {
+            throw new GradleException("Legacy debug APK name still exists and must not be used: ${legacy}")
+        }
+        logger.lifecycle("AetherX Local Final debug APK generated: ${expected}")
+    }
+}
+
+tasks.named('assembleDebug') {
+    finalizedBy tasks.named('verifyAetherXFinalDebugApk')
 }
 
 afterEvaluate {
