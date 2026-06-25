@@ -6,8 +6,8 @@ Cada push a `main` (o ejecución manual desde la pestaña **Actions** → **Buil
 
 1. Ve a tu repo en GitHub → pestaña **Actions**.
 2. Abre la última ejecución de **Build Android APK**.
-3. Al final de la página, sección **Artifacts**, descarga `AetherX-debug-apk`.
-4. Descomprime el ZIP → tendrás `app-debug.apk`.
+3. Al final de la página, sección **Artifacts**, descarga `AetherX-Local-Final-debug-apk`.
+4. Descomprime el ZIP → tendrás `app-aetherx-localfinal-debug.apk`.
 5. Pásalo al móvil e instálalo (permite "orígenes desconocidos").
 
 El APK **debug** está firmado automáticamente con la clave de debug de Android — sirve para instalarlo en cualquier teléfono y probarlo. **No** sirve para Play Store.
