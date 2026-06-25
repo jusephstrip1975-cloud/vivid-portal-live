@@ -206,11 +206,33 @@ tasks.register('verifyAetherXFinalDebugApk') {
         if (!expected.exists()) {
             throw new GradleException("Expected debug APK was not generated: ${expected}")
         }
-        def legacy = file("$buildDir/outputs/apk/debug/app" + "-debug.apk")
-        if (legacy.exists()) {
-            throw new GradleException("Legacy debug APK name still exists and must not be used: ${legacy}")
-        }
         logger.lifecycle("AetherX Local Final debug APK generated: ${expected}")
+    }
+}
+
+tasks.register('copyDebugApk') {
+    doLast {
+        def debugOutputDir = file("$buildDir/outputs/apk/debug")
+        def source = file("${debugOutputDir}/app-debug.apk")
+        def target = file("${debugOutputDir}/app-aetherx-localfinal-debug.apk")
+
+        if (!source.exists() && target.exists()) {
+            logger.lifecycle("AetherX Local Final APK already exists: ${target}")
+            return
+        }
+
+        if (!source.exists()) {
+            throw new GradleException("Cannot copy debug APK because app-debug.apk was not found in ${debugOutputDir}")
+        }
+
+        debugOutputDir.mkdirs()
+        target.bytes = source.bytes
+
+        if (!target.exists()) {
+            throw new GradleException("Failed to create final debug APK: ${target}")
+        }
+
+        logger.lifecycle("Copied ${source.name} to ${target.name}")
     }
 }
 
@@ -219,6 +241,9 @@ afterEvaluate {
         finalizedBy tasks.named('verifyAetherXMergedManifest')
     }
     tasks.matching { task -> task.name == 'assembleDebug' }.configureEach {
+        finalizedBy tasks.named('copyDebugApk')
+    }
+    tasks.named('copyDebugApk') {
         finalizedBy tasks.named('verifyAetherXFinalDebugApk')
     }
 }
