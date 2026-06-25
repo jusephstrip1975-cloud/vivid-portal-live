@@ -7,16 +7,12 @@ const config: CapacitorConfig = {
   backgroundColor: "#000000",
   android: {
     backgroundColor: "#000000",
-    allowMixedContent: false,
-    webContentsDebuggingEnabled: false,
-    captureInput: false,
+    allowMixedContent: true,
+    webContentsDebuggingEnabled: true,
   },
   ios: {
     backgroundColor: "#000000",
     contentInset: "always",
-  },
-  cordova: {
-    accessOrigins: [],
   },
 };
 
