@@ -141,6 +141,9 @@ tasks.register('verifyAetherXLocalCapacitorAssets') {
         if (cordovaConfigText.contains('<allow-intent') || cordovaConfigText.contains('<allow-navigation')) {
             throw new GradleException('Cordova config.xml must not contain allow-intent or allow-navigation entries')
         }
+        if (cordovaConfigText.contains('<access')) {
+            throw new GradleException('Cordova config.xml must not contain broad <access> entries')
+        }
         if (pluginsText.toLowerCase().contains('browser') || packageText.contains('@capacitor/browser')) {
             throw new GradleException('Capacitor Browser plugin is forbidden in this APK')
         }
