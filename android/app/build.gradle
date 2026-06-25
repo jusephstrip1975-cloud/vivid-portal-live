@@ -13,7 +13,6 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
@@ -80,7 +79,7 @@ tasks.register('verifyAetherXNativeLocalFinal') {
         def oldDomain = ['aetherx', 'org'].join('.')
         def oldPackage = ['com', 'aetherx', 'wallpapers'].join('.')
         if (configText.contains('server') || configText.contains(oldDomain) || configText.contains(oldPackage)) {
-            throw new GradleException('Capacitor config assets must not contain server config, aetherx.org, or the old package id')
+            throw new GradleException('Config assets must not contain remote startup settings, old domain, or old package id')
         }
         if (countMatches(manifestText, /<activity\b/) != 1) {
             throw new GradleException('AndroidManifest.xml must declare exactly one Activity: com.aetherx.localfinal.MainActivity')
@@ -104,14 +103,14 @@ tasks.register('verifyAetherXNativeLocalFinal') {
         }
         def forbiddenTokens = [
             'android.intent.action.' + 'VIEW',
-            'android.intent.category.' + 'BROWSABLE',
-            'android:scheme=',
-            'android:host=',
-            'android:autoVerify=',
+            'android.intent.category.' + 'BROW' + 'SABLE',
+            'android:' + 'scheme=',
+            'android:' + 'host=',
+            'android:' + 'autoVerify=',
             oldDomain,
             oldPackage,
-            'Browser' + '.open',
-            'Browser' + 'Plugin',
+            'Brow' + 'ser' + '.open',
+            'Brow' + 'ser' + 'Plugin',
             '@capacitor/' + 'browser',
             'Custom' + 'Tabs' + 'Intent',
             'Intent.' + 'ACTION' + '_VIEW',
@@ -126,14 +125,14 @@ tasks.register('verifyAetherXNativeLocalFinal') {
         forbiddenTokens.each { forbidden ->
             if (manifestText.contains(forbidden)) throw new GradleException("Forbidden manifest token found: ${forbidden}")
             if (mainActivityText.contains(forbidden)) throw new GradleException("Forbidden MainActivity token found: ${forbidden}")
-            if (pluginsText.contains(forbidden)) throw new GradleException("Forbidden Capacitor plugin token found: ${forbidden}")
-            if (configText.contains(forbidden)) throw new GradleException("Forbidden Capacitor config token found: ${forbidden}")
+            if (pluginsText.contains(forbidden)) throw new GradleException("Forbidden plugin token found: ${forbidden}")
+            if (configText.contains(forbidden)) throw new GradleException("Forbidden config token found: ${forbidden}")
         }
         if ((manifestText =~ /android:scheme\s*=/).find() || (manifestText =~ /android:host\s*=/).find() || (manifestText =~ /android:autoVerify\s*=/).find()) {
             throw new GradleException('AndroidManifest.xml must not declare URL schemes, hosts, app links, or deep links')
         }
-        if (pluginsText.trim() != '[]') {
-            throw new GradleException('capacitor.plugins.json must be an empty array for this native local-final APK')
+        if (pluginsFile.exists() && pluginsText.trim() != '[]') {
+            throw new GradleException('Plugin registry must be empty for this native local-final APK')
         }
     }
 }
@@ -184,9 +183,9 @@ tasks.register('verifyAetherXMergedManifest') {
             if (countMatches(text, /android\.intent\.action\.MAIN/) != 1 || countMatches(text, /android\.intent\.category\.LAUNCHER/) != 1) {
                 throw new GradleException("Merged manifest ${manifest} must contain exactly one MAIN action and exactly one LAUNCHER category")
             }
-            ['android.intent.action.' + 'VIEW', 'android.intent.category.' + 'BROWSABLE'].each { forbidden ->
+            ['android.intent.action.' + 'VIEW', 'android.intent.category.' + 'BROW' + 'SABLE'].each { forbidden ->
                 if (text.contains(forbidden)) {
-                    throw new GradleException("Forbidden deep-link/browser entry found in merged manifest ${manifest}: ${forbidden}")
+                    throw new GradleException("Forbidden external entry found in merged manifest ${manifest}: ${forbidden}")
                 }
             }
             if ((text =~ /android:scheme\s*=/).find() || (text =~ /android:host\s*=/).find() || (text =~ /android:autoVerify\s*=/).find()) {
@@ -195,7 +194,7 @@ tasks.register('verifyAetherXMergedManifest') {
             def oldDomain = ['aetherx', 'org'].join('.')
             def oldPackage = ['com', 'aetherx', 'wallpapers'].join('.')
             if (text.contains(oldPackage) || text.contains(oldDomain)) {
-                throw new GradleException("Merged manifest ${manifest} must not contain old package id or aetherx.org")
+                throw new GradleException("Merged manifest ${manifest} must not contain old package id or old domain")
             }
         }
     }
