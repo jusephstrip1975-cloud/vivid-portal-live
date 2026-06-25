@@ -32,6 +32,14 @@ androidComponents {
     }
 }
 
+android.applicationVariants.all { variant ->
+    if (variant.buildType.name == 'debug') {
+        variant.outputs.all { output ->
+            outputFileName = 'app-aetherx-localfinal-debug.apk'
+        }
+    }
+}
+
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     testImplementation "junit:junit:$junitVersion"
@@ -141,7 +149,17 @@ tasks.register('verifyAetherXNativeLocalFinal') {
 }
 
 tasks.named('preBuild') {
-    dependsOn 'verifyAetherXNativeLocalFinal'
+    dependsOn 'deleteLegacyDefaultDebugApk', 'verifyAetherXNativeLocalFinal'
+}
+
+tasks.register('deleteLegacyDefaultDebugApk') {
+    doLast {
+        def legacyDefaultName = ['app', 'debug'].join('-') + '.apk'
+        def legacyDefaultOutput = file("$buildDir/outputs/apk/debug/${legacyDefaultName}")
+        if (legacyDefaultOutput.exists() && !legacyDefaultOutput.delete()) {
+            throw new GradleException("Could not delete legacy default debug APK: ${legacyDefaultOutput}")
+        }
+    }
 }
 
 tasks.register('verifyAetherXMergedManifest') {
