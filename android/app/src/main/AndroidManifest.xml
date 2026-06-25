@@ -37,10 +37,13 @@
 
         <service
             android:name="com.aetherx.localfinal.wallpaper.AetherXLiveWallpaperService"
-            android:label="AetherX Live"
+            android:label="@string/wallpaper_label"
+            android:description="@string/wallpaper_description"
+            android:icon="@mipmap/ic_launcher"
             android:permission="android.permission.BIND_WALLPAPER"
+            android:enabled="true"
             android:exported="true">
-            <intent-filter>
+            <intent-filter android:priority="1">
                 <action android:name="android.service.wallpaper.WallpaperService" />
             </intent-filter>
             <meta-data
