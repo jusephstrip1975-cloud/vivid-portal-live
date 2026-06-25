@@ -125,24 +125,52 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 SharedPreferences prefs = getApplicationContext()
                         .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
                 String path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
-                Log.i(TAG, "startPlayer path=" + path);
+                String savedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
+                Log.i(TAG, "startPlayer savedWallpaperVideo=" + path + " savedUri=" + savedUri);
 
-                if (path == null) {
-                    paintMessage("Selecciona un vídeo en la app");
+                Uri uri = null;
+                long sizeForLog = -1;
+
+                if (path != null) {
+                    File f = new File(path);
+                    boolean exists = f.exists();
+                    boolean canRead = f.canRead();
+                    sizeForLog = exists ? f.length() : -1;
+                    Log.i(TAG, "File exists=" + exists + " canRead=" + canRead + " size=" + sizeForLog
+                        + " path=" + path);
+                    if (exists && sizeForLog > 0) {
+                        // Verify we can actually open it
+                        try (android.os.ParcelFileDescriptor pfd =
+                                 android.os.ParcelFileDescriptor.open(f, android.os.ParcelFileDescriptor.MODE_READ_ONLY)) {
+                            Log.i(TAG, "ContentResolver openFileDescriptor (file) ok fd=" + (pfd != null));
+                            uri = Uri.fromFile(f);
+                        } catch (Exception e) {
+                            Log.w(TAG, "openFileDescriptor on file path failed: " + e.getMessage());
+                        }
+                    }
+                }
+
+                if (uri == null && savedUri != null) {
+                    Uri candidate = Uri.parse(savedUri);
+                    Log.i(TAG, "Falling back to savedUri=" + candidate);
+                    try (android.os.ParcelFileDescriptor pfd =
+                             getApplicationContext().getContentResolver()
+                                 .openFileDescriptor(candidate, "r")) {
+                        Log.i(TAG, "ContentResolver openFileDescriptor (uri) ok fd=" + (pfd != null));
+                        uri = candidate;
+                    } catch (Exception e) {
+                        Log.w(TAG, "openFileDescriptor on saved uri failed: " + e.getMessage());
+                    }
+                }
+
+                if (uri == null) {
+                    paintMessage(path == null
+                        ? "Selecciona un vídeo en la app"
+                        : "Vídeo no encontrado");
                     return;
                 }
-                File f = new File(path);
-                if (!f.exists() || f.length() == 0) {
-                    Log.w(TAG, "video file missing or empty: " + path);
-                    paintMessage("Vídeo no encontrado");
-                    return;
-                }
-                if (!f.canRead()) {
-                    Log.w(TAG, "video file not readable: " + path);
-                }
 
-                Uri uri = Uri.fromFile(f);
-                Log.i(TAG, "Building ExoPlayer for uri=" + uri + " size=" + f.length());
+                Log.i(TAG, "ExoPlayer media item=" + uri + " size=" + sizeForLog);
 
                 player = new ExoPlayer.Builder(getApplicationContext()).build();
                 player.setRepeatMode(Player.REPEAT_MODE_ALL);
