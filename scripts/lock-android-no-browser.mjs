@@ -19,6 +19,20 @@ const mainActivityPath = join(
 );
 const stringsPath = join(androidRoot, "app", "src", "main", "res", "values", "strings.xml");
 const pluginsJsonPath = join(androidRoot, "app", "src", "main", "assets", "capacitor.plugins.json");
+const androidPublicIndexPath = join(androidRoot, "app", "src", "main", "assets", "public", "index.html");
+const liveWallpaperPluginPath = join(
+  root,
+  "plugins",
+  "aetherx-live-wallpaper",
+  "android",
+  "src",
+  "main",
+  "java",
+  "com",
+  "aetherx",
+  "livewallpaper",
+  "AetherXLiveWallpaperPlugin.java",
+);
 const templateMainActivity = join(root, "android-template", "MainActivity.java");
 const templateStrings = join(root, "android-template", "strings.xml");
 
@@ -45,8 +59,14 @@ function assertNoBrowserRoutes() {
   const manifest = read(manifestPath).replace(/<!--([\s\S]*?)-->/g, "");
   const mainActivity = read(mainActivityPath);
   const configXml = read(configXmlPath);
+  const androidPublicIndex = existsSync(androidPublicIndexPath) ? readFileSync(androidPublicIndexPath, "utf8") : "";
+  const liveWallpaperPlugin = existsSync(liveWallpaperPluginPath) ? readFileSync(liveWallpaperPluginPath, "utf8") : "";
   const pluginsJson = existsSync(pluginsJsonPath) ? readFileSync(pluginsJsonPath, "utf8") : "";
   const packageJson = read(join(root, "package.json"));
+
+  if (!androidPublicIndex.includes("APP LOCAL AETHERX VERSION FINAL")) {
+    fail("Android local index.html must contain APP LOCAL AETHERX VERSION FINAL.");
+  }
 
   if (count(manifest, /<activity\b/g) !== 1) {
     fail("AndroidManifest.xml must declare exactly one Activity.");
@@ -77,6 +97,11 @@ function assertNoBrowserRoutes() {
     "Browser.open",
     "CustomTabsIntent",
     "loadUrl(\"http",
+    "location.href",
+    "location.replace",
+    "window.open",
+    "target=\"_blank\"",
+    "target='_blank'",
   ];
 
   for (const token of forbidden) {
@@ -85,6 +110,14 @@ function assertNoBrowserRoutes() {
     if (pluginsJson.includes(token)) fail(`Forbidden Capacitor plugin token found: ${token}`);
     if (packageJson.includes(token)) fail(`Forbidden package dependency/script token found: ${token}`);
     if (mainActivity.includes(token)) fail(`Forbidden MainActivity token found: ${token}`);
+    if (androidPublicIndex.includes(token)) fail(`Forbidden Android local index token found: ${token}`);
+    if (liveWallpaperPlugin.includes(token)) fail(`Forbidden live wallpaper plugin token found: ${token}`);
+  }
+
+  const forbiddenActivityCalls = ["startActivity(", "startActivityForResult("];
+  for (const token of forbiddenActivityCalls) {
+    if (mainActivity.includes(token)) fail(`Forbidden MainActivity Activity launch call found: ${token}`);
+    if (liveWallpaperPlugin.includes(token)) fail(`Forbidden live wallpaper plugin Activity launch call found: ${token}`);
   }
 }
 

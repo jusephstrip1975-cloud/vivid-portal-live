@@ -47,7 +47,9 @@ if (window.location.pathname.endsWith("/index.html")) {
   window.history.replaceState(null, document.title, "./#/");
 }
 
-bootLog("mounting local hash router", window.location.href);
+const localRouteLabel = () => window.location.pathname + window.location.search + window.location.hash;
+
+bootLog("mounting local hash router", localRouteLabel());
 
 try {
   const router = getRouter({ history: "hash" });
@@ -59,7 +61,7 @@ try {
       </StrictMode>,
     );
     document.documentElement.dataset.aetherxBooted = "true";
-    bootLog("mounted", window.location.href);
+    bootLog("mounted", localRouteLabel());
   });
 } catch (error) {
   console.error("[AetherX Android SPA] fatal mount error", error);
