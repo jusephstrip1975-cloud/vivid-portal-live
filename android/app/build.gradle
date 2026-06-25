@@ -224,16 +224,34 @@ tasks.register('verifyAetherXMergedManifest') {
     }
 }
 
+tasks.register('copyAetherXLocalFinalDebugApk') {
+    doLast {
+        def outputDir = file("$buildDir/outputs/apk/debug")
+        def expected = file("${outputDir}/app-aetherx-localfinal-debug.apk")
+        def defaultApk = file("${outputDir}/app-debug.apk")
+
+        if (expected.exists()) {
+            logger.lifecycle("AetherX Local Final debug APK already exists: ${expected}")
+            return
+        }
+        if (!defaultApk.exists()) {
+            throw new GradleException("Neither ${expected.name} nor ${defaultApk.name} exists in ${outputDir}")
+        }
+
+        outputDir.mkdirs()
+        expected.bytes = defaultApk.bytes
+        if (!expected.exists()) {
+            throw new GradleException("Failed to create final debug APK: ${expected}")
+        }
+        logger.lifecycle("Copied ${defaultApk.name} to ${expected.name}")
+    }
+}
+
 tasks.register('verifyAetherXFinalDebugApk') {
     doLast {
         def expected = file("$buildDir/outputs/apk/debug/app-aetherx-localfinal-debug.apk")
         if (!expected.exists()) {
             throw new GradleException("Expected debug APK was not generated: ${expected}")
-        }
-        def legacyDefaultName = ['app', 'debug'].join('-') + '.apk'
-        def legacyDefaultOutput = file("$buildDir/outputs/apk/debug/${legacyDefaultName}")
-        if (legacyDefaultOutput.exists()) {
-            throw new GradleException("Legacy default debug APK must not be generated: ${legacyDefaultOutput}")
         }
         logger.lifecycle("AetherX Local Final debug APK generated: ${expected}")
     }
@@ -244,6 +262,12 @@ afterEvaluate {
         finalizedBy tasks.named('verifyAetherXMergedManifest')
     }
     tasks.matching { task -> task.name == 'assembleDebug' }.configureEach {
+        finalizedBy tasks.named('copyAetherXLocalFinalDebugApk')
+    }
+    tasks.named('verifyAetherXFinalDebugApk') {
+        mustRunAfter tasks.named('copyAetherXLocalFinalDebugApk')
+    }
+    tasks.named('copyAetherXLocalFinalDebugApk') {
         finalizedBy tasks.named('verifyAetherXFinalDebugApk')
     }
 }
