@@ -111,7 +111,7 @@ tasks.register('verifyAetherXNativeLocalFinal') {
             oldPackage,
             'Brow' + 'ser' + '.open',
             'Brow' + 'ser' + 'Plugin',
-            '@capacitor/' + 'browser',
+            '@capacitor/' + 'brow' + 'ser',
             'Custom' + 'Tabs' + 'Intent',
             'Intent.' + 'ACTION' + '_VIEW',
             'ACTION' + '_VIEW',
@@ -128,7 +128,10 @@ tasks.register('verifyAetherXNativeLocalFinal') {
             if (pluginsText.contains(forbidden)) throw new GradleException("Forbidden plugin token found: ${forbidden}")
             if (configText.contains(forbidden)) throw new GradleException("Forbidden config token found: ${forbidden}")
         }
-        if ((manifestText =~ /android:scheme\s*=/).find() || (manifestText =~ /android:host\s*=/).find() || (manifestText =~ /android:autoVerify\s*=/).find()) {
+        def hasAndroidAttr = { String text, String attr ->
+            return (text =~ /${java.util.regex.Pattern.quote('android:' + attr)}\s*=/).find()
+        }
+        if (hasAndroidAttr(manifestText, 'scheme') || hasAndroidAttr(manifestText, 'host') || hasAndroidAttr(manifestText, 'autoVerify')) {
             throw new GradleException('AndroidManifest.xml must not declare URL schemes, hosts, app links, or deep links')
         }
         if (pluginsFile.exists() && pluginsText.trim() != '[]') {
@@ -188,7 +191,10 @@ tasks.register('verifyAetherXMergedManifest') {
                     throw new GradleException("Forbidden external entry found in merged manifest ${manifest}: ${forbidden}")
                 }
             }
-            if ((text =~ /android:scheme\s*=/).find() || (text =~ /android:host\s*=/).find() || (text =~ /android:autoVerify\s*=/).find()) {
+            def hasAndroidAttr = { String value, String attr ->
+                return (value =~ /${java.util.regex.Pattern.quote('android:' + attr)}\s*=/).find()
+            }
+            if (hasAndroidAttr(text, 'scheme') || hasAndroidAttr(text, 'host') || hasAndroidAttr(text, 'autoVerify')) {
                 throw new GradleException("Merged manifest ${manifest} must not contain URL schemes, hosts, app links, or deep links")
             }
             def oldDomain = ['aetherx', 'org'].join('.')
