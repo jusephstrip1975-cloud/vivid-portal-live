@@ -161,6 +161,56 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
     }
 
+    @Override
+    public void startActivity(android.content.Intent intent) {
+        if (blockExternalActivity(intent, "startActivity")) return;
+        super.startActivity(intent);
+    }
+
+    @Override
+    public void startActivity(android.content.Intent intent, Bundle options) {
+        if (blockExternalActivity(intent, "startActivityWithOptions")) return;
+        super.startActivity(intent, options);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void startActivityForResult(android.content.Intent intent, int requestCode) {
+        if (blockExternalActivity(intent, "startActivityForResult")) return;
+        super.startActivityForResult(intent, requestCode);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void startActivityForResult(android.content.Intent intent, int requestCode, Bundle options) {
+        if (blockExternalActivity(intent, "startActivityForResultWithOptions")) return;
+        super.startActivityForResult(intent, requestCode, options);
+    }
+
+    private boolean blockExternalActivity(android.content.Intent intent, String source) {
+        if (intent == null) return false;
+
+        Uri data = intent.getData();
+        String packageName = intent.getPackage();
+        String componentName = intent.getComponent() != null ? intent.getComponent().flattenToShortString() : null;
+        String target = ((packageName == null ? "" : packageName) + " "
+            + (componentName == null ? "" : componentName)).toLowerCase();
+
+        if (data != null && isHttpLike(data)) {
+            Log.w(TAG, "Blocked external Activity URL launch from " + source + ": action="
+                + intent.getAction() + " data=" + data + " target=" + target);
+            return true;
+        }
+
+        if (target.contains("chrome") || target.contains("browser") || target.contains("customtabs")) {
+            Log.w(TAG, "Blocked external browser Activity launch from " + source + ": action="
+                + intent.getAction() + " data=" + data + " target=" + target);
+            return true;
+        }
+
+        return false;
+    }
+
     private boolean handleNavigation(Uri uri, boolean isMainFrame, String source) {
         if (uri == null) {
             Log.w(TAG, "Blocked null navigation from " + source);
