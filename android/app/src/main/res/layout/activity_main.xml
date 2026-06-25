@@ -1,17 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="#000000"
+    android:fillViewport="true">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
+        android:orientation="vertical"
         android:padding="24dp"
-        android:text="AETHERX APP LOCAL FUNCIONANDO"
-        android:textColor="#ffffff"
-        android:textSize="32sp"
-        android:textStyle="bold" />
-</FrameLayout>
+        android:gravity="center_horizontal">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingBottom="24dp"
+            android:text="AETHERX LIVE WALLPAPER"
+            android:textColor="#ffffff"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnPickVideo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="1. SELECCIONAR VÍDEO DEL DISPOSITIVO" />
+
+        <Button
+            android:id="@+id/btnSaveVideo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="2. GUARDAR VÍDEO COMO WALLPAPER" />
+
+        <Button
+            android:id="@+id/btnApplyWallpaper"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="3. APLICAR LIVE WALLPAPER" />
+
+        <Button
+            android:id="@+id/btnStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="4. VER ESTADO GUARDADO" />
+
+        <TextView
+            android:id="@+id/txtStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:padding="12dp"
+            android:background="#111111"
+            android:text="Estado: sin vídeo seleccionado"
+            android:textColor="#cccccc"
+            android:textSize="14sp"
+            android:typeface="monospace" />
+    </LinearLayout>
+</ScrollView>
