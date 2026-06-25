@@ -1,37 +1,20 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-/**
- * Capacitor config — APK local.
- *
- * Android arranca desde `public/dist/index.html`, empaquetado dentro del APK.
- * No hay configuración remota de servidor, no hay carga remota inicial y MainActivity no fuerza
- * ninguna URL web remota.
- */
 const config: CapacitorConfig = {
-  appId: "com.aetherx.wallpapers",
-  appName: "AetherX",
+  appId: "com.aetherx.localfinal",
+  appName: "AetherX Local Final",
   webDir: "public/dist",
-  backgroundColor: "#02040a",
+  backgroundColor: "#000000",
   android: {
-    backgroundColor: "#02040a",
+    backgroundColor: "#000000",
     allowMixedContent: false,
-    webContentsDebuggingEnabled: true,
-    captureInput: true,
+    webContentsDebuggingEnabled: false,
+    captureInput: false,
   },
   ios: {
-    backgroundColor: "#02040a",
+    backgroundColor: "#000000",
     contentInset: "always",
   },
-  plugins: {
-    SplashScreen: {
-      backgroundColor: "#02040a",
-      showSpinner: false,
-      launchAutoHide: true,
-      launchShowDuration: 1500,
-    },
-  },
-  // Evita que Capacitor regenere res/xml/config.xml con reglas Cordova amplias
-  // o rutas que puedan delegar navegación a un navegador externo.
   cordova: {
     accessOrigins: [],
   },

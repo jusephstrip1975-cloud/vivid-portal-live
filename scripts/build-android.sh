@@ -2,13 +2,13 @@
 set -euo pipefail
 
 echo "=========================================="
-echo "  AetherX — Android Build Script"
+echo "  AetherX Local Final — Android Build Script"
 echo "=========================================="
 
-# 1. Build the local web app bundle used by Capacitor
+# 1. Prepare the static local fallback asset. The debug APK itself is native.
 echo ""
-echo "🔨  Step 1/5: Building local web app into public/dist..."
-bun run build
+echo "🔨  Step 1/5: Preparing local final marker..."
+node scripts/prepare-android-local.mjs --prepare
 
 # 2. Add Android platform if missing
 echo ""
@@ -20,25 +20,18 @@ else
   echo "    Android platform already present."
 fi
 
-# 3. Sync Capacitor with Android. This copies public/dist into
-#    android/app/src/main/assets/public for true local APK startup.
+# 3. Sync Capacitor metadata, then lock Android back to native local-final mode.
 echo ""
 echo "🔄  Step 3/5: Syncing Capacitor + Android..."
 bunx cap sync android
 
-# 4. Sobrescribir MainActivity y strings con la plantilla AetherX
+# 4. Enforce native MainActivity and package id.
 echo ""
-echo "🧩  Step 4/5: Inyectando MainActivity personalizado..."
-MAIN_ACTIVITY_DIR="android/app/src/main/java/com/aetherx/wallpapers"
-STRINGS_FILE="android/app/src/main/res/values/strings.xml"
-mkdir -p "$MAIN_ACTIVITY_DIR"
-cp android-template/MainActivity.java "$MAIN_ACTIVITY_DIR/MainActivity.java"
-if [ -f "android-template/strings.xml" ]; then
-  cp android-template/strings.xml "$STRINGS_FILE"
-fi
-echo "    ✓ MainActivity.java actualizado."
-echo "    ✓ strings.xml actualizado."
-echo "    ✓ WebView arranca desde assets locales, sin server.url remoto."
+echo "🧩  Step 4/5: Locking native local-final Android project..."
+node scripts/lock-android-no-browser.mjs
+echo "    ✓ package/applicationId: com.aetherx.localfinal"
+echo "    ✓ app_name: AetherX Local Final"
+echo "    ✓ pantalla nativa local sin navegador externo."
 
 # 5. Open Android Studio
 echo ""
@@ -48,7 +41,7 @@ echo "    cd android"
 echo "    ./gradlew clean assembleDebug      # Linux/macOS"
 echo "    .\\gradlew.bat clean assembleDebug  # Windows"
 echo ""
-echo "    El APK quedará en android/app/build/outputs/apk/debug/app-aetherx-local-final-debug.apk"
+echo "    El APK quedará en android/app/build/outputs/apk/debug/app-aetherx-localfinal-debug.apk"
 echo ""
 echo "    O abre Android Studio con: bunx cap open android"
 echo "=========================================="

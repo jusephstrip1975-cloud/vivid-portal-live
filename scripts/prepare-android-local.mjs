@@ -12,21 +12,17 @@ const HTML = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>AetherX</title>
+    <title>AetherX Local Final</title>
     <style>
       html, body { margin:0; padding:0; width:100%; height:100%; background:#000; color:#fff;
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
       body { display:flex; align-items:center; justify-content:center; text-align:center;
         padding:24px; box-sizing:border-box; }
       h1 { font-size:32px; font-weight:800; letter-spacing:.04em; line-height:1.3; margin:0; }
-      small { display:block; margin-top:16px; font-size:12px; opacity:.5; }
     </style>
   </head>
   <body>
-    <div>
-      <h1>AETHERX APP LOCAL FUNCIONANDO</h1>
-      <small>APP LOCAL AETHERX VERSION FINAL</small>
-    </div>
+    <h1>AETHERX APP LOCAL FUNCIONANDO</h1>
   </body>
 </html>
 `;
