@@ -34,11 +34,11 @@ public class MainActivity extends BridgeActivity {
             Uri data = launchIntent.getData();
             Log.i(TAG, "BOOT_AUDIT launchIntent action=" + action + " data=" + data
                 + " categories=" + launchIntent.getCategories() + " package=" + launchIntent.getPackage());
-            if (android.content.Intent.ACTION_VIEW.equals(action)) {
-                Log.w(TAG, "BOOT_AUDIT WARNING: app launched via ACTION_VIEW — ignoring URI, staying in local WebView");
+            if (data != null && isHttpLike(data)) {
+                Log.w(TAG, "BOOT_AUDIT WARNING: app launched with external URL data — ignoring URI, staying in local WebView");
                 setIntent(createCleanLauncherIntent());
             } else {
-                Log.i(TAG, "BOOT_AUDIT OK: no ACTION_VIEW at boot; no external Chrome/Browser launch path triggered");
+                Log.i(TAG, "BOOT_AUDIT OK: launcher boot has no URL data and no external Chrome/Browser path");
             }
         }
         Log.i(TAG, "BOOT_AUDIT MainActivity has no external browser launch path — forcing assets/public before Bridge load");
@@ -159,6 +159,56 @@ public class MainActivity extends BridgeActivity {
         }
         setIntent(intent);
         super.onNewIntent(intent);
+    }
+
+    @Override
+    public void startActivity(android.content.Intent intent) {
+        if (blockExternalActivity(intent, "startActivity")) return;
+        super.startActivity(intent);
+    }
+
+    @Override
+    public void startActivity(android.content.Intent intent, Bundle options) {
+        if (blockExternalActivity(intent, "startActivityWithOptions")) return;
+        super.startActivity(intent, options);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void startActivityForResult(android.content.Intent intent, int requestCode) {
+        if (blockExternalActivity(intent, "startActivityForResult")) return;
+        super.startActivityForResult(intent, requestCode);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void startActivityForResult(android.content.Intent intent, int requestCode, Bundle options) {
+        if (blockExternalActivity(intent, "startActivityForResultWithOptions")) return;
+        super.startActivityForResult(intent, requestCode, options);
+    }
+
+    private boolean blockExternalActivity(android.content.Intent intent, String source) {
+        if (intent == null) return false;
+
+        Uri data = intent.getData();
+        String packageName = intent.getPackage();
+        String componentName = intent.getComponent() != null ? intent.getComponent().flattenToShortString() : null;
+        String target = ((packageName == null ? "" : packageName) + " "
+            + (componentName == null ? "" : componentName)).toLowerCase();
+
+        if (data != null && isHttpLike(data)) {
+            Log.w(TAG, "Blocked external Activity URL launch from " + source + ": action="
+                + intent.getAction() + " data=" + data + " target=" + target);
+            return true;
+        }
+
+        if (target.contains("chrome") || target.contains("browser") || target.contains("customtabs")) {
+            Log.w(TAG, "Blocked external browser Activity launch from " + source + ": action="
+                + intent.getAction() + " data=" + data + " target=" + target);
+            return true;
+        }
+
+        return false;
     }
 
     private boolean handleNavigation(Uri uri, boolean isMainFrame, String source) {

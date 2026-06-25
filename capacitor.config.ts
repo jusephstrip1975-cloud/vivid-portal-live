@@ -30,6 +30,11 @@ const config: CapacitorConfig = {
       launchShowDuration: 1500,
     },
   },
+  // Evita que Capacitor regenere res/xml/config.xml con reglas Cordova amplias
+  // o rutas que puedan delegar navegación a un navegador externo.
+  cordova: {
+    accessOrigins: [],
+  },
 };
 
 export default config;

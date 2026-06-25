@@ -3,5 +3,4 @@
     <string name="app_name">AetherX</string>
     <string name="title_activity_main">AetherX</string>
     <string name="package_name">com.aetherx.wallpapers</string>
-    <string name="custom_url_scheme">com.aetherx.wallpapers</string>
 </resources>

@@ -20,5 +20,8 @@
 			"launchAutoHide": true,
 			"launchShowDuration": 1500
 		}
+	},
+	"cordova": {
+		"accessOrigins": []
 	}
 }
