@@ -1,43 +1,37 @@
 #!/usr/bin/env node
-// Modo TEST mínimo: genera una sola pantalla negra estática en public/dist.
-// Sin Vite, sin React, sin TanStack, sin router, sin plugins, sin red.
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+/**
+ * Build the FULL AetherX SPA (galería 3D + todas las rutas) en public/dist
+ * para que Capacitor lo empaquete dentro del APK. Usa vite.capacitor.config.ts
+ * con hash router (sin SSR) para ejecutarse 100% offline dentro del WebView.
+ */
+import { rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 const publicDist = join(root, "public", "dist");
 
-const HTML = `<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>AetherX Local Final</title>
-    <style>
-      html, body { margin:0; padding:0; width:100%; height:100%; background:#000; color:#fff;
-        font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-      body { display:flex; align-items:center; justify-content:center; text-align:center;
-        padding:24px; box-sizing:border-box; }
-      h1 { font-size:32px; font-weight:800; letter-spacing:.04em; line-height:1.3; margin:0; }
-    </style>
-  </head>
-  <body>
-    <h1>AETHERX APP LOCAL FUNCIONANDO</h1>
-  </body>
-</html>
-`;
-
-function cleanPublicDist() {
+function clean() {
   rmSync(publicDist, { recursive: true, force: true });
+  console.log("[prepare-android-local] cleaned public/dist");
 }
 
 function prepare() {
-  cleanPublicDist();
-  mkdirSync(publicDist, { recursive: true });
-  writeFileSync(join(publicDist, "index.html"), HTML, "utf8");
-  console.log("Prepared minimal local test screen at public/dist/index.html");
+  clean();
+  console.log("[prepare-android-local] building full SPA via vite.capacitor.config.ts ...");
+  const runner = existsSync(join(root, "bun.lockb")) || existsSync(join(root, "bunfig.toml")) ? "bunx" : "npx";
+  const res = spawnSync(runner, ["vite", "build", "--config", "vite.capacitor.config.ts"], {
+    stdio: "inherit",
+    cwd: root,
+    env: process.env,
+  });
+  if (res.status !== 0) {
+    console.error("[prepare-android-local] vite build failed");
+    process.exit(res.status ?? 1);
+  }
+  console.log("[prepare-android-local] SPA built into public/dist");
 }
 
 const args = new Set(process.argv.slice(2));
-if (args.has("--clean")) cleanPublicDist();
+if (args.has("--clean")) clean();
 if (args.has("--prepare") || (!args.has("--clean") && args.size === 0)) prepare();
