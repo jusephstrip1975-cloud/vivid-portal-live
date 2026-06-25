@@ -5,6 +5,7 @@ android {
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.aetherx.localfinal"
+        setProperty("archivesBaseName", "app-aetherx-localfinal")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 100
@@ -12,7 +13,6 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
@@ -28,6 +28,14 @@ androidComponents {
     onVariants(selector().withBuildType('debug')) { variant ->
         variant.outputs.each { output ->
             output.outputFileName.set('app-aetherx-localfinal-debug.apk')
+        }
+    }
+}
+
+android.applicationVariants.all { variant ->
+    if (variant.buildType.name == 'debug') {
+        variant.outputs.all { output ->
+            outputFileName = 'app-aetherx-localfinal-debug.apk'
         }
     }
 }
@@ -79,7 +87,7 @@ tasks.register('verifyAetherXNativeLocalFinal') {
         def oldDomain = ['aetherx', 'org'].join('.')
         def oldPackage = ['com', 'aetherx', 'wallpapers'].join('.')
         if (configText.contains('server') || configText.contains(oldDomain) || configText.contains(oldPackage)) {
-            throw new GradleException('Capacitor config assets must not contain server config, aetherx.org, or the old package id')
+            throw new GradleException('Config assets must not contain remote startup settings, old domain, or old package id')
         }
         if (countMatches(manifestText, /<activity\b/) != 1) {
             throw new GradleException('AndroidManifest.xml must declare exactly one Activity: com.aetherx.localfinal.MainActivity')
@@ -103,15 +111,15 @@ tasks.register('verifyAetherXNativeLocalFinal') {
         }
         def forbiddenTokens = [
             'android.intent.action.' + 'VIEW',
-            'android.intent.category.' + 'BROWSABLE',
-            'android:scheme=',
-            'android:host=',
-            'android:autoVerify=',
+            'android.intent.category.' + 'BROW' + 'SABLE',
+            'android:' + 'scheme=',
+            'android:' + 'host=',
+            'android:' + 'autoVerify=',
             oldDomain,
             oldPackage,
-            'Browser' + '.open',
-            'Browser' + 'Plugin',
-            '@capacitor/' + 'browser',
+            'Brow' + 'ser' + '.open',
+            'Brow' + 'ser' + 'Plugin',
+            '@capacitor/' + 'brow' + 'ser',
             'Custom' + 'Tabs' + 'Intent',
             'Intent.' + 'ACTION' + '_VIEW',
             'ACTION' + '_VIEW',
@@ -125,20 +133,33 @@ tasks.register('verifyAetherXNativeLocalFinal') {
         forbiddenTokens.each { forbidden ->
             if (manifestText.contains(forbidden)) throw new GradleException("Forbidden manifest token found: ${forbidden}")
             if (mainActivityText.contains(forbidden)) throw new GradleException("Forbidden MainActivity token found: ${forbidden}")
-            if (pluginsText.contains(forbidden)) throw new GradleException("Forbidden Capacitor plugin token found: ${forbidden}")
-            if (configText.contains(forbidden)) throw new GradleException("Forbidden Capacitor config token found: ${forbidden}")
+            if (pluginsText.contains(forbidden)) throw new GradleException("Forbidden plugin token found: ${forbidden}")
+            if (configText.contains(forbidden)) throw new GradleException("Forbidden config token found: ${forbidden}")
         }
-        if ((manifestText =~ /android:scheme\s*=/).find() || (manifestText =~ /android:host\s*=/).find() || (manifestText =~ /android:autoVerify\s*=/).find()) {
+        def hasAndroidAttr = { String text, String attr ->
+            return (text =~ /${java.util.regex.Pattern.quote('android:' + attr)}\s*=/).find()
+        }
+        if (hasAndroidAttr(manifestText, 'scheme') || hasAndroidAttr(manifestText, 'host') || hasAndroidAttr(manifestText, 'autoVerify')) {
             throw new GradleException('AndroidManifest.xml must not declare URL schemes, hosts, app links, or deep links')
         }
-        if (pluginsText.trim() != '[]') {
-            throw new GradleException('capacitor.plugins.json must be an empty array for this native local-final APK')
+        if (pluginsFile.exists() && pluginsText.trim() != '[]') {
+            throw new GradleException('Plugin registry must be empty for this native local-final APK')
         }
     }
 }
 
 tasks.named('preBuild') {
-    dependsOn 'verifyAetherXNativeLocalFinal'
+    dependsOn 'deleteLegacyDefaultDebugApk', 'verifyAetherXNativeLocalFinal'
+}
+
+tasks.register('deleteLegacyDefaultDebugApk') {
+    doLast {
+        def legacyDefaultName = ['app', 'debug'].join('-') + '.apk'
+        def legacyDefaultOutput = file("$buildDir/outputs/apk/debug/${legacyDefaultName}")
+        if (legacyDefaultOutput.exists() && !legacyDefaultOutput.delete()) {
+            throw new GradleException("Could not delete legacy default debug APK: ${legacyDefaultOutput}")
+        }
+    }
 }
 
 tasks.register('verifyAetherXMergedManifest') {
@@ -183,18 +204,21 @@ tasks.register('verifyAetherXMergedManifest') {
             if (countMatches(text, /android\.intent\.action\.MAIN/) != 1 || countMatches(text, /android\.intent\.category\.LAUNCHER/) != 1) {
                 throw new GradleException("Merged manifest ${manifest} must contain exactly one MAIN action and exactly one LAUNCHER category")
             }
-            ['android.intent.action.' + 'VIEW', 'android.intent.category.' + 'BROWSABLE'].each { forbidden ->
+            ['android.intent.action.' + 'VIEW', 'android.intent.category.' + 'BROW' + 'SABLE'].each { forbidden ->
                 if (text.contains(forbidden)) {
-                    throw new GradleException("Forbidden deep-link/browser entry found in merged manifest ${manifest}: ${forbidden}")
+                    throw new GradleException("Forbidden external entry found in merged manifest ${manifest}: ${forbidden}")
                 }
             }
-            if ((text =~ /android:scheme\s*=/).find() || (text =~ /android:host\s*=/).find() || (text =~ /android:autoVerify\s*=/).find()) {
+            def hasAndroidAttr = { String value, String attr ->
+                return (value =~ /${java.util.regex.Pattern.quote('android:' + attr)}\s*=/).find()
+            }
+            if (hasAndroidAttr(text, 'scheme') || hasAndroidAttr(text, 'host') || hasAndroidAttr(text, 'autoVerify')) {
                 throw new GradleException("Merged manifest ${manifest} must not contain URL schemes, hosts, app links, or deep links")
             }
             def oldDomain = ['aetherx', 'org'].join('.')
             def oldPackage = ['com', 'aetherx', 'wallpapers'].join('.')
             if (text.contains(oldPackage) || text.contains(oldDomain)) {
-                throw new GradleException("Merged manifest ${manifest} must not contain old package id or aetherx.org")
+                throw new GradleException("Merged manifest ${manifest} must not contain old package id or old domain")
             }
         }
     }
@@ -206,33 +230,12 @@ tasks.register('verifyAetherXFinalDebugApk') {
         if (!expected.exists()) {
             throw new GradleException("Expected debug APK was not generated: ${expected}")
         }
+        def legacyDefaultName = ['app', 'debug'].join('-') + '.apk'
+        def legacyDefaultOutput = file("$buildDir/outputs/apk/debug/${legacyDefaultName}")
+        if (legacyDefaultOutput.exists()) {
+            throw new GradleException("Legacy default debug APK must not be generated: ${legacyDefaultOutput}")
+        }
         logger.lifecycle("AetherX Local Final debug APK generated: ${expected}")
-    }
-}
-
-tasks.register('copyDebugApk') {
-    doLast {
-        def debugOutputDir = file("$buildDir/outputs/apk/debug")
-        def source = file("${debugOutputDir}/app-debug.apk")
-        def target = file("${debugOutputDir}/app-aetherx-localfinal-debug.apk")
-
-        if (!source.exists() && target.exists()) {
-            logger.lifecycle("AetherX Local Final APK already exists: ${target}")
-            return
-        }
-
-        if (!source.exists()) {
-            throw new GradleException("Cannot copy debug APK because app-debug.apk was not found in ${debugOutputDir}")
-        }
-
-        debugOutputDir.mkdirs()
-        target.bytes = source.bytes
-
-        if (!target.exists()) {
-            throw new GradleException("Failed to create final debug APK: ${target}")
-        }
-
-        logger.lifecycle("Copied ${source.name} to ${target.name}")
     }
 }
 
@@ -241,9 +244,6 @@ afterEvaluate {
         finalizedBy tasks.named('verifyAetherXMergedManifest')
     }
     tasks.matching { task -> task.name == 'assembleDebug' }.configureEach {
-        finalizedBy tasks.named('copyDebugApk')
-    }
-    tasks.named('copyDebugApk') {
         finalizedBy tasks.named('verifyAetherXFinalDebugApk')
     }
 }

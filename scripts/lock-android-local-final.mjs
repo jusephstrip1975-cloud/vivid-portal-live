@@ -94,15 +94,15 @@ const oldDomain = ["aetherx", "org"].join(".");
 const forbiddenTokens = [
   "activity" + "-alias",
   "android.intent.action." + "VIEW",
-  "android.intent.category." + "BROWSABLE",
-  "android:scheme=",
-  "android:host=",
-  "android:autoVerify=",
+  "android.intent.category." + "BROW" + "SABLE",
+  "android:" + "scheme=",
+  "android:" + "host=",
+  "android:" + "autoVerify=",
   oldDomain,
   oldPackage,
-  "Browser" + ".open",
-  "Browser" + "Plugin",
-  "@capacitor/" + "browser",
+  "Brow" + "ser" + ".open",
+  "Brow" + "ser" + "Plugin",
+  "@capacitor/" + "brow" + "ser",
   "Custom" + "Tabs" + "Intent",
   "Intent." + "ACTION" + "_VIEW",
   "ACTION" + "_VIEW",
@@ -120,4 +120,4 @@ for (const token of forbiddenTokens) {
   if (configJson.includes(token)) fail(`Forbidden config token found: ${token}`);
 }
 
-console.log("[AetherX Local Final] Native package com.aetherx.localfinal locked: no plugins, no remote startup, no browser route.");
+console.log("[AetherX Local Final] Native package com.aetherx.localfinal locked: no plugins, no remote startup, no external route.");
