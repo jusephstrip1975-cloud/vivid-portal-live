@@ -1,60 +1,45 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+// Modo TEST mínimo: genera una sola pantalla negra estática en public/dist.
+// Sin Vite, sin React, sin TanStack, sin router, sin plugins, sin red.
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
 const publicDist = join(root, "public", "dist");
 
+const HTML = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>AetherX</title>
+    <style>
+      html, body { margin:0; padding:0; width:100%; height:100%; background:#000; color:#fff;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+      body { display:flex; align-items:center; justify-content:center; text-align:center;
+        padding:24px; box-sizing:border-box; }
+      h1 { font-size:32px; font-weight:800; letter-spacing:.04em; line-height:1.3; margin:0; }
+      small { display:block; margin-top:16px; font-size:12px; opacity:.5; }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1>AETHERX APP LOCAL FUNCIONANDO</h1>
+      <small>APP LOCAL AETHERX VERSION FINAL</small>
+    </div>
+  </body>
+</html>
+`;
+
 function cleanPublicDist() {
   rmSync(publicDist, { recursive: true, force: true });
 }
 
-function assertLocalBundle() {
-  const indexPath = join(publicDist, "index.html");
-  if (!existsSync(indexPath)) {
-    throw new Error("Missing public/dist/index.html after Capacitor SPA build.");
-  }
-  const index = readFileSync(indexPath, "utf8");
-  if (!index.includes("/assets/") && !index.includes("./assets/")) {
-    throw new Error("public/dist/index.html does not reference bundled local assets.");
-  }
-  if (/https:\/\/aetherx\.org|server\.url|loadUrl\(/i.test(index)) {
-    throw new Error("public/dist/index.html contains a forbidden remote startup reference.");
-  }
-  if (!index.includes("aetherx-native-fallback")) {
-    throw new Error("public/dist/index.html is missing the native boot fallback.");
-  }
-  if (!index.includes("AetherX cargando local") || !index.includes("window.onerror")) {
-    throw new Error("public/dist/index.html is missing visible Android boot diagnostics.");
-  }
-  if (!index.includes("APP LOCAL AETHERX VERSION FINAL")) {
-    throw new Error("public/dist/index.html is missing the final local APK marker text.");
-  }
-}
-
-function normalizeHtmlOutput() {
-  const nestedIndex = join(publicDist, "src", "capacitor-index.html");
-  const rootIndex = join(publicDist, "index.html");
-  if (existsSync(nestedIndex) && !existsSync(rootIndex)) {
-    renameSync(nestedIndex, rootIndex);
-    rmSync(join(publicDist, "src"), { recursive: true, force: true });
-  }
-  if (existsSync(rootIndex)) {
-    const normalized = readFileSync(rootIndex, "utf8").replaceAll("../assets/", "./assets/");
-    writeFileSync(rootIndex, normalized, "utf8");
-  }
-}
-
 function prepare() {
   cleanPublicDist();
-  execFileSync("bunx", ["vite", "build", "--config", "vite.capacitor.config.ts"], {
-    cwd: root,
-    stdio: "inherit",
-  });
-  normalizeHtmlOutput();
-  assertLocalBundle();
-  console.log("Prepared Capacitor SPA at public/dist/index.html for 100% local APK startup");
+  mkdirSync(publicDist, { recursive: true });
+  writeFileSync(join(publicDist, "index.html"), HTML, "utf8");
+  console.log("Prepared minimal local test screen at public/dist/index.html");
 }
 
 const args = new Set(process.argv.slice(2));
