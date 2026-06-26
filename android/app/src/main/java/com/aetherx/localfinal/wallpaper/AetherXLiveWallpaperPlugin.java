@@ -389,6 +389,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " size=" + (current.exists() ? current.length() : -1));
         deleteFileIfExists(current, "DELETE_OLD_WALLPAPER current.mp4");
         deleteConvertedDirIfExists();
+        cleanOrphanWallpaperFiles("prepareForNewWallpaper");
         prefs.edit()
             .remove(KEY_VIDEO_PATH)
             .remove("last_transcode_error")
