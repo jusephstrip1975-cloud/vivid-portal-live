@@ -299,8 +299,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     private void persistOriginalPath(String absolutePath) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String previousOriginal = prefs.getString(KEY_ORIGINAL_PATH, null);
+        String currentVideo = prefs.getString(KEY_VIDEO_PATH, null);
         prefs.edit().putString(KEY_ORIGINAL_PATH, absolutePath).commit();
         Log.i(TAG, "persistOriginalPath=" + absolutePath);
+        if (previousOriginal != null
+            && !previousOriginal.equals(absolutePath)
+            && !previousOriginal.equals(currentVideo)) {
+            deleteIfStale(previousOriginal, absolutePath, "previous-original-path");
+        }
     }
 
     private void persistVideoPath(String absolutePath) {
