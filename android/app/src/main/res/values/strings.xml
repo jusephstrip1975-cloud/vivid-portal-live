@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">AetherX Local Final</string>
-    <string name="title_activity_main">AetherX Local Final</string>
+    <string name="app_name">AETHERX</string>
+    <string name="title_activity_main">AETHERX</string>
     <string name="package_name">com.aetherx.localfinal</string>
     <string name="wallpaper_label">AetherX Live Wallpaper</string>
     <string name="wallpaper_description">Fondos animados AetherX para tu pantalla de inicio y bloqueo.</string>
