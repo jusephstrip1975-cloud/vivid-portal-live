@@ -7,9 +7,13 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
 import android.media.MediaPlayer;
 import android.media.MediaMetadataRetriever;
+import android.media.PlaybackParams;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.wallpaper.WallpaperService;
@@ -207,6 +211,11 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     return;
                 }
 
+                VideoStats stats = readVideoStats(uri);
+                Log.i(TAG, "Wallpaper media stats renderer=prepare inputDurationMs=" + stats.durationMs
+                    + " inputFps=" + stats.fps
+                    + " inputSize=" + stats.width + "x" + stats.height
+                    + " uri=" + uri);
                 Log.i(TAG, "ExoPlayer media item=" + uri + " size=" + sizeForLog);
                 lastUri = uri;
 
@@ -218,6 +227,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 // Explicit 1.0x playback to defeat any system-level slowdown
                 // and to guarantee real-time rendering on Samsung One UI.
                 player.setPlaybackParameters(new PlaybackParameters(1.0f));
+                Log.i(TAG, "renderer=ExoPlayer playbackSpeed=" + player.getPlaybackParameters().speed
+                    + " targetFps=" + stats.fps
+                    + " durationMs=" + stats.durationMs);
                 player.setAudioAttributes(
                         new AudioAttributes.Builder().setUsage(C.USAGE_UNKNOWN).build(),
                         false);
@@ -225,7 +237,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player.addListener(new Player.Listener() {
                     @Override
                     public void onPlaybackStateChanged(int state) {
-                        Log.i(TAG, "ExoPlayer state=" + state);
+                        Log.i(TAG, "renderer=ExoPlayer state=" + state
+                            + " playbackSpeed=" + player.getPlaybackParameters().speed);
                     }
 
                     @Override
@@ -238,7 +251,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
                     @Override
                     public void onRenderedFirstFrame() {
-                        Log.i(TAG, "ExoPlayer onRenderedFirstFrame");
+                        Log.i(TAG, "renderer=ExoPlayer onRenderedFirstFrame playbackSpeed="
+                            + player.getPlaybackParameters().speed);
                     }
 
                     @Override
@@ -269,7 +283,10 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     Log.w(TAG, "MediaPlayer fallback: surface not valid");
                     return;
                 }
-                Log.i(TAG, "MediaPlayer fallback start uri=" + uri);
+                VideoStats stats = readVideoStats(uri);
+                Log.i(TAG, "renderer=MediaPlayer start uri=" + uri
+                    + " inputDurationMs=" + stats.durationMs
+                    + " inputFps=" + stats.fps);
                 fallbackPlayer = new MediaPlayer();
                 fallbackPlayer.setSurface(currentHolder.getSurface());
                 fallbackPlayer.setLooping(true);
@@ -280,8 +297,16 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     return true;
                 });
                 fallbackPlayer.setOnPreparedListener(mp -> {
-                    Log.i(TAG, "MediaPlayer prepared, starting playback");
-                    try { mp.start(); } catch (Throwable t) { Log.e(TAG, "MediaPlayer start failed", t); }
+                    Log.i(TAG, "renderer=MediaPlayer prepared, starting playback");
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            mp.setPlaybackParams(new PlaybackParams().setSpeed(1.0f));
+                            Log.i(TAG, "renderer=MediaPlayer playbackSpeed=" + mp.getPlaybackParams().getSpeed());
+                        } else {
+                            Log.i(TAG, "renderer=MediaPlayer playbackSpeed=1.0 sdkNoPlaybackParams");
+                        }
+                        mp.start();
+                    } catch (Throwable t) { Log.e(TAG, "MediaPlayer start failed", t); }
                 });
                 fallbackPlayer.setDataSource(getApplicationContext(), uri);
                 fallbackPlayer.prepareAsync();
@@ -303,7 +328,10 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     Log.w(TAG, "Canvas frame fallback: surface not valid");
                     return;
                 }
-                Log.i(TAG, "Canvas frame fallback start uri=" + uri);
+                VideoStats stats = readVideoStats(uri);
+                Log.i(TAG, "renderer=Canvas start uri=" + uri
+                    + " inputDurationMs=" + stats.durationMs
+                    + " inputFps=" + stats.fps);
                 frameRetriever = new MediaMetadataRetriever();
                 frameRetriever.setDataSource(getApplicationContext(), uri);
                 String durationValue = frameRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
@@ -314,7 +342,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     parsedDurationUs = 5_000_000L;
                 }
                 final long durationUs = parsedDurationUs;
-                final long frameStepUs = 33_333L; // 30 fps fallback for fluid motion.
+                final int targetFps = stats.fps >= 50f
+                    ? 60
+                    : (stats.fps >= 23f ? Math.max(24, Math.round(stats.fps)) : 60);
+                final long frameStepUs = Math.max(1L, 1_000_000L / targetFps);
+                final long frameDelayMs = Math.max(1L, 1000L / targetFps);
+                Log.i(TAG, "renderer=Canvas playbackSpeed=1.0 targetFps=" + targetFps
+                    + " frameStepUs=" + frameStepUs
+                    + " frameDelayMs=" + frameDelayMs
+                    + " durationUs=" + durationUs);
                 final long[] positionUs = new long[] {0L};
                 frameLoop = new Runnable() {
                     @Override
@@ -327,7 +363,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                                 frame.recycle();
                             }
                             positionUs[0] = (positionUs[0] + frameStepUs) % durationUs;
-                            main.postDelayed(this, 33L);
+                            main.postDelayed(this, frameDelayMs);
                         } catch (Throwable t) {
                             Log.e(TAG, "Canvas frame fallback failed while drawing", t);
                             paintMessage("Vídeo no soportado por el dispositivo");
@@ -383,6 +419,69 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     if (c != null && currentHolder != null) currentHolder.unlockCanvasAndPost(c);
                 } catch (Throwable ignored) {}
             }
+        }
+
+        private VideoStats readVideoStats(Uri uri) {
+            VideoStats stats = new VideoStats();
+            if (uri == null) return stats;
+            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+            MediaExtractor extractor = new MediaExtractor();
+            try {
+                retriever.setDataSource(getApplicationContext(), uri);
+                stats.width = parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+                stats.height = parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+                stats.durationMs = parseLong(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
+                stats.fps = parseFloat(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE));
+
+                if ("file".equals(uri.getScheme()) && uri.getPath() != null) {
+                    extractor.setDataSource(uri.getPath());
+                } else {
+                    extractor.setDataSource(getApplicationContext(), uri, null);
+                }
+                for (int i = 0; i < extractor.getTrackCount(); i++) {
+                    MediaFormat format = extractor.getTrackFormat(i);
+                    String mime = format.containsKey(MediaFormat.KEY_MIME)
+                        ? format.getString(MediaFormat.KEY_MIME)
+                        : "";
+                    if (mime != null && mime.startsWith("video/")) {
+                        if (stats.fps <= 0f && format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
+                            stats.fps = format.getInteger(MediaFormat.KEY_FRAME_RATE);
+                        }
+                        if (stats.durationMs <= 0 && format.containsKey(MediaFormat.KEY_DURATION)) {
+                            stats.durationMs = format.getLong(MediaFormat.KEY_DURATION) / 1000L;
+                        }
+                        break;
+                    }
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "readVideoStats failed uri=" + uri, t);
+            } finally {
+                try { retriever.release(); } catch (Throwable ignored) {}
+                try { extractor.release(); } catch (Throwable ignored) {}
+            }
+            return stats;
+        }
+
+        private int parseInt(String value) {
+            try { return value == null ? 0 : Integer.parseInt(value); }
+            catch (Throwable ignored) { return 0; }
+        }
+
+        private long parseLong(String value) {
+            try { return value == null ? 0L : Long.parseLong(value); }
+            catch (Throwable ignored) { return 0L; }
+        }
+
+        private float parseFloat(String value) {
+            try { return value == null ? 0f : Float.parseFloat(value); }
+            catch (Throwable ignored) { return 0f; }
+        }
+
+        private final class VideoStats {
+            long durationMs;
+            float fps;
+            int width;
+            int height;
         }
 
         private void releasePlayer() {
