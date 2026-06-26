@@ -58,6 +58,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private final Set<String> failedPlaybackPaths = new HashSet<>();
+        private boolean preserveFailedPathsOnNextStart = false;
         private final Handler main = new Handler(Looper.getMainLooper());
         private SharedPreferences prefs;
         private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
@@ -172,7 +173,11 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
                     + " new=" + path + " newVersion=" + version + " savedUri=" + savedUri);
                 if (path == null || !path.equals(currentPath) || version != currentVersion) {
-                    failedPlaybackPaths.clear();
+                    if (preserveFailedPathsOnNextStart) {
+                        preserveFailedPathsOnNextStart = false;
+                    } else {
+                        failedPlaybackPaths.clear();
+                    }
                 }
                 currentPath = path;
                 currentVersion = version;
@@ -430,6 +435,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     .putLong("video_updated_at", System.currentTimeMillis())
                     .putLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, version)
                     .commit();
+                preserveFailedPathsOnNextStart = true;
                 releasePlayer();
                 startPlayer();
             } catch (Throwable t) {
