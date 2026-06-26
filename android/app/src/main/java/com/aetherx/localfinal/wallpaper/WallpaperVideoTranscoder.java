@@ -1,6 +1,7 @@
 package com.aetherx.localfinal.wallpaper;
 
 import android.content.Context;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -36,7 +37,8 @@ public final class WallpaperVideoTranscoder {
     private static final String TAG = "AetherXLiveWP";
     private static final int SAFE_OUTPUT_HEIGHT = 720;
     private static final int SAFE_OUTPUT_FRAME_RATE = 30;
-    private static final int SAFE_OUTPUT_BITRATE = 2_500_000;
+    private static final int SAFE_OUTPUT_BITRATE = 1_800_000;
+    public static final String OUTPUT_FILE_NAME = "output-samsung-safe-v4.mp4";
     private static Transformer currentTransformer;
 
     public interface Callback {
@@ -48,11 +50,16 @@ public final class WallpaperVideoTranscoder {
         new Handler(Looper.getMainLooper()).post(() -> runOnMain(context, input, cb));
     }
 
+    public static File getOutputFile(Context context) {
+        return new File(new File(context.getFilesDir(), "wallpapers/converted"), OUTPUT_FILE_NAME);
+    }
+
     private static void runOnMain(final Context context, final File input, final Callback cb) {
         try {
             File outDir = new File(context.getFilesDir(), "wallpapers/converted");
             if (!outDir.exists()) outDir.mkdirs();
-            final File output = new File(outDir, "output.mp4");
+            deleteOldConvertedOutputs(outDir);
+            final File output = getOutputFile(context);
             if (output.exists() && !output.delete()) {
                 Log.w(TAG, "Could not delete previous converted output, overwriting may fail: " + output.getAbsolutePath());
             }
@@ -94,7 +101,11 @@ public final class WallpaperVideoTranscoder {
                         Log.i(TAG, "Transformer onCompleted output=" + output.getAbsolutePath()
                             + " size=" + (output.exists() ? output.length() : -1));
                         currentTransformer = null;
-                        cb.onSuccess(output);
+                        if (isReadableVideo(context, output)) {
+                            cb.onSuccess(output);
+                        } else {
+                            cb.onFailure(new IllegalStateException("converted-video-not-readable"));
+                        }
                     }
 
                     @Override
@@ -114,6 +125,42 @@ public final class WallpaperVideoTranscoder {
         } catch (Throwable t) {
             Log.e(TAG, "Transformer setup failed", t);
             cb.onFailure(t instanceof Exception ? (Exception) t : new RuntimeException(t));
+        }
+    }
+
+    private static void deleteOldConvertedOutputs(File outDir) {
+        File[] files = outDir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            if (f.isFile() && f.getName().startsWith("output") && !OUTPUT_FILE_NAME.equals(f.getName())) {
+                if (!f.delete()) Log.w(TAG, "Could not delete stale converted file: " + f.getAbsolutePath());
+            }
+        }
+    }
+
+    private static boolean isReadableVideo(Context context, File file) {
+        if (file == null || !file.exists() || file.length() <= 0) return false;
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(context, Uri.fromFile(file));
+            String width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
+            String height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
+            String duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            Log.i(TAG, "Converted metadata width=" + width + " height=" + height + " duration=" + duration);
+            return parsePositive(width) && parsePositive(height) && parsePositive(duration);
+        } catch (Throwable t) {
+            Log.e(TAG, "Converted metadata validation failed", t);
+            return false;
+        } finally {
+            try { retriever.release(); } catch (Throwable ignored) {}
+        }
+    }
+
+    private static boolean parsePositive(String value) {
+        try {
+            return value != null && Long.parseLong(value) > 0;
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 
