@@ -96,7 +96,7 @@ export async function pickDeviceVideo(): Promise<
   }
 }
 
-/** Aplica el último vídeo guardado en filesDir al destino indicado. */
+/** Aplica el último vídeo guardado en almacenamiento externo privado persistente al destino indicado. */
 export async function applyPickedVideo(
   target: WallpaperTarget = "home",
 ): Promise<SaveResult> {
