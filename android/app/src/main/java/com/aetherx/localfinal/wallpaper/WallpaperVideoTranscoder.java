@@ -57,8 +57,7 @@ public final class WallpaperVideoTranscoder {
     private static final int PASS_PRIMARY = 1;
     private static final int MAX_OUTPUT_HEIGHT_PRIMARY = 1280;
     private static final int MAX_OUTPUT_WIDTH_PRIMARY = 720;
-    private static final int TARGET_FPS_CAP = 30;
-    private static final int BITRATE_PRIMARY = 2_500_000;
+    private static final int BITRATE_PRIMARY = 4_500_000;
     public static final String OUTPUT_PREFIX = "output-samsung-safe-";
     public static final String OUTPUT_SUFFIX = ".mp4";
     private static Transformer currentTransformer;
@@ -97,21 +96,19 @@ public final class WallpaperVideoTranscoder {
             final int maxWidth = MAX_OUTPUT_WIDTH_PRIMARY;
             final int targetBitrate = BITRATE_PRIMARY;
             final int targetHeight = chooseTargetHeight(inputStats, maxHeight, maxWidth);
-            final int outputFps = chooseOutputFps(inputStats.fps);
 
-            logVideoStats("TRANSCODER_INPUT_PASS_" + pass, input, inputStats);
+            logVideoStats("TRANSCODER_INPUT_SINGLE_PASS", input, inputStats);
             Log.i(TAG, "TRANSCODER_DECISION=RESCUE_ONLY pass=" + pass
                 + " noAggressivePass=true originalPlaybackAllowed=true"
                 + " targetHeight=" + targetHeight
-                + " fpsCap=" + outputFps
+                + " preserveInputFps=true noFrameRateCap=true noFpsForcing=true"
                 + " targetBitrate=" + targetBitrate
                 + " previousError=" + (previousError == null ? "none" : previousError.getMessage()));
 
             MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(input));
             EditedMediaItem editedMediaItem = new EditedMediaItem.Builder(mediaItem)
-                // For video inputs this is a maximum frame rate. It drops frames if needed,
-                // but preserves media timestamps/duration instead of creating slow motion.
-                .setFrameRate(outputFps)
+                // Do not call setFrameRate for videos. A fixed cap was dropping
+                // 60fps premium wallpapers to 30fps and causing slow-motion / duration issues.
                 .setEffects(new Effects(
                     Collections.emptyList(),
                     Collections.singletonList(Presentation.createForHeight(targetHeight))))
@@ -160,7 +157,7 @@ public final class WallpaperVideoTranscoder {
                         currentTransformer = null;
                         VideoStats outputStats = readVideoStats(context, output);
                         ValidationResult validation = validateConvertedOutput(context, inputStats, output, outputStats);
-                        logVideoStats("TRANSCODER_OUTPUT_PASS_" + pass, output, outputStats);
+                        logVideoStats("TRANSCODER_OUTPUT_SINGLE_PASS", output, outputStats);
                         Log.i(TAG, "TRANSCODER_COMPLETED pass=" + pass
                             + " output=" + output.getAbsolutePath()
                             + " size=" + (output.exists() ? output.length() : -1)
@@ -195,7 +192,7 @@ public final class WallpaperVideoTranscoder {
                 + " input=" + input.getAbsolutePath()
                 + " output=" + output.getAbsolutePath()
                 + " targetHeight=" + targetHeight
-                + " fpsCap=" + outputFps
+                + " fpsMode=preserve_original"
                 + " bitrate=" + targetBitrate
                 + " mimeVideo=H264 mimeAudio=AAC"
                 + " colorFormat=yuv420p-compatible"
@@ -226,11 +223,6 @@ public final class WallpaperVideoTranscoder {
         float scale = Math.min(1f, Math.min(heightScale, widthScale));
         int target = Math.max(2, Math.round(stats.height * scale));
         return target % 2 == 0 ? target : target - 1;
-    }
-
-    private static int chooseOutputFps(float inputFps) {
-        if (inputFps > 0f && inputFps < TARGET_FPS_CAP) return Math.max(15, Math.round(inputFps));
-        return TARGET_FPS_CAP;
     }
 
     private static ValidationResult validateConvertedOutput(
