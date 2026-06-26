@@ -226,9 +226,7 @@ public final class WallpaperVideoTranscoder {
             && stats.durationMs > 0
             && stats.videoMime != null
             && stats.videoMime.startsWith("video/")
-            && stats.videoSampleReadable
-            && stats.decoderName != null
-            && !stats.decoderName.isEmpty();
+            && stats.videoSampleReadable;
     }
 
     private static boolean isSamsungSafePassthrough(VideoStats stats) {
@@ -311,8 +309,8 @@ public final class WallpaperVideoTranscoder {
             }
             if (stats.videoMime == null || stats.videoMime.isEmpty()) stats.unplayableReason = "no-video-track";
             else if (!stats.videoSampleReadable) stats.unplayableReason = "video-sample-not-readable";
-            else if (stats.decoderName == null || stats.decoderName.isEmpty()) stats.unplayableReason = "no-decoder-for-format";
             else if (stats.durationMs <= 0) stats.unplayableReason = "duration-missing";
+            else if (stats.decoderName == null || stats.decoderName.isEmpty()) stats.unplayableReason = "decoder-name-unreported-but-metadata-ok";
             else stats.unplayableReason = "ok";
         } catch (Throwable t) {
             Log.e(TAG, "Video metadata read failed file=" + file.getAbsolutePath(), t);
