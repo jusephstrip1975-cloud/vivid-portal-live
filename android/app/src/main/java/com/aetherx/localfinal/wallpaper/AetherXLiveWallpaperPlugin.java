@@ -210,6 +210,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String path = prefs.getString(KEY_VIDEO_PATH, null);
         String original = prefs.getString(KEY_ORIGINAL_PATH, null);
+        String converted = prefs.getString(KEY_CONVERTED_PATH, null);
         String uri = prefs.getString(KEY_VIDEO_URI, null);
         String lastError = prefs.getString("last_transcode_error", null);
         long version = prefs.getLong(KEY_VIDEO_VERSION, 0L);
@@ -231,10 +232,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " exists=" + exists + " size=" + size + " canRead=" + canRead
             + " fdOk=" + fdOk + " fdErr=" + fdErr
             + " version=" + version + " updatedAt=" + updatedAt
-            + " originalSource=" + original + " lastTranscodeError=" + lastError);
+            + " originalSource=" + original
+            + " convertedCandidate=" + converted
+            + " lastTranscodeError=" + lastError);
         JSObject ret = new JSObject();
         ret.put("savedPath", path);
         ret.put("originalSourcePath", original);
+        ret.put("convertedCandidatePath", converted);
         ret.put("savedUri", uri);
         ret.put("exists", exists);
         ret.put("size", size);
@@ -452,8 +456,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String previousOriginal = prefs.getString(KEY_ORIGINAL_PATH, null);
         String currentVideo = prefs.getString(KEY_VIDEO_PATH, null);
-        prefs.edit().putString(KEY_ORIGINAL_PATH, absolutePath).commit();
-        Log.i(TAG, "persistOriginalPath=" + absolutePath);
+        prefs.edit()
+            .putString(KEY_ORIGINAL_PATH, absolutePath)
+            .remove(KEY_CONVERTED_PATH)
+            .commit();
+        Log.i(TAG, "persistOriginalPath=" + absolutePath + " clearedConvertedCandidate=true");
         if (previousOriginal != null
             && !previousOriginal.equals(absolutePath)
             && !previousOriginal.equals(currentVideo)) {
