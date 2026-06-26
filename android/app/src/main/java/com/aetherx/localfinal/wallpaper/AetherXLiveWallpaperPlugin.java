@@ -507,7 +507,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         prefs.edit().putString(KEY_CONVERTED_PATH, absolutePath).commit();
         Log.i(TAG, "persistConvertedCandidate previous=" + previous + " new=" + absolutePath);
         if (previous != null && !previous.equals(absolutePath)) {
-            deleteIfStale(previous, absolutePath, "previous-converted-candidate");
+            String currentVideo = prefs.getString(KEY_VIDEO_PATH, null);
+            if (!previous.equals(currentVideo)) {
+                deleteIfStale(previous, absolutePath, "previous-converted-candidate");
+            }
         }
     }
 
