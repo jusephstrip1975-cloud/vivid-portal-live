@@ -190,7 +190,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     @PluginMethod
     public void pickVideoFromDevice(PluginCall call) {
-        Log.i(TAG, "pickVideoFromDevice opening ACTION_OPEN_DOCUMENT copy-to-internal-current-only=true");
+        Log.i(TAG, "pickVideoFromDevice opening ACTION_OPEN_DOCUMENT copy-to-externalMovies-current-only=true");
         String storageError = guardStorageOrReject("pickVideoFromDevice");
         if (storageError != null) { call.reject(storageError); return; }
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
