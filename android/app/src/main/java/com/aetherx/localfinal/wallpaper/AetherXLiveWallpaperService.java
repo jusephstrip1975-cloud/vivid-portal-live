@@ -288,15 +288,22 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.setOnPreparedListener(mp -> {
                     Log.i(TAG, "renderer=MediaPlayer prepared, starting playback");
                     try {
+                        mp.start();
+                        Log.i(TAG, "renderer=MediaPlayer started currentWallpaperPath=" + currentPath);
+                    } catch (Throwable t) {
+                        Log.e(TAG, "MediaPlayer start failed", t);
+                        return;
+                    }
+                    try {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                             mp.setPlaybackParams(new PlaybackParams().setSpeed(1.0f).setPitch(1.0f));
                             Log.i(TAG, "renderer=MediaPlayer playbackSpeed=" + mp.getPlaybackParams().getSpeed());
                         } else {
                             Log.i(TAG, "renderer=MediaPlayer playbackSpeed=1.0 sdkNoPlaybackParams");
                         }
-                        mp.start();
-                        Log.i(TAG, "renderer=MediaPlayer started playbackSpeed=1.0 currentWallpaperPath=" + currentPath);
-                    } catch (Throwable t) { Log.e(TAG, "MediaPlayer start failed", t); }
+                    } catch (Throwable t) {
+                        Log.w(TAG, "MediaPlayer setPlaybackParams failed; continuing native realtime playback: " + t.getMessage());
+                    }
                 });
                 fallbackPlayer.setDataSource(getApplicationContext(), uri);
                 fallbackPlayer.prepareAsync();
