@@ -22,6 +22,7 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.VideoSize;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
@@ -133,6 +134,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String savedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
                 Log.i(TAG, "startPlayer savedWallpaperVideo=" + path + " savedUri=" + savedUri);
 
+                File convertedOutput = new File(getApplicationContext().getFilesDir(), "wallpapers/converted/output.mp4");
+                if (convertedOutput.exists() && convertedOutput.length() > 0 && convertedOutput.canRead()) {
+                    path = convertedOutput.getAbsolutePath();
+                    Log.i(TAG, "Using mandatory converted output.mp4 path=" + path
+                        + " size=" + convertedOutput.length());
+                }
+
                 Uri uri = null;
                 long sizeForLog = -1;
 
@@ -178,7 +186,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.i(TAG, "ExoPlayer media item=" + uri + " size=" + sizeForLog);
                 lastUri = uri;
 
-                player = new ExoPlayer.Builder(getApplicationContext()).build();
+                DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(getApplicationContext())
+                    .setEnableDecoderFallback(true);
+                player = new ExoPlayer.Builder(getApplicationContext(), renderersFactory).build();
                 player.setRepeatMode(Player.REPEAT_MODE_ALL);
                 player.setVolume(0f);
                 player.setAudioAttributes(
