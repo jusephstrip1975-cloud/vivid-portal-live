@@ -88,7 +88,6 @@ public final class WallpaperVideoTranscoder {
                 .setRequestedVideoEncoderSettings(
                     new VideoEncoderSettings.Builder()
                         .setBitrate(SAFE_OUTPUT_BITRATE)
-                        .setMaxBFrames(0)
                         .setiFrameIntervalSeconds(1f)
                         .build())
                 .build();
