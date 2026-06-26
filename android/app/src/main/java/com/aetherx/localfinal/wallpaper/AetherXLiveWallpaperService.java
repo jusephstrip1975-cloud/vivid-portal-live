@@ -564,15 +564,33 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         ? format.getString(MediaFormat.KEY_MIME)
                         : "";
                     if (mime != null && mime.startsWith("video/")) {
+                        stats.videoMime = mime;
+                        stats.decoderName = findDecoderName(format, mime);
                         if (stats.fps <= 0f && format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
                             stats.fps = format.getInteger(MediaFormat.KEY_FRAME_RATE);
                         }
                         if (stats.durationMs <= 0 && format.containsKey(MediaFormat.KEY_DURATION)) {
                             stats.durationMs = format.getLong(MediaFormat.KEY_DURATION) / 1000L;
                         }
-                        break;
+                        stats.bitrate = getInteger(format, "bitrate");
+                        stats.profile = getInteger(format, "profile");
+                        stats.level = getInteger(format, "level");
+                        stats.colorFormat = getInteger(format, "color-format");
+                        extractor.selectTrack(i);
+                        stats.sampleReadable = extractor.readSampleData(java.nio.ByteBuffer.allocate(1), 0) >= 0;
+                        extractor.unselectTrack(i);
+                    } else if (mime != null && mime.startsWith("audio/")) {
+                        stats.audioMime = mime;
                     }
                 }
+                stats.playable = stats.width > 0
+                    && stats.height > 0
+                    && stats.durationMs > 0
+                    && stats.videoMime != null
+                    && stats.videoMime.startsWith("video/")
+                    && stats.sampleReadable
+                    && stats.decoderName != null
+                    && !stats.decoderName.isEmpty();
             } catch (Throwable t) {
                 Log.e(TAG, "readVideoStats failed uri=" + uri, t);
             } finally {
@@ -580,6 +598,37 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 try { extractor.release(); } catch (Throwable ignored) {}
             }
             return stats;
+        }
+
+        private String findDecoderName(MediaFormat format, String mime) {
+            try {
+                MediaCodecList list = new MediaCodecList(MediaCodecList.ALL_CODECS);
+                String direct = list.findDecoderForFormat(format);
+                if (direct != null && !direct.isEmpty()) return direct;
+                for (MediaCodecInfo info : list.getCodecInfos()) {
+                    if (info.isEncoder()) continue;
+                    String[] types = info.getSupportedTypes();
+                    if (types == null) continue;
+                    for (String type : types) {
+                        if (!mime.equalsIgnoreCase(type)) continue;
+                        try {
+                            if (info.getCapabilitiesForType(type).isFormatSupported(format)) {
+                                return info.getName();
+                            }
+                        } catch (Throwable ignored) {
+                            return info.getName();
+                        }
+                    }
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "findDecoderName failed mime=" + mime + " err=" + t.getMessage());
+            }
+            return "";
+        }
+
+        private int getInteger(MediaFormat format, String key) {
+            try { return format.containsKey(key) ? format.getInteger(key) : 0; }
+            catch (Throwable ignored) { return 0; }
         }
 
         private int parseInt(String value) {
@@ -602,6 +651,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             float fps;
             int width;
             int height;
+            int bitrate;
+            int profile;
+            int level;
+            int colorFormat;
+            String videoMime = "";
+            String audioMime = "";
+            String decoderName = "";
+            boolean sampleReadable;
+            boolean playable;
         }
 
         private void releasePlayer() {
