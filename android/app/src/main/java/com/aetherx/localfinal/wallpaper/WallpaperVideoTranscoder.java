@@ -37,8 +37,7 @@ public final class WallpaperVideoTranscoder {
 
     private static final String TAG = "AetherXLiveWP";
     private static final int SAFE_OUTPUT_HEIGHT = 720;
-    private static final int SAFE_OUTPUT_FRAME_RATE = 30;
-    private static final int SAFE_OUTPUT_BITRATE = 1_800_000;
+    private static final int SAFE_OUTPUT_BITRATE = 4_500_000;
     public static final String OUTPUT_PREFIX = "output-samsung-safe-";
     public static final String OUTPUT_SUFFIX = ".mp4";
     private static Transformer currentTransformer;
@@ -73,8 +72,10 @@ public final class WallpaperVideoTranscoder {
             Log.i(TAG, "Transcode unique output target=" + output.getAbsolutePath());
 
             MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(input));
+            // Do NOT force frame rate: forcing 30fps on a 60fps source causes the
+            // visible "slow-motion" effect on Samsung. Keep the source FPS and only
+            // cap resolution for decoder compatibility.
             EditedMediaItem editedMediaItem = new EditedMediaItem.Builder(mediaItem)
-                .setFrameRate(SAFE_OUTPUT_FRAME_RATE)
                 .setEffects(new Effects(
                     Collections.emptyList(),
                     Collections.singletonList(Presentation.createForHeight(SAFE_OUTPUT_HEIGHT))))

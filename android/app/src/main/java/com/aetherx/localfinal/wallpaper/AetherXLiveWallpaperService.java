@@ -22,6 +22,7 @@ import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
+import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.Player;
 import androidx.media3.common.VideoSize;
 import androidx.media3.common.util.UnstableApi;
@@ -214,6 +215,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player = new ExoPlayer.Builder(getApplicationContext(), renderersFactory).build();
                 player.setRepeatMode(Player.REPEAT_MODE_ALL);
                 player.setVolume(0f);
+                // Explicit 1.0x playback to defeat any system-level slowdown
+                // and to guarantee real-time rendering on Samsung One UI.
+                player.setPlaybackParameters(new PlaybackParameters(1.0f));
                 player.setAudioAttributes(
                         new AudioAttributes.Builder().setUsage(C.USAGE_UNKNOWN).build(),
                         false);
@@ -310,7 +314,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     parsedDurationUs = 5_000_000L;
                 }
                 final long durationUs = parsedDurationUs;
-                final long frameStepUs = 83_333L; // 12 fps: stable for wallpaper preview surfaces.
+                final long frameStepUs = 33_333L; // 30 fps fallback for fluid motion.
                 final long[] positionUs = new long[] {0L};
                 frameLoop = new Runnable() {
                     @Override
@@ -323,7 +327,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                                 frame.recycle();
                             }
                             positionUs[0] = (positionUs[0] + frameStepUs) % durationUs;
-                            main.postDelayed(this, 83L);
+                            main.postDelayed(this, 33L);
                         } catch (Throwable t) {
                             Log.e(TAG, "Canvas frame fallback failed while drawing", t);
                             paintMessage("Vídeo no soportado por el dispositivo");
