@@ -48,9 +48,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private MediaMetadataRetriever frameRetriever;
         private Runnable frameLoop;
         private Uri lastUri;
+        private String currentPath;
+        private long currentVersion = -1L;
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
+        private SharedPreferences prefs;
+        private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
 
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
@@ -58,6 +62,19 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             Log.i(TAG, "Engine.onCreate");
             setOffsetNotificationsEnabled(false);
             setTouchEventsEnabled(false);
+            prefs = getApplicationContext()
+                .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            prefsListener = (sp, key) -> {
+                if (AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH.equals(key)
+                    || AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION.equals(key)) {
+                    Log.i(TAG, "Prefs changed key=" + key + " -> reloading wallpaper engine");
+                    main.post(() -> {
+                        releasePlayer();
+                        startPlayer();
+                    });
+                }
+            };
+            prefs.registerOnSharedPreferenceChangeListener(prefsListener);
         }
 
         @Override
