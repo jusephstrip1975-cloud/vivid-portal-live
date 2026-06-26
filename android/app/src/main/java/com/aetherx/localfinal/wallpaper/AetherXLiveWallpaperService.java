@@ -585,7 +585,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         stats.level = getInteger(format, "level");
                         stats.colorFormat = getInteger(format, "color-format");
                         extractor.selectTrack(i);
-                        stats.sampleReadable = extractor.readSampleData(java.nio.ByteBuffer.allocate(1), 0) >= 0;
+                        stats.sampleReadable = extractor.readSampleData(java.nio.ByteBuffer.allocate(16 * 1024), 0) >= 0;
                         extractor.unselectTrack(i);
                     } else if (mime != null && mime.startsWith("audio/")) {
                         stats.audioMime = mime;
