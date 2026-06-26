@@ -101,6 +101,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             call.reject("missing-url");
             return;
         }
+        String storageError = guardStorageOrReject("saveVideoFromUrl");
+        if (storageError != null) { call.reject(storageError); return; }
 
         new Thread(() -> {
             File current = getCurrentWallpaperFile();
