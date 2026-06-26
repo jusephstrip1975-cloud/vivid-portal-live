@@ -1,7 +1,6 @@
 package com.aetherx.livewallpaper.wallpaper;
 
 import android.content.Context;
-import android.content.ContentResolver;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -18,7 +17,6 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.PowerManager;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
 import android.view.Surface;
@@ -37,16 +35,11 @@ import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
-    private static final int MAX_REDIRECTS = 5;
     @Override
     public Engine onCreateEngine() {
         Log.i(TAG, "onCreateEngine");
@@ -64,8 +57,6 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private String rendererUsed = "NONE";
         private SurfaceHolder currentHolder;
         private boolean visible = false;
-        private boolean preserveFailedPathsOnNextStart = false;
-        private volatile boolean restoreInProgress = false;
         private final Handler main = new Handler(Looper.getMainLooper());
         private SharedPreferences prefs;
         private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
@@ -182,21 +173,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     + " new=" + path + " newVersion=" + version
                     + " expectedCurrent=" + expectedCurrent.getAbsolutePath());
                 if (!isCurrentPathUsable(path, expectedCurrent, "startPlayer-initial")) {
-                    Log.w(TAG, "CURRENT_MP4_MISSING service attempting restore path=" + path);
-                    if (attemptRestoreCurrentMp4("service-startPlayer")) {
-                        path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
-                        version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
-                        expectedCurrent = getCurrentWallpaperFile();
-                        logServicePath("startPlayer-after-restore", path, expectedCurrent);
-                    } else if (scheduleRestoreFromLastSource("service-startPlayer", expectedCurrent)) {
-                        paintLoading("Cargando vídeo...");
-                        return;
-                    }
-                }
-                if (path == null || !path.equals(currentPath) || version != currentVersion) {
-                    if (preserveFailedPathsOnNextStart) {
-                        preserveFailedPathsOnNextStart = false;
-                    }
+                    Log.e(TAG, "CURRENT_MP4_MISSING service-blocked-no-fallback path=" + path);
+                    paintMessage("Archivo de wallpaper no encontrado");
+                    return;
                 }
                 currentPath = path;
                 currentVersion = version;
