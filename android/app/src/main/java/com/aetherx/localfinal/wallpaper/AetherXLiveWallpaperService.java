@@ -520,7 +520,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 startPlayer();
             } catch (Throwable t) {
                 Log.e(TAG, "tryAlternateOrFatal failed", t);
-                paintMessage("Vídeo no soportado por el dispositivo");
+                paintMessage("archivo no encontrado");
             }
         }
 
@@ -578,7 +578,11 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             for (String candidate : candidates) {
                 if (candidate == null || candidate.equals(currentPath) || failedPlaybackPaths.contains(candidate)) continue;
                 File f = new File(candidate);
-                if (f.exists() && f.length() > 0 && f.canRead()) return candidate;
+                Log.i(TAG, "ALTERNATE_PATH_CHECK SELECTED_PATH=" + candidate
+                    + " FILE_EXISTS=" + f.exists()
+                    + " FILE_SIZE=" + (f.exists() ? f.length() : -1)
+                    + " canRead=" + f.canRead());
+                if (f.exists() && f.length() >= MIN_VALID_VIDEO_BYTES && f.canRead()) return candidate;
                 Log.w(TAG, "Alternate playback path not usable path=" + candidate
                     + " exists=" + f.exists()
                     + " size=" + (f.exists() ? f.length() : -1)
