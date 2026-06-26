@@ -269,7 +269,7 @@ public final class WallpaperVideoTranscoder {
         if (outputStats == null || !outputStats.metadataReadable) return ValidationResult.fail("metadata-not-readable");
         if (!MimeTypes.VIDEO_H264.equals(outputStats.videoMime)) return ValidationResult.fail("codec-not-h264:" + outputStats.videoMime);
         if (outputStats.width <= 0 || outputStats.height <= 0) return ValidationResult.fail("invalid-size");
-        if (outputStats.width > MAX_OUTPUT_WIDTH_PRIMARY || outputStats.height > MAX_OUTPUT_HEIGHT_PRIMARY) {
+        if (!isWithinSamsungSizeLimit(outputStats.width, outputStats.height, MAX_OUTPUT_WIDTH_PRIMARY, MAX_OUTPUT_HEIGHT_PRIMARY)) {
             return ValidationResult.fail("size-over-limit:" + outputStats.width + "x" + outputStats.height);
         }
         if (outputStats.durationMs <= 0) return ValidationResult.fail("duration-invalid");
@@ -284,8 +284,37 @@ public final class WallpaperVideoTranscoder {
             long allowed = Math.max(DURATION_TOLERANCE_MS, inputStats.durationMs / 20L);
             if (delta > allowed) return ValidationResult.fail("duration-mismatch:" + delta + ">" + allowed);
         }
+        if (!isMp4StandardFile(output)) return ValidationResult.fail("mp4-container-invalid");
+        if (!isYuv420Compatible(outputStats.colorFormat)) return ValidationResult.fail("color-format-not-yuv420-compatible:" + outputStats.colorFormat);
         if (!canPrepareWithMediaPlayer(context, output)) return ValidationResult.fail("mediaplayer-prepare-failed");
         return ValidationResult.ok();
+    }
+
+    private static boolean isWithinSamsungSizeLimit(int width, int height, int maxShort, int maxLong) {
+        int shortSide = Math.min(width, height);
+        int longSide = Math.max(width, height);
+        return shortSide <= maxShort && longSide <= maxLong;
+    }
+
+    private static boolean isYuv420Compatible(int colorFormat) {
+        // MediaExtractor usually reports 0 for compressed MP4 tracks. Accept 0
+        // because the H.264 Android encoder output is decoder-standard YUV 4:2:0.
+        return colorFormat == 0
+            || colorFormat == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
+            || colorFormat == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar
+            || colorFormat == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar;
+    }
+
+    private static boolean isMp4StandardFile(File output) {
+        try {
+            String name = output.getName().toLowerCase();
+            boolean ok = name.endsWith(".mp4") && output.length() > 1024;
+            Log.i(TAG, "VALIDATION_MP4_STANDARD path=" + output.getAbsolutePath()
+                + " ok=" + ok + " faststartRequested=true");
+            return ok;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private static boolean canPrepareWithMediaPlayer(Context context, File file) {
