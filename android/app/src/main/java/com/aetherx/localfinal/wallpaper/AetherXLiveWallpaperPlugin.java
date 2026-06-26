@@ -196,7 +196,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public void getStatus(PluginCall call) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String path = prefs.getString(KEY_VIDEO_PATH, null);
+        String original = prefs.getString(KEY_ORIGINAL_PATH, null);
         String uri = prefs.getString(KEY_VIDEO_URI, null);
+        String lastError = prefs.getString("last_transcode_error", null);
+        long version = prefs.getLong(KEY_VIDEO_VERSION, 0L);
+        long updatedAt = prefs.getLong("video_updated_at", 0L);
         File f = path == null ? null : new File(path);
         boolean exists = f != null && f.exists();
         long size = f != null && f.exists() ? f.length() : 0;
@@ -212,14 +216,23 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
         Log.i(TAG, "getStatus path=" + path + " uri=" + uri
             + " exists=" + exists + " size=" + size + " canRead=" + canRead
-            + " fdOk=" + fdOk + " fdErr=" + fdErr);
+            + " fdOk=" + fdOk + " fdErr=" + fdErr
+            + " version=" + version + " updatedAt=" + updatedAt
+            + " originalSource=" + original + " lastTranscodeError=" + lastError);
         JSObject ret = new JSObject();
         ret.put("savedPath", path);
+        ret.put("originalSourcePath", original);
         ret.put("savedUri", uri);
         ret.put("exists", exists);
         ret.put("size", size);
         ret.put("canRead", canRead);
         ret.put("fdOk", fdOk);
+        ret.put("version", version);
+        ret.put("updatedAt", updatedAt);
+        ret.put("renderer", "native-wallpaper-service");
+        ret.put("playbackSpeed", 1.0);
+        ret.put("droppedFrames", "logged-by-renderer");
+        if (lastError != null) ret.put("lastTranscodeError", lastError);
         if (fdErr != null) ret.put("fdError", fdErr);
         call.resolve(ret);
     }
@@ -312,6 +325,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         long version = prefs.getLong(KEY_VIDEO_VERSION, 0L) + 1L;
         prefs.edit()
             .putString(KEY_VIDEO_PATH, absolutePath)
+            .remove("last_transcode_error")
             .putLong("video_updated_at", System.currentTimeMillis())
             .putLong(KEY_VIDEO_VERSION, version)
             .commit();
