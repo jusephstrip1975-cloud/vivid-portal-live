@@ -222,7 +222,7 @@ export async function saveWallpaperToDevice(
       await Filesystem.writeFile({
         path: fileName,
         data: base64,
-        directory: Directory.Cache,
+        directory: Directory.Documents,
       });
       return { ok: true, reason: "ios-saved" };
     }
