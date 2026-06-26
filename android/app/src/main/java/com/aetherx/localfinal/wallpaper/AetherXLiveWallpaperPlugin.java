@@ -55,11 +55,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 Log.i(TAG, "saveVideoFromUrl downloaded bytes=" + bytes
                     + " exists=" + outFile.exists() + " size=" + outFile.length()
                     + " canRead=" + outFile.canRead());
-                persistVideoPath(outFile.getAbsolutePath());
-                JSObject ret = new JSObject();
-                ret.put("path", outFile.getAbsolutePath());
-                ret.put("bytes", outFile.length());
-                call.resolve(ret);
+                transcodeAndResolve(outFile, call);
             } catch (Exception e) {
                 Log.e(TAG, "saveVideoFromUrl failed", e);
                 call.reject("download-failed: " + e.getMessage(), e);
@@ -83,11 +79,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 fos.write(data);
             }
             Log.i(TAG, "saveVideo wrote bytes=" + outFile.length() + " path=" + outFile.getAbsolutePath());
-            persistVideoPath(outFile.getAbsolutePath());
-            JSObject ret = new JSObject();
-            ret.put("path", outFile.getAbsolutePath());
-            ret.put("bytes", outFile.length());
-            call.resolve(ret);
+            transcodeAndResolve(outFile, call);
         } catch (Exception e) {
             Log.e(TAG, "saveVideo failed", e);
             call.reject("save-failed: " + e.getMessage(), e);
@@ -144,13 +136,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
             Log.i(TAG, "Copied picked video bytes=" + total + " to=" + outFile.getAbsolutePath()
                 + " exists=" + outFile.exists() + " canRead=" + outFile.canRead());
-            persistVideoPath(outFile.getAbsolutePath());
             persistVideoUri(uri.toString());
-            JSObject ret = new JSObject();
-            ret.put("path", outFile.getAbsolutePath());
-            ret.put("bytes", outFile.length());
-            ret.put("sourceUri", uri.toString());
-            call.resolve(ret);
+            transcodeAndResolve(outFile, call, uri.toString());
         } catch (Exception e) {
             Log.e(TAG, "pick-video-failed", e);
             call.reject("pick-video-failed: " + e.getMessage(), e);
@@ -262,6 +249,40 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         File dir = new File(getContext().getFilesDir(), "wallpapers");
         if (!dir.exists()) dir.mkdirs();
         return new File(dir, fileName);
+    }
+
+    /** Transcode the downloaded MP4 to Samsung-friendly H.264/AAC, fall back to original on failure. */
+    private void transcodeAndResolve(final File input, final PluginCall call) {
+        transcodeAndResolve(input, call, null);
+    }
+
+    private void transcodeAndResolve(final File input, final PluginCall call, final String sourceUri) {
+        Log.i(TAG, "transcodeAndResolve start input=" + input.getAbsolutePath());
+        WallpaperVideoTranscoder.transcode(getContext(), input, new WallpaperVideoTranscoder.Callback() {
+            @Override
+            public void onSuccess(File output) {
+                persistVideoPath(output.getAbsolutePath());
+                JSObject ret = new JSObject();
+                ret.put("path", output.getAbsolutePath());
+                ret.put("bytes", output.length());
+                ret.put("transcoded", true);
+                if (sourceUri != null) ret.put("sourceUri", sourceUri);
+                call.resolve(ret);
+            }
+
+            @Override
+            public void onFailure(Exception error) {
+                Log.w(TAG, "Transcode failed, falling back to original file: " + error.getMessage());
+                persistVideoPath(input.getAbsolutePath());
+                JSObject ret = new JSObject();
+                ret.put("path", input.getAbsolutePath());
+                ret.put("bytes", input.length());
+                ret.put("transcoded", false);
+                ret.put("transcodeError", error.getMessage() == null ? "unknown" : error.getMessage());
+                if (sourceUri != null) ret.put("sourceUri", sourceUri);
+                call.resolve(ret);
+            }
+        });
     }
 
     private void persistVideoPath(String absolutePath) {
