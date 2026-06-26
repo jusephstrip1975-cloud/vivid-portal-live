@@ -43,27 +43,22 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 
 /**
- * Production transcoder for Android live wallpapers.
+ * Rescue transcoder for Android live wallpapers.
  *
- * Important rules:
- * - Always exports a new H.264/AAC MP4. The original file is never returned as wallpaper output.
- * - First pass targets Samsung-safe 720x1280 max, H.264 AVC, AAC, 30fps cap, stable bitrate.
- * - If validation fails, a second aggressive pass lowers resolution/bitrate and requests AVC baseline.
+ * Important: the app now prioritizes playing the original MP4. This class is
+ * only used if Samsung MediaPlayer cannot prepare the original. It must not
+ * block valid videos because of metadata differences, fps, bitrate, profile, or
+ * duration mismatch.
  */
 @OptIn(markerClass = UnstableApi.class)
 public final class WallpaperVideoTranscoder {
 
     private static final String TAG = "AetherXLiveWP";
     private static final int PASS_PRIMARY = 1;
-    private static final int PASS_AGGRESSIVE = 2;
     private static final int MAX_OUTPUT_HEIGHT_PRIMARY = 1280;
     private static final int MAX_OUTPUT_WIDTH_PRIMARY = 720;
-    private static final int MAX_OUTPUT_HEIGHT_AGGRESSIVE = 960;
-    private static final int MAX_OUTPUT_WIDTH_AGGRESSIVE = 540;
     private static final int TARGET_FPS_CAP = 30;
     private static final int BITRATE_PRIMARY = 2_500_000;
-    private static final int BITRATE_AGGRESSIVE = 1_200_000;
-    private static final long DURATION_TOLERANCE_MS = 1000L;
     public static final String OUTPUT_PREFIX = "output-samsung-safe-";
     public static final String OUTPUT_SUFFIX = ".mp4";
     private static Transformer currentTransformer;
@@ -78,12 +73,7 @@ public final class WallpaperVideoTranscoder {
     }
 
     public static void transcodeAggressive(final Context context, final File input, final Callback cb) {
-        new Handler(Looper.getMainLooper()).post(() -> transcodePass(
-            context,
-            input,
-            PASS_AGGRESSIVE,
-            new IllegalStateException("runtime-renderer-failed"),
-            cb));
+        new Handler(Looper.getMainLooper()).post(() -> transcodePass(context, input, PASS_PRIMARY, null, cb));
     }
 
     public static File getConvertedDir(Context context) {
@@ -107,16 +97,15 @@ public final class WallpaperVideoTranscoder {
         try {
             final VideoStats inputStats = readVideoStats(context, input);
             final File output = buildUniqueOutput(context, pass);
-            final boolean aggressive = pass == PASS_AGGRESSIVE;
-            final int maxHeight = aggressive ? MAX_OUTPUT_HEIGHT_AGGRESSIVE : MAX_OUTPUT_HEIGHT_PRIMARY;
-            final int maxWidth = aggressive ? MAX_OUTPUT_WIDTH_AGGRESSIVE : MAX_OUTPUT_WIDTH_PRIMARY;
-            final int targetBitrate = aggressive ? BITRATE_AGGRESSIVE : BITRATE_PRIMARY;
+            final int maxHeight = MAX_OUTPUT_HEIGHT_PRIMARY;
+            final int maxWidth = MAX_OUTPUT_WIDTH_PRIMARY;
+            final int targetBitrate = BITRATE_PRIMARY;
             final int targetHeight = chooseTargetHeight(inputStats, maxHeight, maxWidth);
             final int outputFps = chooseOutputFps(inputStats.fps);
 
             logVideoStats("TRANSCODER_INPUT_PASS_" + pass, input, inputStats);
-            Log.i(TAG, "TRANSCODER_DECISION=MANDATORY_TRANSCODE pass=" + pass
-                + " noOriginalPlayback=true aggressive=" + aggressive
+            Log.i(TAG, "TRANSCODER_DECISION=RESCUE_ONLY pass=" + pass
+                + " noAggressivePass=true originalPlaybackAllowed=true"
                 + " targetHeight=" + targetHeight
                 + " fpsCap=" + outputFps
                 + " targetBitrate=" + targetBitrate
@@ -152,9 +141,7 @@ public final class WallpaperVideoTranscoder {
             try {
                 videoSettings.setEncodingProfileLevel(
                     MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline,
-                    aggressive
-                        ? MediaCodecInfo.CodecProfileLevel.AVCLevel31
-                        : MediaCodecInfo.CodecProfileLevel.AVCLevel32);
+                    MediaCodecInfo.CodecProfileLevel.AVCLevel32);
                 Log.i(TAG, "TRANSCODER_PROFILE requested=AVC_BASELINE pass=" + pass);
             } catch (Throwable t) {
                 Log.w(TAG, "TRANSCODER_PROFILE request failed: " + t.getMessage());
@@ -189,17 +176,10 @@ public final class WallpaperVideoTranscoder {
                             + " inputFps=" + inputStats.fps
                             + " outputFps=" + outputStats.fps
                             + " rendererValidation=MediaPlayer.prepare");
-                        if (validation.ok) {
-                            cb.onSuccess(output);
-                            return;
-                        }
-                        deleteQuietly(output, "invalid-pass-" + pass);
-                        if (pass == PASS_PRIMARY) {
-                            transcodePass(context, input, PASS_AGGRESSIVE,
-                                new IllegalStateException(validation.reason), cb);
-                        } else {
-                            cb.onFailure(new IllegalStateException("converted-video-invalid-after-aggressive-pass: "
-                                + validation.reason));
+                        if (validation.ok) cb.onSuccess(output);
+                        else {
+                            deleteQuietly(output, "invalid-rescue-output");
+                            cb.onFailure(new IllegalStateException("converted-video-invalid: " + validation.reason));
                         }
                     }
 
@@ -210,11 +190,7 @@ public final class WallpaperVideoTranscoder {
                             + " code=" + exportException.errorCode
                             + " name=" + exportException.getErrorCodeName(), exportException);
                         deleteQuietly(output, "error-pass-" + pass);
-                        if (pass == PASS_PRIMARY) {
-                            transcodePass(context, input, PASS_AGGRESSIVE, exportException, cb);
-                        } else {
-                            cb.onFailure(exportException);
-                        }
+                        cb.onFailure(exportException);
                     }
                 })
                 .build();
@@ -232,12 +208,7 @@ public final class WallpaperVideoTranscoder {
             transformer.start(editedMediaItem, output.getAbsolutePath());
         } catch (Throwable t) {
             Log.e(TAG, "TRANSCODER_SETUP_FAILED pass=" + pass, t);
-            if (pass == PASS_PRIMARY) {
-                transcodePass(context, input, PASS_AGGRESSIVE,
-                    t instanceof Exception ? (Exception) t : new RuntimeException(t), cb);
-            } else {
-                cb.onFailure(t instanceof Exception ? (Exception) t : new RuntimeException(t));
-            }
+            cb.onFailure(t instanceof Exception ? (Exception) t : new RuntimeException(t));
         }
     }
 
@@ -272,30 +243,20 @@ public final class WallpaperVideoTranscoder {
         File output,
         VideoStats outputStats
     ) {
-        if (output == null || !output.exists() || output.length() <= 0) {
+        if (output == null || !output.exists() || output.length() <= 1024 * 1024L) {
             return ValidationResult.fail("empty-output");
         }
         if (outputStats == null || !outputStats.metadataReadable) return ValidationResult.fail("metadata-not-readable");
-        if (!MimeTypes.VIDEO_H264.equals(outputStats.videoMime)) return ValidationResult.fail("codec-not-h264:" + outputStats.videoMime);
         if (outputStats.width <= 0 || outputStats.height <= 0) return ValidationResult.fail("invalid-size");
-        if (!isWithinSamsungSizeLimit(outputStats.width, outputStats.height, MAX_OUTPUT_WIDTH_PRIMARY, MAX_OUTPUT_HEIGHT_PRIMARY)) {
-            return ValidationResult.fail("size-over-limit:" + outputStats.width + "x" + outputStats.height);
-        }
         if (outputStats.durationMs <= 0) return ValidationResult.fail("duration-invalid");
-        if (outputStats.fps <= 0f || outputStats.fps > 31.5f) return ValidationResult.fail("fps-invalid:" + outputStats.fps);
         if (!outputStats.videoSampleReadable) return ValidationResult.fail("video-sample-not-readable");
-        if (outputStats.audioMime != null && !outputStats.audioMime.isEmpty()
-            && !MimeTypes.AUDIO_AAC.equals(outputStats.audioMime)) {
-            return ValidationResult.fail("audio-not-aac:" + outputStats.audioMime);
-        }
-        if (inputStats != null && inputStats.durationMs > 0) {
-            long delta = Math.abs(inputStats.durationMs - outputStats.durationMs);
-            long allowed = Math.max(DURATION_TOLERANCE_MS, inputStats.durationMs / 20L);
-            if (delta > allowed) return ValidationResult.fail("duration-mismatch:" + delta + ">" + allowed);
-        }
         if (!isMp4StandardFile(output)) return ValidationResult.fail("mp4-container-invalid");
-        if (!isYuv420Compatible(outputStats.colorFormat)) return ValidationResult.fail("color-format-not-yuv420-compatible:" + outputStats.colorFormat);
-        if (!canPrepareWithMediaPlayer(context, output)) return ValidationResult.fail("mediaplayer-prepare-failed");
+        Log.i(TAG, "TRANSCODER_PERMISSIVE_VALIDATION codec=" + outputStats.videoMime
+            + " fps=" + outputStats.fps
+            + " bitrate=" + outputStats.bitrate
+            + " profile=" + outputStats.profile
+            + " audio=" + outputStats.audioMime
+            + " note=no_fps_bitrate_profile_duration_rejection");
         return ValidationResult.ok();
     }
 
