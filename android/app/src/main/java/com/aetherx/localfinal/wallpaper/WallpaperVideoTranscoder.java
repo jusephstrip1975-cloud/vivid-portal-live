@@ -1,6 +1,8 @@
 package com.aetherx.localfinal.wallpaper;
 
 import android.content.Context;
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.MediaMetadataRetriever;
@@ -39,7 +41,8 @@ public final class WallpaperVideoTranscoder {
 
     private static final String TAG = "AetherXLiveWP";
     private static final int SAFE_OUTPUT_HEIGHT = 720;
-    private static final int SAFE_OUTPUT_BITRATE = 4_500_000;
+    private static final int SAFE_OUTPUT_BITRATE_30 = 3_000_000;
+    private static final int SAFE_OUTPUT_BITRATE_60 = 4_500_000;
     public static final String OUTPUT_PREFIX = "output-samsung-safe-";
     public static final String OUTPUT_SUFFIX = ".mp4";
     private static Transformer currentTransformer;
@@ -67,15 +70,26 @@ public final class WallpaperVideoTranscoder {
     private static void runOnMain(final Context context, final File input, final Callback cb) {
         try {
             File outDir = getConvertedDir(context);
-            // Wipe ALL previous converted outputs so the old file cannot linger,
-            // decoder caches cannot keep handles, and Samsung cannot reuse it.
-            deleteAllConvertedOutputs(outDir);
             final File output = buildUniqueOutput(context);
             final VideoStats inputStats = readVideoStats(context, input);
+            logVideoStats("TRANSCODER_INPUT", input, inputStats);
+            if (isSamsungSafePassthrough(inputStats)) {
+                Log.i(TAG, "TRANSCODER_DECISION=PASSTHROUGH_ORIGINAL_ALREADY_SAMSUNG_SAFE path="
+                    + input.getAbsolutePath());
+                cb.onSuccess(input);
+                return;
+            }
             Log.i(TAG, "Transcode unique output target=" + output.getAbsolutePath());
             Log.i(TAG, "Transcoder inputDurationMs=" + inputStats.durationMs
                 + " inputFps=" + inputStats.fps
                 + " inputSize=" + inputStats.width + "x" + inputStats.height
+                + " inputCodec=" + inputStats.videoMime
+                + " inputBitrate=" + inputStats.bitrate
+                + " inputProfile=" + inputStats.profile
+                + " inputLevel=" + inputStats.level
+                + " inputColorFormat=" + inputStats.colorFormat
+                + " inputAudio=" + inputStats.audioMime
+                + " inputDecoder=" + inputStats.decoderName
                 + " inputBytes=" + input.length());
 
             MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(input));
@@ -99,12 +113,13 @@ public final class WallpaperVideoTranscoder {
                 decoderFactory,
                 Clock.DEFAULT);
 
+            int targetBitrate = inputStats.fps >= 45f ? SAFE_OUTPUT_BITRATE_60 : SAFE_OUTPUT_BITRATE_30;
             VideoEncoderSettings.Builder videoSettings = new VideoEncoderSettings.Builder()
-                .setBitrate(SAFE_OUTPUT_BITRATE)
+                .setBitrate(targetBitrate)
                 .setiFrameIntervalSeconds(1f);
 
             DefaultEncoderFactory encoderFactory = new DefaultEncoderFactory.Builder(context)
-                .setEnableFallback(false)
+                .setEnableFallback(true)
                 .setRequestedVideoEncoderSettings(videoSettings.build())
                 .build();
 
@@ -118,26 +133,46 @@ public final class WallpaperVideoTranscoder {
                     public void onCompleted(Composition composition, ExportResult exportResult) {
                         VideoStats outputStats = readVideoStats(context, output);
                         long durationDeltaMs = Math.abs(inputStats.durationMs - outputStats.durationMs);
+                        logVideoStats("TRANSCODER_OUTPUT", output, outputStats);
                         Log.i(TAG, "Transformer onCompleted output=" + output.getAbsolutePath()
                             + " size=" + (output.exists() ? output.length() : -1));
                         Log.i(TAG, "Transcoder outputDurationMs=" + outputStats.durationMs
                             + " outputFps=" + outputStats.fps
                             + " outputSize=" + outputStats.width + "x" + outputStats.height
+                            + " outputCodec=" + outputStats.videoMime
+                            + " outputBitrate=" + outputStats.bitrate
+                            + " outputProfile=" + outputStats.profile
+                            + " outputLevel=" + outputStats.level
+                            + " outputColorFormat=" + outputStats.colorFormat
+                            + " outputAudio=" + outputStats.audioMime
+                            + " outputDecoder=" + outputStats.decoderName
                             + " inputDurationMs=" + inputStats.durationMs
                             + " inputFps=" + inputStats.fps
                             + " durationDeltaMs=" + durationDeltaMs);
                         currentTransformer = null;
-                        // Relaxed validation: only reject if file truly missing/empty.
-                        // Any playable file with bytes is accepted; renderers will fall back if needed.
                         if (output == null || !output.exists() || output.length() <= 0) {
                             Log.e(TAG, "TRANSCODER_OUTPUT_EMPTY rejecting");
                             cb.onFailure(new IllegalStateException("converted-video-empty"));
                             return;
                         }
+                        if (!isPlayableVideo(outputStats)) {
+                            Log.e(TAG, "TRANSCODER_OUTPUT_NOT_PLAYABLE fallbackToOriginal=true reason="
+                                + outputStats.unplayableReason);
+                            cb.onFailure(new IllegalStateException("converted-video-not-playable: "
+                                + outputStats.unplayableReason));
+                            return;
+                        }
                         if (inputStats.durationMs > 0 && outputStats.durationMs > 0) {
+                            long allowedDelta = Math.max(750L, inputStats.durationMs / 20L); // 5% tolerance.
                             Log.i(TAG, "TRANSCODER_DURATION_INFO inputDurationMs=" + inputStats.durationMs
                                 + " outputDurationMs=" + outputStats.durationMs
-                                + " durationDeltaMs=" + durationDeltaMs + " (no rejection, informational)");
+                                + " durationDeltaMs=" + durationDeltaMs
+                                + " allowedDeltaMs=" + allowedDelta);
+                            if (durationDeltaMs > allowedDelta) {
+                                Log.e(TAG, "TRANSCODER_DURATION_MISMATCH fallbackToOriginal=true avoidsSlowMotion=true");
+                                cb.onFailure(new IllegalStateException("converted-duration-mismatch"));
+                                return;
+                            }
                         }
                         cb.onSuccess(output);
                     }
@@ -153,7 +188,10 @@ public final class WallpaperVideoTranscoder {
                 .build();
 
             Log.i(TAG, "Transformer.start input=" + input.getAbsolutePath()
-                + " output=" + output.getAbsolutePath());
+                + " output=" + output.getAbsolutePath()
+                + " targetHeight=" + SAFE_OUTPUT_HEIGHT
+                + " targetBitrate=" + targetBitrate
+                + " fpsMode=preserve-source-timestamps");
             currentTransformer = transformer;
             transformer.start(editedMediaItem, output.getAbsolutePath());
         } catch (Throwable t) {
@@ -162,23 +200,62 @@ public final class WallpaperVideoTranscoder {
         }
     }
 
-    private static void deleteAllConvertedOutputs(File outDir) {
+    public static void deleteAllConvertedOutputsExcept(Context context, String keepPath) {
+        deleteAllConvertedOutputsExcept(getConvertedDir(context), keepPath);
+    }
+
+    private static void deleteAllConvertedOutputsExcept(File outDir, String keepPath) {
         File[] files = outDir.listFiles();
         if (files == null) return;
         for (File f : files) {
             if (f.isFile() && f.getName().startsWith(OUTPUT_PREFIX)) {
+                if (keepPath != null && keepPath.equals(f.getAbsolutePath())) continue;
                 boolean ok = f.delete();
                 Log.i(TAG, "Deleting stale converted file=" + f.getAbsolutePath() + " ok=" + ok);
             }
         }
     }
 
-    private static boolean isReadableVideo(Context context, File file) {
-        if (file == null || !file.exists() || file.length() <= 0) return false;
-        VideoStats stats = readVideoStats(context, file);
-        Log.i(TAG, "Converted metadata width=" + stats.width + " height=" + stats.height
-            + " durationMs=" + stats.durationMs + " fps=" + stats.fps);
-        return stats.width > 0 && stats.height > 0 && stats.durationMs > 0;
+    private static boolean isPlayableVideo(VideoStats stats) {
+        return stats != null
+            && stats.width > 0
+            && stats.height > 0
+            && stats.durationMs > 0
+            && stats.videoMime != null
+            && stats.videoMime.startsWith("video/")
+            && stats.videoSampleReadable
+            && stats.decoderName != null
+            && !stats.decoderName.isEmpty();
+    }
+
+    private static boolean isSamsungSafePassthrough(VideoStats stats) {
+        if (!isPlayableVideo(stats)) return false;
+        if (!MimeTypes.VIDEO_H264.equals(stats.videoMime)) return false;
+        if (stats.height > 1080 || stats.width > 1920) return false;
+        if (stats.fps > 61f) return false;
+        return true;
+    }
+
+    private static void logVideoStats(String prefix, File file, VideoStats stats) {
+        Log.i(TAG, prefix
+            + " path=" + (file == null ? "null" : file.getAbsolutePath())
+            + " exists=" + (file != null && file.exists())
+            + " bytes=" + (file != null && file.exists() ? file.length() : -1)
+            + " codec=" + stats.videoMime
+            + " width=" + stats.width
+            + " height=" + stats.height
+            + " fps=" + stats.fps
+            + " durationMs=" + stats.durationMs
+            + " bitrate=" + stats.bitrate
+            + " profile=" + stats.profile
+            + " level=" + stats.level
+            + " colorFormat=" + stats.colorFormat
+            + " audio=" + stats.audioMime
+            + " hasAudio=" + stats.hasAudio
+            + " sampleReadable=" + stats.videoSampleReadable
+            + " decoder=" + stats.decoderName
+            + " playable=" + isPlayableVideo(stats)
+            + " reason=" + stats.unplayableReason);
     }
 
     private static VideoStats readVideoStats(Context context, File file) {
@@ -204,22 +281,74 @@ public final class WallpaperVideoTranscoder {
                     ? format.getString(MediaFormat.KEY_MIME)
                     : "";
                 if (mime != null && mime.startsWith("video/")) {
+                    stats.videoMime = mime;
+                    stats.decoderName = findDecoderName(format, mime);
                     if (stats.fps <= 0f && format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
                         stats.fps = format.getInteger(MediaFormat.KEY_FRAME_RATE);
                     }
                     if (stats.durationMs <= 0 && format.containsKey(MediaFormat.KEY_DURATION)) {
                         stats.durationMs = format.getLong(MediaFormat.KEY_DURATION) / 1000L;
                     }
-                    break;
+                    stats.bitrate = getInteger(format, "bitrate");
+                    stats.profile = getInteger(format, "profile");
+                    stats.level = getInteger(format, "level");
+                    stats.colorFormat = getInteger(format, "color-format");
+                    extractor.selectTrack(i);
+                    stats.videoSampleReadable = extractor.readSampleData(java.nio.ByteBuffer.allocate(1), 0) >= 0;
+                    extractor.unselectTrack(i);
+                } else if (mime != null && mime.startsWith("audio/")) {
+                    stats.hasAudio = true;
+                    stats.audioMime = mime;
+                    if (stats.audioMime == null || stats.audioMime.isEmpty()) stats.audioMime = mime;
                 }
             }
+            if (stats.videoMime == null || stats.videoMime.isEmpty()) stats.unplayableReason = "no-video-track";
+            else if (!stats.videoSampleReadable) stats.unplayableReason = "video-sample-not-readable";
+            else if (stats.decoderName == null || stats.decoderName.isEmpty()) stats.unplayableReason = "no-decoder-for-format";
+            else if (stats.durationMs <= 0) stats.unplayableReason = "duration-missing";
+            else stats.unplayableReason = "ok";
         } catch (Throwable t) {
             Log.e(TAG, "Video metadata read failed file=" + file.getAbsolutePath(), t);
+            stats.unplayableReason = t.getClass().getSimpleName() + ":" + t.getMessage();
         } finally {
             try { retriever.release(); } catch (Throwable ignored) {}
             try { extractor.release(); } catch (Throwable ignored) {}
         }
         return stats;
+    }
+
+    private static String findDecoderName(MediaFormat format, String mime) {
+        try {
+            MediaCodecList list = new MediaCodecList(MediaCodecList.ALL_CODECS);
+            String direct = list.findDecoderForFormat(format);
+            if (direct != null && !direct.isEmpty()) return direct;
+            for (MediaCodecInfo info : list.getCodecInfos()) {
+                if (info.isEncoder()) continue;
+                String[] types = info.getSupportedTypes();
+                if (types == null) continue;
+                for (String type : types) {
+                    if (!mime.equalsIgnoreCase(type)) continue;
+                    try {
+                        if (info.getCapabilitiesForType(type).isFormatSupported(format)) {
+                            return info.getName();
+                        }
+                    } catch (Throwable ignored) {
+                        return info.getName();
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "findDecoderName failed mime=" + mime + " err=" + t.getMessage());
+        }
+        return "";
+    }
+
+    private static int getInteger(MediaFormat format, String key) {
+        try {
+            return format.containsKey(key) ? format.getInteger(key) : 0;
+        } catch (Throwable ignored) {
+            return 0;
+        }
     }
 
     private static int parseInt(String value) {
@@ -251,6 +380,16 @@ public final class WallpaperVideoTranscoder {
         float fps;
         int width;
         int height;
+        int bitrate;
+        int profile;
+        int level;
+        int colorFormat;
+        String videoMime = "";
+        String audioMime = "";
+        String decoderName = "";
+        String unplayableReason = "unknown";
+        boolean hasAudio;
+        boolean videoSampleReadable;
     }
 
     private WallpaperVideoTranscoder() {}
