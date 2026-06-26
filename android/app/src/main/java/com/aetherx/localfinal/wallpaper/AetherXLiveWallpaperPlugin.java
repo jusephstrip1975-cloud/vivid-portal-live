@@ -44,22 +44,31 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public void saveVideoFromUrl(final PluginCall call) {
         final String url = call.getString("url");
         final String fileName = sanitizeFileName(call.getString("fileName", "wallpaper.mp4"));
-        Log.i(TAG, "saveVideoFromUrl url=" + url + " fileName=" + fileName);
+        final String wallpaperId = call.getString("wallpaperId", fileName);
+        Log.i(TAG, "saveVideoFromUrl wallpaperId=" + wallpaperId + " url=" + url + " fileName=" + fileName);
         if (url == null || url.isEmpty()) {
+            Log.e(TAG, "saveVideoFromUrl missing-url wallpaperId=" + wallpaperId);
             call.reject("missing-url");
             return;
         }
         new Thread(() -> {
             try {
                 File outFile = ensureWallpaperFile(fileName);
-                Log.i(TAG, "saveVideoFromUrl downloading to=" + outFile.getAbsolutePath());
+                Log.i(TAG, "saveVideoFromUrl wallpaperId=" + wallpaperId + " downloading to=" + outFile.getAbsolutePath());
                 long bytes = downloadFollowingRedirects(url, outFile);
-                Log.i(TAG, "saveVideoFromUrl downloaded bytes=" + bytes
+                Log.i(TAG, "saveVideoFromUrl wallpaperId=" + wallpaperId
+                    + " downloadedBytes=" + bytes
                     + " exists=" + outFile.exists() + " size=" + outFile.length()
                     + " canRead=" + outFile.canRead());
+                if (!outFile.exists() || outFile.length() < 4096) {
+                    Log.e(TAG, "saveVideoFromUrl wallpaperId=" + wallpaperId
+                        + " file-too-small size=" + outFile.length());
+                    call.reject("empty-download: file-too-small size=" + outFile.length());
+                    return;
+                }
                 transcodeAndResolve(outFile, call);
             } catch (Exception e) {
-                Log.e(TAG, "saveVideoFromUrl failed", e);
+                Log.e(TAG, "saveVideoFromUrl failed wallpaperId=" + wallpaperId, e);
                 call.reject("download-failed: " + e.getMessage(), e);
             }
         }).start();
