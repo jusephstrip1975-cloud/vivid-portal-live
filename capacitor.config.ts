@@ -1,14 +1,14 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.aetherx.localfinal",
+  appId: "com.aetherx.livewallpaper",
   appName: "AETHERX",
   webDir: "public/dist",
   backgroundColor: "#000000",
   android: {
     backgroundColor: "#000000",
-    allowMixedContent: true,
-    webContentsDebuggingEnabled: true,
+    allowMixedContent: false,
+    webContentsDebuggingEnabled: false,
   },
   ios: {
     backgroundColor: "#000000",

@@ -4,48 +4,70 @@ android {
     namespace = "com.aetherx.localfinal"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.aetherx.localfinal"
-        setProperty("archivesBaseName", "app-aetherx-localfinal")
+        applicationId "com.aetherx.livewallpaper"
+        setProperty("archivesBaseName", "aetherx")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 101
-        versionName "1.1-live-wallpaper"
+        versionCode 200
+        versionName "2.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    buildTypes {
+
+    signingConfigs {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            def ksPath = System.getenv("AETHERX_KEYSTORE_PATH") ?: "release.keystore"
+            def ksFile = file(ksPath)
+            if (ksFile.exists()) {
+                storeFile ksFile
+                storePassword System.getenv("AETHERX_KEYSTORE_PASSWORD") ?: ""
+                keyAlias System.getenv("AETHERX_KEY_ALIAS") ?: ""
+                keyPassword System.getenv("AETHERX_KEY_PASSWORD") ?: ""
+            }
         }
     }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            debuggable false
+            zipAlignEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            def ksFile = file(System.getenv("AETHERX_KEYSTORE_PATH") ?: "release.keystore")
+            if (ksFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            minifyEnabled false
+            debuggable true
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
+    bundle {
+        language { enableSplit = true }
+        density  { enableSplit = true }
+        abi      { enableSplit = true }
     }
 }
 
 repositories {
     flatDir {
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
-    }
-}
-
-androidComponents {
-    onVariants(selector().withBuildType('debug')) { variant ->
-        variant.outputs.each { output ->
-            output.outputFileName.set('app-aetherx-localfinal-debug.apk')
-        }
-    }
-}
-
-android.applicationVariants.all { variant ->
-    if (variant.buildType.name == 'debug') {
-        variant.outputs.all { output ->
-            outputFileName = 'app-aetherx-localfinal-debug.apk'
-        }
     }
 }
 
@@ -56,7 +78,7 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
 
-    // Media3 ExoPlayer for live wallpaper video rendering
+    // Media3 ExoPlayer for live wallpaper video rendering (fallback after MediaPlayer)
     implementation "androidx.media3:media3-exoplayer:1.4.1"
     implementation "androidx.media3:media3-common:1.4.1"
     testImplementation "junit:junit:$junitVersion"
@@ -95,50 +117,6 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
     }
 }
 
-tasks.register('copyAetherXLocalFinalDebugApk') {
-    doLast {
-        def outputDir = file("$buildDir/outputs/apk/debug")
-        def expected = file("${outputDir}/app-aetherx-localfinal-debug.apk")
-        def defaultApk = file("${outputDir}/app-debug.apk")
-
-        if (expected.exists()) {
-            logger.lifecycle("AetherX Local Final debug APK already exists: ${expected}")
-            return
-        }
-        if (!defaultApk.exists()) {
-            throw new GradleException("Neither ${expected.name} nor ${defaultApk.name} exists in ${outputDir}")
-        }
-        outputDir.mkdirs()
-        expected.bytes = defaultApk.bytes
-        if (!expected.exists()) {
-            throw new GradleException("Failed to create final debug APK: ${expected}")
-        }
-        logger.lifecycle("Copied ${defaultApk.name} to ${expected.name}")
-    }
-}
-
-tasks.register('verifyAetherXFinalDebugApk') {
-    doLast {
-        def expected = file("$buildDir/outputs/apk/debug/app-aetherx-localfinal-debug.apk")
-        if (!expected.exists()) {
-            throw new GradleException("Expected debug APK was not generated: ${expected}")
-        }
-        logger.lifecycle("AetherX Local Final debug APK generated: ${expected}")
-    }
-}
-
 tasks.named('preBuild') {
     dependsOn 'verifyAetherXLiveWallpaperSetup'
-}
-
-afterEvaluate {
-    tasks.matching { task -> task.name == 'assembleDebug' }.configureEach {
-        finalizedBy tasks.named('copyAetherXLocalFinalDebugApk')
-    }
-    tasks.named('verifyAetherXFinalDebugApk') {
-        mustRunAfter tasks.named('copyAetherXLocalFinalDebugApk')
-    }
-    tasks.named('copyAetherXLocalFinalDebugApk') {
-        finalizedBy tasks.named('verifyAetherXFinalDebugApk')
-    }
 }
