@@ -35,6 +35,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private static final String TAG = "AetherXLiveWP";
     public static final String PREFS = "aetherx_live_wallpaper";
     public static final String KEY_VIDEO_PATH = "video_path";
+    public static final String KEY_ORIGINAL_PATH = "original_path";
     public static final String KEY_VIDEO_URI = "video_uri";
     public static final String KEY_VIDEO_VERSION = "video_version";
     private static final int MAX_REDIRECTS = 5;
@@ -258,10 +259,16 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private void transcodeAndResolve(final File input, final PluginCall call, final String sourceUri) {
-        Log.i(TAG, "transcodeAndResolve start input=" + input.getAbsolutePath());
+        Log.i(TAG, "transcodeAndResolve start input=" + input.getAbsolutePath()
+            + " inputExists=" + input.exists() + " inputSize=" + input.length());
+        // Always persist the original as a fallback so the service can play it
+        // if the converted output fails on this device.
+        persistOriginalPath(input.getAbsolutePath());
         WallpaperVideoTranscoder.transcode(getContext(), input, new WallpaperVideoTranscoder.Callback() {
             @Override
             public void onSuccess(File output) {
+                Log.i(TAG, "transcodeAndResolve onSuccess output=" + output.getAbsolutePath()
+                    + " outputExists=" + output.exists() + " outputSize=" + output.length());
                 persistVideoPath(output.getAbsolutePath());
                 JSObject ret = new JSObject();
                 ret.put("path", output.getAbsolutePath());
@@ -273,10 +280,26 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
             @Override
             public void onFailure(Exception error) {
-                Log.e(TAG, "Transcode failed; refusing to persist unsupported original video", error);
-                call.reject("transcode-failed: " + (error.getMessage() == null ? "unknown" : error.getMessage()), error);
+                Log.w(TAG, "Transcode failed; falling back to ORIGINAL video as wallpaper source", error);
+                // Don't block playback. Persist the original; the service will try
+                // ExoPlayer -> MediaPlayer on it.
+                persistVideoPath(input.getAbsolutePath());
+                JSObject ret = new JSObject();
+                ret.put("path", input.getAbsolutePath());
+                ret.put("bytes", input.length());
+                ret.put("transcoded", false);
+                ret.put("fallback", "original");
+                ret.put("transcodeError", error.getMessage() == null ? "unknown" : error.getMessage());
+                if (sourceUri != null) ret.put("sourceUri", sourceUri);
+                call.resolve(ret);
             }
         });
+    }
+
+    private void persistOriginalPath(String absolutePath) {
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        prefs.edit().putString(KEY_ORIGINAL_PATH, absolutePath).commit();
+        Log.i(TAG, "persistOriginalPath=" + absolutePath);
     }
 
     private void persistVideoPath(String absolutePath) {

@@ -57,6 +57,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private String currentPath;
         private long currentVersion = -1L;
         private String rendererUsed = "NONE";
+        private boolean triedOriginalFallback = false;
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
@@ -175,6 +176,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
                 Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
                     + " new=" + path + " newVersion=" + version + " savedUri=" + savedUri);
+                if (path == null || !path.equals(currentPath) || version != currentVersion) {
+                    triedOriginalFallback = false;
+                }
                 currentPath = path;
                 currentVersion = version;
 
@@ -301,12 +305,16 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.setLooping(true);
                 fallbackPlayer.setVolume(0f, 0f);
                 fallbackPlayer.setOnErrorListener((mp, what, extra) -> {
-                    Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra);
+                    Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra
+                        + " currentPath=" + currentPath + " triedOriginal=" + triedOriginalFallback);
+                    if (!triedOriginalFallback && tryOriginalFallback()) {
+                        return true;
+                    }
                     if (ENABLE_CANVAS_EMERGENCY_FALLBACK) {
                         Log.w(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED switchingTo=CANVAS_FALLBACK");
                         main.post(() -> startCanvasFrameFallback(uri));
                     } else {
-                        Log.e(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED canvasFallbackDisabled=true");
+                        Log.e(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED canvasFallbackDisabled=true noOriginalFallbackAvailable=true");
                         main.post(() -> paintMessage("Vídeo no soportado por el dispositivo"));
                     }
                     return true;
@@ -334,12 +342,49 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.prepareAsync();
             } catch (Throwable t) {
                 Log.e(TAG, "MediaPlayer fallback failed", t);
+                if (!triedOriginalFallback && tryOriginalFallback()) {
+                    return;
+                }
                 if (ENABLE_CANVAS_EMERGENCY_FALLBACK) {
                     startCanvasFrameFallback(uri);
                 } else {
                     Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true");
                     paintMessage("Vídeo no soportado por el dispositivo");
                 }
+            }
+        }
+
+        /**
+         * Last-resort fallback: re-point the wallpaper service to the ORIGINAL (un-transcoded)
+         * file if it exists and differs from what we just tried. Returns true if a retry was scheduled.
+         */
+        private boolean tryOriginalFallback() {
+            try {
+                if (prefs == null) return false;
+                String original = prefs.getString(AetherXLiveWallpaperPlugin.KEY_ORIGINAL_PATH, null);
+                Log.i(TAG, "tryOriginalFallback original=" + original + " current=" + currentPath);
+                if (original == null) return false;
+                File f = new File(original);
+                if (!f.exists() || f.length() <= 0 || !f.canRead()) {
+                    Log.w(TAG, "tryOriginalFallback: original file not usable size="
+                        + (f.exists() ? f.length() : -1));
+                    return false;
+                }
+                if (original.equals(currentPath)) {
+                    Log.w(TAG, "tryOriginalFallback: already playing original, nothing to retry");
+                    return false;
+                }
+                triedOriginalFallback = true;
+                Log.w(TAG, "RENDERER_USED=RETRY_WITH_ORIGINAL_FILE path=" + original);
+                prefs.edit().putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, original).commit();
+                main.post(() -> {
+                    releasePlayer();
+                    startPlayer();
+                });
+                return true;
+            } catch (Throwable t) {
+                Log.e(TAG, "tryOriginalFallback failed", t);
+                return false;
             }
         }
 
