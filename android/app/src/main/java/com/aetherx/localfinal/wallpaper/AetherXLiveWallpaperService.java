@@ -139,6 +139,11 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         @Override
         public void onDestroy() {
             Log.i(TAG, "Engine.onDestroy");
+            try {
+                if (prefs != null && prefsListener != null) {
+                    prefs.unregisterOnSharedPreferenceChangeListener(prefsListener);
+                }
+            } catch (Throwable ignored) {}
             main.post(this::releasePlayer);
             super.onDestroy();
         }
@@ -152,19 +157,25 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     return;
                 }
 
-                SharedPreferences prefs = getApplicationContext()
+                if (prefs == null) {
+                    prefs = getApplicationContext()
                         .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                }
                 String path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
                 String savedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
-                Log.i(TAG, "startPlayer savedWallpaperVideo=" + path + " savedUri=" + savedUri);
+                long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
+                Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
+                    + " new=" + path + " newVersion=" + version + " savedUri=" + savedUri);
+                currentPath = path;
+                currentVersion = version;
 
-                File convertedOutput = WallpaperVideoTranscoder.getOutputFile(getApplicationContext());
-                if (convertedOutput.exists() && convertedOutput.length() > 0 && convertedOutput.canRead()) {
-                    path = convertedOutput.getAbsolutePath();
-                    Log.i(TAG, "Using mandatory Samsung-safe converted path=" + path
-                        + " size=" + convertedOutput.length());
-                } else {
-                    Log.w(TAG, "Samsung-safe converted output missing; refusing to play original unsupported video");
+                if (path == null) {
+                    paintMessage("Guarda el vídeo otra vez en la app");
+                    return;
+                }
+                File convertedOutput = new File(path);
+                if (!convertedOutput.exists() || convertedOutput.length() <= 0 || !convertedOutput.canRead()) {
+                    Log.w(TAG, "Persisted wallpaper file missing or unreadable: " + path);
                     paintMessage("Guarda el vídeo otra vez en la app");
                     return;
                 }
