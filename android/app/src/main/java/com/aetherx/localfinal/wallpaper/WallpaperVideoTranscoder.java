@@ -545,13 +545,13 @@ public final class WallpaperVideoTranscoder {
         }
 
         @Override
-        public TrackToken addTrack(Format format) throws MuxerException {
+        public Muxer.TrackToken addTrack(Format format) throws Muxer.MuxerException {
             return muxer.addTrack(format);
         }
 
         @Override
-        public void writeSampleData(TrackToken trackToken, ByteBuffer byteBuffer, MediaCodec.BufferInfo bufferInfo)
-                throws MuxerException {
+        public void writeSampleData(Muxer.TrackToken trackToken, ByteBuffer byteBuffer, MediaCodec.BufferInfo bufferInfo)
+                throws Muxer.MuxerException {
             muxer.writeSampleData(trackToken, byteBuffer, bufferInfo);
         }
 
@@ -561,7 +561,7 @@ public final class WallpaperVideoTranscoder {
         }
 
         @Override
-        public void close() throws MuxerException {
+        public void close() throws Muxer.MuxerException {
             muxer.close();
         }
     }
