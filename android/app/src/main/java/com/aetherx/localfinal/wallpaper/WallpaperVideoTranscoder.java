@@ -72,10 +72,6 @@ public final class WallpaperVideoTranscoder {
         new Handler(Looper.getMainLooper()).post(() -> transcodePass(context, input, PASS_PRIMARY, null, cb));
     }
 
-    public static void transcodeAggressive(final Context context, final File input, final Callback cb) {
-        new Handler(Looper.getMainLooper()).post(() -> transcodePass(context, input, PASS_PRIMARY, null, cb));
-    }
-
     public static File getConvertedDir(Context context) {
         File dir = new File(context.getFilesDir(), "wallpapers/converted");
         if (!dir.exists()) dir.mkdirs();
