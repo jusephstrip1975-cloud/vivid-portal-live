@@ -245,6 +245,7 @@ public final class WallpaperVideoTranscoder {
             + " width=" + stats.width
             + " height=" + stats.height
             + " fps=" + stats.fps
+            + " estimatedFps=" + stats.estimatedFps
             + " durationMs=" + stats.durationMs
             + " bitrate=" + stats.bitrate
             + " profile=" + stats.profile
@@ -295,6 +296,9 @@ public final class WallpaperVideoTranscoder {
                     stats.colorFormat = getInteger(format, "color-format");
                     extractor.selectTrack(i);
                     stats.videoSampleReadable = extractor.readSampleData(java.nio.ByteBuffer.allocate(1024 * 1024), 0) >= 0;
+                    try { extractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC); } catch (Throwable ignored) {}
+                    stats.estimatedFps = estimateSelectedTrackFps(extractor);
+                    if (stats.estimatedFps > 0f) stats.fps = stats.estimatedFps;
                     extractor.unselectTrack(i);
                 } else if (mime != null && mime.startsWith("audio/")) {
                     stats.hasAudio = true;
@@ -343,6 +347,31 @@ public final class WallpaperVideoTranscoder {
         return "";
     }
 
+    private static float estimateSelectedTrackFps(MediaExtractor extractor) {
+        try {
+            long firstUs = -1L;
+            long previousUs = -1L;
+            long totalDeltaUs = 0L;
+            int deltas = 0;
+            for (int i = 0; i < 120; i++) {
+                long timeUs = extractor.getSampleTime();
+                if (timeUs < 0) break;
+                if (firstUs < 0) firstUs = timeUs;
+                if (previousUs >= 0 && timeUs > previousUs) {
+                    totalDeltaUs += (timeUs - previousUs);
+                    deltas++;
+                }
+                previousUs = timeUs;
+                if (!extractor.advance()) break;
+            }
+            if (deltas <= 0 || totalDeltaUs <= 0L) return 0f;
+            return 1_000_000f / (totalDeltaUs / (float) deltas);
+        } catch (Throwable t) {
+            Log.w(TAG, "estimateSelectedTrackFps failed err=" + t.getMessage());
+            return 0f;
+        }
+    }
+
     private static int getInteger(MediaFormat format, String key) {
         try {
             return format.containsKey(key) ? format.getInteger(key) : 0;
@@ -384,6 +413,7 @@ public final class WallpaperVideoTranscoder {
         int profile;
         int level;
         int colorFormat;
+        float estimatedFps;
         String videoMime = "";
         String audioMime = "";
         String decoderName = "";
