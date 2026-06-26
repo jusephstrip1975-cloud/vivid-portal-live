@@ -640,7 +640,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private File getWallpaperDir() {
             File moviesDir = getApplicationContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES);
             if (moviesDir == null) {
-                return new File(getApplicationContext().getFilesDir(), "wallpaper-external-unavailable");
+                File externalRoot = Environment.getExternalStorageDirectory();
+                moviesDir = new File(externalRoot, "Android/data/" + getApplicationContext().getPackageName() + "/files/Movies");
+                Log.w(TAG, "external-movies-dir-unavailable using-package-external-path=" + moviesDir.getAbsolutePath());
             }
             File dir = new File(moviesDir, "AetherX");
             if (!dir.exists() && !dir.mkdirs()) {
