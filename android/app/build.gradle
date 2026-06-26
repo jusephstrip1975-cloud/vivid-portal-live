@@ -8,8 +8,8 @@ android {
         setProperty("archivesBaseName", "AETHERX")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 201
-        versionName "2.0.1"
+        versionCode 202
+        versionName "2.0.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
@@ -121,6 +121,27 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
     }
 }
 
+tasks.register('requireAetherXReleaseSigning') {
+    doLast {
+        def ksPath = System.getenv("AETHERX_KEYSTORE_PATH") ?: "release.keystore"
+        def ksFile = file(ksPath)
+        def missing = []
+        if (!ksFile.exists() || ksFile.length() <= 0L) missing << "AETHERX_KEYSTORE_PATH/release.keystore"
+        if (!(System.getenv("AETHERX_KEYSTORE_PASSWORD") ?: "").trim()) missing << "AETHERX_KEYSTORE_PASSWORD"
+        if (!(System.getenv("AETHERX_KEY_ALIAS") ?: "").trim()) missing << "AETHERX_KEY_ALIAS"
+        if (!(System.getenv("AETHERX_KEY_PASSWORD") ?: "").trim()) missing << "AETHERX_KEY_PASSWORD"
+        if (!missing.isEmpty()) {
+            throw new GradleException("AETHERX release signing is mandatory. Missing: " + missing.join(', '))
+        }
+    }
+}
+
 tasks.named('preBuild') {
     dependsOn 'verifyAetherXLiveWallpaperSetup'
+}
+
+gradle.projectsEvaluated {
+    tasks.matching { it.name in ['assembleRelease', 'bundleRelease'] }.configureEach {
+        dependsOn 'requireAetherXReleaseSigning'
+    }
 }
