@@ -169,6 +169,7 @@ export async function saveWallpaperToDevice(
   videoUrl: string,
   fileName: string,
   target: WallpaperTarget = "home",
+  wallpaperId?: string,
 ): Promise<SaveResult> {
   if (!(await isNative())) {
     return { ok: false, reason: "web" };
@@ -180,7 +181,13 @@ export async function saveWallpaperToDevice(
 
     if (platform === "android") {
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-      const saved = await LiveWallpaper.saveVideoFromUrl({ url: resolveDownloadUrl(videoUrl), fileName });
+      const resolvedUrl = resolveDownloadUrl(videoUrl);
+      console.info("[AetherX] saveVideoFromUrl", { wallpaperId, fileName, resolvedUrl });
+      const saved = await LiveWallpaper.saveVideoFromUrl({
+        url: resolvedUrl,
+        fileName,
+        wallpaperId,
+      });
       const previewUrl = Capacitor.convertFileSrc(saved.path);
       void runInternalSpeedProbe(previewUrl, saved.path);
       return applyPickedVideo(target);
