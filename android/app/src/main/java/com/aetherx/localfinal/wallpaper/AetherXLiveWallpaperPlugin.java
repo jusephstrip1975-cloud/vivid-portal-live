@@ -272,15 +272,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
             @Override
             public void onFailure(Exception error) {
-                Log.w(TAG, "Transcode failed, falling back to original file: " + error.getMessage());
-                persistVideoPath(input.getAbsolutePath());
-                JSObject ret = new JSObject();
-                ret.put("path", input.getAbsolutePath());
-                ret.put("bytes", input.length());
-                ret.put("transcoded", false);
-                ret.put("transcodeError", error.getMessage() == null ? "unknown" : error.getMessage());
-                if (sourceUri != null) ret.put("sourceUri", sourceUri);
-                call.resolve(ret);
+                Log.e(TAG, "Transcode failed; refusing to persist unsupported original video", error);
+                call.reject("transcode-failed: " + (error.getMessage() == null ? "unknown" : error.getMessage()), error);
             }
         });
     }

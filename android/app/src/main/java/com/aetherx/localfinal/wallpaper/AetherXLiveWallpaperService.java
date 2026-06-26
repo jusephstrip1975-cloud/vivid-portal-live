@@ -22,6 +22,7 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.VideoSize;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
@@ -133,6 +134,17 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String savedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
                 Log.i(TAG, "startPlayer savedWallpaperVideo=" + path + " savedUri=" + savedUri);
 
+                File convertedOutput = new File(getApplicationContext().getFilesDir(), "wallpapers/converted/output.mp4");
+                if (convertedOutput.exists() && convertedOutput.length() > 0 && convertedOutput.canRead()) {
+                    path = convertedOutput.getAbsolutePath();
+                    Log.i(TAG, "Using mandatory converted output.mp4 path=" + path
+                        + " size=" + convertedOutput.length());
+                } else {
+                    Log.w(TAG, "Converted output.mp4 missing; refusing to play original unsupported video");
+                    paintMessage("Guarda el vídeo otra vez en la app");
+                    return;
+                }
+
                 Uri uri = null;
                 long sizeForLog = -1;
 
@@ -154,31 +166,17 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         }
                     }
                 }
-
-                if (uri == null && savedUri != null) {
-                    Uri candidate = Uri.parse(savedUri);
-                    Log.i(TAG, "Falling back to savedUri=" + candidate);
-                    try (android.os.ParcelFileDescriptor pfd =
-                             getApplicationContext().getContentResolver()
-                                 .openFileDescriptor(candidate, "r")) {
-                        Log.i(TAG, "ContentResolver openFileDescriptor (uri) ok fd=" + (pfd != null));
-                        uri = candidate;
-                    } catch (Exception e) {
-                        Log.w(TAG, "openFileDescriptor on saved uri failed: " + e.getMessage());
-                    }
-                }
-
                 if (uri == null) {
-                    paintMessage(path == null
-                        ? "Selecciona un vídeo en la app"
-                        : "Vídeo no encontrado");
+                    paintMessage("Vídeo convertido no encontrado");
                     return;
                 }
 
                 Log.i(TAG, "ExoPlayer media item=" + uri + " size=" + sizeForLog);
                 lastUri = uri;
 
-                player = new ExoPlayer.Builder(getApplicationContext()).build();
+                DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(getApplicationContext())
+                    .setEnableDecoderFallback(true);
+                player = new ExoPlayer.Builder(getApplicationContext(), renderersFactory).build();
                 player.setRepeatMode(Player.REPEAT_MODE_ALL);
                 player.setVolume(0f);
                 player.setAudioAttributes(
