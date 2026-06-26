@@ -76,7 +76,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             currentHolder = holder;
             Log.i(TAG, "onSurfaceChanged " + width + "x" + height + " format=" + format);
             main.post(() -> {
-                if (player == null) {
+                if (player == null && fallbackPlayer == null && frameRetriever == null) {
                     startPlayer();
                 } else {
                     try {
@@ -94,7 +94,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             visible = v;
             Log.i(TAG, "onVisibilityChanged visible=" + v + " player=" + (player != null));
             main.post(() -> {
-                if (player == null && fallbackPlayer == null) {
+                if (player == null && fallbackPlayer == null && frameRetriever == null) {
                     if (v) startPlayer();
                     return;
                 }
@@ -102,9 +102,11 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     if (v) {
                         if (player != null) { player.setPlayWhenReady(true); player.play(); }
                         if (fallbackPlayer != null) fallbackPlayer.start();
+                        if (frameRetriever != null && frameLoop != null) main.post(frameLoop);
                     } else {
                         if (player != null) { player.setPlayWhenReady(false); player.pause(); }
                         if (fallbackPlayer != null && fallbackPlayer.isPlaying()) fallbackPlayer.pause();
+                        if (frameLoop != null) main.removeCallbacks(frameLoop);
                     }
                 } catch (Throwable ignored) {}
             });
