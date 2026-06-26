@@ -1,4 +1,4 @@
-package com.aetherx.localfinal.wallpaper;
+package com.aetherx.livewallpaper.wallpaper;
 
 import android.app.Activity;
 import android.app.WallpaperManager;
@@ -42,8 +42,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String PREFS = "aetherx_live_wallpaper";
     public static final String KEY_VIDEO_PATH = "video_path";
     public static final String KEY_VIDEO_VERSION = "video_version";
-    public static final String KEY_LAST_SOURCE_URI = "last_source_uri";
     public static final String KEY_LAST_SOURCE_URL = "last_source_url";
+    public static final String KEY_LAST_DOWNLOAD_BYTES = "last_download_bytes";
+    public static final String KEY_LAST_ERROR = "last_error";
+    public static final String KEY_OPEN_PICKER_CALLED = "open_picker_called";
 
     private static final int MAX_REDIRECTS = 5;
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
