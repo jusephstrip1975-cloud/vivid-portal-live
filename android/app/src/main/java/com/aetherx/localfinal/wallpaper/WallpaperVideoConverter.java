@@ -3,9 +3,8 @@ package com.aetherx.localfinal.wallpaper;
 import android.content.Context;
 import android.util.Log;
 
-import com.arthenica.ffmpegkit.FFmpegKit;
-import com.arthenica.ffmpegkit.FFmpegSession;
-import com.arthenica.ffmpegkit.ReturnCode;
+import com.arthenica.mobileffmpeg.Config;
+import com.arthenica.mobileffmpeg.FFmpeg;
 
 import java.io.File;
 
@@ -45,13 +44,11 @@ public final class WallpaperVideoConverter {
         );
         Log.i(TAG, "FFmpeg cmd: " + cmd);
 
-        FFmpegSession session = FFmpegKit.execute(cmd);
-        ReturnCode rc = session.getReturnCode();
-        Log.i(TAG, "FFmpeg rc=" + rc + " state=" + session.getState()
-            + " duration=" + session.getDuration() + "ms");
+        int rc = FFmpeg.execute(cmd);
+        Log.i(TAG, "FFmpeg rc=" + rc);
 
-        if (!ReturnCode.isSuccess(rc)) {
-            String logs = session.getAllLogsAsString();
+        if (rc != Config.RETURN_CODE_SUCCESS) {
+            String logs = Config.getLastCommandOutput();
             if (logs != null && logs.length() > 2000) logs = logs.substring(logs.length() - 2000);
             Log.e(TAG, "FFmpeg failed logs(tail)=\n" + logs);
             throw new Exception("ffmpeg-failed rc=" + rc);
