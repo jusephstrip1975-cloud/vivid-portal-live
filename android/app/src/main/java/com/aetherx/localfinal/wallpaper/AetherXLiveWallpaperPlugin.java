@@ -164,11 +164,31 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     @PluginMethod
     public void pickVideoFromDevice(PluginCall call) {
         Log.i(TAG, "pickVideoFromDevice opening ACTION_OPEN_DOCUMENT copy-to-internal-current-only=true");
+        String storageError = guardStorageOrReject("pickVideoFromDevice");
+        if (storageError != null) { call.reject(storageError); return; }
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("video/*");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivityForResult(call, intent, "onPickVideoResult");
+    }
+
+    @PluginMethod
+    public void checkStorage(PluginCall call) {
+        File dir = getWallpaperDir();
+        StatFs stat = new StatFs(dir.getAbsolutePath());
+        long freeBytes = stat.getAvailableBytes();
+        long freeMb = freeBytes / (1024L * 1024L);
+        long requiredMb = MIN_FREE_SPACE_BYTES / (1024L * 1024L);
+        boolean ok = freeBytes >= MIN_FREE_SPACE_BYTES;
+        Log.i(TAG, "FREE_SPACE_MB=" + freeMb + " stage=checkStorage requiredMb=" + requiredMb + " ok=" + ok);
+        if (!ok) Log.w(TAG, "LOW_STORAGE_WARNING freeMb=" + freeMb + " requiredMb=" + requiredMb);
+        JSObject ret = new JSObject();
+        ret.put("ok", ok);
+        ret.put("freeMb", freeMb);
+        ret.put("requiredMb", requiredMb);
+        ret.put("message", ok ? "ok" : LOW_STORAGE_MESSAGE);
+        call.resolve(ret);
     }
 
     @ActivityCallback
