@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -39,6 +40,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
     private class VideoEngine extends Engine {
 
         private ExoPlayer player;
+        private MediaPlayer fallbackPlayer;
+        private Uri lastUri;
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
@@ -85,17 +88,19 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             visible = v;
             Log.i(TAG, "onVisibilityChanged visible=" + v + " player=" + (player != null));
             main.post(() -> {
-                if (player == null) {
+                if (player == null && fallbackPlayer == null) {
                     if (v) startPlayer();
                     return;
                 }
-                if (v) {
-                    player.setPlayWhenReady(true);
-                    player.play();
-                } else {
-                    player.setPlayWhenReady(false);
-                    player.pause();
-                }
+                try {
+                    if (v) {
+                        if (player != null) { player.setPlayWhenReady(true); player.play(); }
+                        if (fallbackPlayer != null) fallbackPlayer.start();
+                    } else {
+                        if (player != null) { player.setPlayWhenReady(false); player.pause(); }
+                        if (fallbackPlayer != null && fallbackPlayer.isPlaying()) fallbackPlayer.pause();
+                    }
+                } catch (Throwable ignored) {}
             });
         }
 
@@ -171,6 +176,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 }
 
                 Log.i(TAG, "ExoPlayer media item=" + uri + " size=" + sizeForLog);
+                lastUri = uri;
 
                 player = new ExoPlayer.Builder(getApplicationContext()).build();
                 player.setRepeatMode(Player.REPEAT_MODE_ALL);
@@ -189,7 +195,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     public void onPlayerError(PlaybackException error) {
                         Log.e(TAG, "ExoPlayer error code=" + error.errorCode
                                 + " name=" + error.getErrorCodeName(), error);
-                        paintMessage("Error: " + error.getErrorCodeName());
+                        Log.i(TAG, "Falling back to native MediaPlayer due to ExoPlayer failure");
+                        main.post(() -> startMediaPlayerFallback(lastUri));
                     }
 
                     @Override
@@ -208,8 +215,42 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player.play();
                 Log.i(TAG, "ExoPlayer.prepare+play issued");
             } catch (Throwable t) {
-                Log.e(TAG, "startPlayer failed", t);
-                paintMessage("Fallo al iniciar reproductor");
+                Log.e(TAG, "startPlayer failed, trying MediaPlayer fallback", t);
+                startMediaPlayerFallback(lastUri);
+            }
+        }
+
+        private void startMediaPlayerFallback(Uri uri) {
+            try {
+                releasePlayer();
+                if (uri == null) {
+                    paintMessage("Vídeo no disponible");
+                    return;
+                }
+                if (currentHolder == null || currentHolder.getSurface() == null
+                        || !currentHolder.getSurface().isValid()) {
+                    Log.w(TAG, "MediaPlayer fallback: surface not valid");
+                    return;
+                }
+                Log.i(TAG, "MediaPlayer fallback start uri=" + uri);
+                fallbackPlayer = new MediaPlayer();
+                fallbackPlayer.setSurface(currentHolder.getSurface());
+                fallbackPlayer.setLooping(true);
+                fallbackPlayer.setVolume(0f, 0f);
+                fallbackPlayer.setOnErrorListener((mp, what, extra) -> {
+                    Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra);
+                    paintMessage("Vídeo no soportado por el dispositivo");
+                    return true;
+                });
+                fallbackPlayer.setOnPreparedListener(mp -> {
+                    Log.i(TAG, "MediaPlayer prepared, starting playback");
+                    try { mp.start(); } catch (Throwable t) { Log.e(TAG, "MediaPlayer start failed", t); }
+                });
+                fallbackPlayer.setDataSource(getApplicationContext(), uri);
+                fallbackPlayer.prepareAsync();
+            } catch (Throwable t) {
+                Log.e(TAG, "MediaPlayer fallback failed", t);
+                paintMessage("Vídeo no soportado por el dispositivo");
             }
         }
 
@@ -242,6 +283,14 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 } catch (Throwable ignored) {
                 }
                 player = null;
+            }
+            if (fallbackPlayer != null) {
+                try {
+                    if (fallbackPlayer.isPlaying()) fallbackPlayer.stop();
+                    fallbackPlayer.release();
+                } catch (Throwable ignored) {
+                }
+                fallbackPlayer = null;
             }
         }
     }
