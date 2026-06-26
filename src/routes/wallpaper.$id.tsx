@@ -86,7 +86,7 @@ function WallpaperDetail() {
             return;
           }
         }
-        const result = await saveWallpaperToDevice(wp.video, fileName, target);
+        const result = await saveWallpaperToDevice(wp.video, fileName, target, wp.id);
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
         const successMsg =
           target === "lock"
