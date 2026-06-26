@@ -182,6 +182,16 @@ export async function saveWallpaperToDevice(
 
     if (platform === "android") {
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      try {
+        const storage = await LiveWallpaper.checkStorage();
+        console.info("[AetherX] FREE_SPACE_MB", storage.freeMb, "requiredMb", storage.requiredMb, "ok", storage.ok);
+        if (!storage.ok) {
+          console.warn("[AetherX] DOWNLOAD_ABORTED_LOW_STORAGE", storage);
+          return { ok: false, reason: storage.message || "Espacio insuficiente para procesar wallpapers 3D" };
+        }
+      } catch (err) {
+        console.warn("checkStorage failed (continuing)", err);
+      }
       const resolvedUrl = resolveDownloadUrl(videoUrl);
       console.info("[AetherX] saveVideoFromUrl", { wallpaperId, fileName, resolvedUrl });
       const saved = await LiveWallpaper.saveVideoFromUrl({
