@@ -215,6 +215,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player = new ExoPlayer.Builder(getApplicationContext(), renderersFactory).build();
                 player.setRepeatMode(Player.REPEAT_MODE_ALL);
                 player.setVolume(0f);
+                // Explicit 1.0x playback to defeat any system-level slowdown
+                // and to guarantee real-time rendering on Samsung One UI.
+                player.setPlaybackParameters(new PlaybackParameters(1.0f));
                 player.setAudioAttributes(
                         new AudioAttributes.Builder().setUsage(C.USAGE_UNKNOWN).build(),
                         false);
