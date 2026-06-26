@@ -75,6 +75,16 @@ export async function pickDeviceVideo(): Promise<
       return { ok: false, reason: "unsupported-platform" };
     }
     const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    try {
+      const storage = await LiveWallpaper.checkStorage();
+      console.info("[AetherX] FREE_SPACE_MB", storage.freeMb, "stage=pickDeviceVideo ok=", storage.ok);
+      if (!storage.ok) {
+        console.warn("[AetherX] DOWNLOAD_ABORTED_LOW_STORAGE pickDeviceVideo", storage);
+        return { ok: false, reason: storage.message || "Espacio insuficiente para procesar wallpapers 3D" };
+      }
+    } catch (err) {
+      console.warn("checkStorage failed (continuing)", err);
+    }
     const picked = await LiveWallpaper.pickVideoFromDevice();
     const previewUrl = Capacitor.convertFileSrc(picked.path);
     return { ok: true, video: { ...picked, previewUrl } };
