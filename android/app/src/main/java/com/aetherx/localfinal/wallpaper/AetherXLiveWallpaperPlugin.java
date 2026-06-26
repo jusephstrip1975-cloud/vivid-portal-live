@@ -55,11 +55,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 Log.i(TAG, "saveVideoFromUrl downloaded bytes=" + bytes
                     + " exists=" + outFile.exists() + " size=" + outFile.length()
                     + " canRead=" + outFile.canRead());
-                persistVideoPath(outFile.getAbsolutePath());
-                JSObject ret = new JSObject();
-                ret.put("path", outFile.getAbsolutePath());
-                ret.put("bytes", outFile.length());
-                call.resolve(ret);
+                transcodeAndResolve(outFile, call);
             } catch (Exception e) {
                 Log.e(TAG, "saveVideoFromUrl failed", e);
                 call.reject("download-failed: " + e.getMessage(), e);
