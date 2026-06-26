@@ -765,6 +765,73 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
     }
 
+    private ValidationResult validateFinalPathBeforePicker(String finalPath, String stage) {
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        File current = getCurrentWallpaperFile();
+        String persisted = prefs.getString(KEY_VIDEO_PATH, null);
+        if (finalPath == null || finalPath.isEmpty()) {
+            return ValidationResult.fail("CURRENT_MP4_NOT_READY:key-video-path-empty:" + stage);
+        }
+        if (persisted == null || !persisted.equals(finalPath)) {
+            return ValidationResult.fail("CURRENT_MP4_NOT_READY:key-video-path-mismatch:" + stage);
+        }
+        try {
+            if (!new File(finalPath).getCanonicalPath().equals(current.getCanonicalPath())) {
+                return ValidationResult.fail("CURRENT_MP4_NOT_READY:not-current-mp4:" + stage);
+            }
+        } catch (Exception e) {
+            return ValidationResult.fail("CURRENT_MP4_NOT_READY:canonical-path-failed:" + stage + ":" + e.getMessage());
+        }
+
+        File file = new File(finalPath);
+        Log.i(TAG, "CURRENT_MP4_STRICT_PICKER_CHECK stage=" + stage
+            + " PATH=" + finalPath
+            + " EXISTS=" + file.exists()
+            + " CAN_READ=" + file.canRead()
+            + " SIZE=" + (file.exists() ? file.length() : -1)
+            + " KEY_VIDEO_PATH=" + persisted);
+
+        if (!file.exists() || file.length() < 1024 * 1024) {
+            return ValidationResult.fail("CURRENT_MP4_NOT_READY");
+        }
+        if (!file.canRead()) {
+            return ValidationResult.fail("CURRENT_MP4_NOT_READY:file-not-readable:" + stage);
+        }
+
+        ValidationResult playbackValidation = validateCurrentMp4ForPlayback("openLivePicker-" + stage);
+        if (!playbackValidation.ok) {
+            return ValidationResult.fail("CURRENT_MP4_NOT_READY:" + playbackValidation.reason);
+        }
+        return ValidationResult.ok();
+    }
+
+    private void rejectPickerNotReady(PluginCall call, String finalPath, String reason) {
+        setOpenPickerCalled(false);
+        setLastError("CURRENT_MP4_NOT_READY: " + reason);
+        File file = finalPath == null ? null : new File(finalPath);
+        Log.e(TAG, "CURRENT_MP4_NOT_READY reason=" + reason
+            + " PATH=" + finalPath
+            + " EXISTS=" + (file != null && file.exists())
+            + " CAN_READ=" + (file != null && file.canRead())
+            + " SIZE=" + (file != null && file.exists() ? file.length() : -1)
+            + " openPickerCalled=false");
+        call.reject("CURRENT_MP4_NOT_READY");
+    }
+
+    private String classifySaveError(Exception e) {
+        String msg = e == null || e.getMessage() == null ? "" : e.getMessage().toLowerCase();
+        if (msg.startsWith("http-")
+            || msg.contains("redirect")
+            || msg.contains("timed out")
+            || msg.contains("timeout")
+            || msg.contains("host")
+            || msg.contains("network")
+            || msg.contains("connection")) {
+            return "descarga fallida";
+        }
+        return "archivo no guardado";
+    }
+
     private void resolveSaved(PluginCall call, File file, boolean transcoded, String sourceUri, String reason) {
         JSObject ret = new JSObject();
         ret.put("path", file.getAbsolutePath());
