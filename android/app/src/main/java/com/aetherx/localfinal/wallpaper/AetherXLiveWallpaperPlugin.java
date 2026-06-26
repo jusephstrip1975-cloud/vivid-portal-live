@@ -284,8 +284,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     /**
-     * Production flow: use the original MP4 first. Transcoding is only a rescue
-     * path when Samsung's native MediaPlayer cannot prepare the original.
+     * Production flow: use the original MP4 first. Transcoding is only a single
+     * rescue conversion when Samsung's native MediaPlayer cannot prepare it.
      */
     private void transcodeAndResolve(final File input, final PluginCall call) {
         transcodeAndResolve(input, call, null, input == null ? "unknown" : input.getName());
@@ -296,6 +296,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private void transcodeAndResolve(final File input, final PluginCall call, final String sourceUri, final String wallpaperId) {
+        if (input == null) {
+            call.reject("video-corrupt: file-missing");
+            return;
+        }
         Log.i(TAG, "transcodeAndResolve start input=" + input.getAbsolutePath()
             + " inputExists=" + input.exists() + " inputSize=" + input.length()
             + " wallpaperId=" + wallpaperId);
@@ -324,24 +328,27 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
         Log.w(TAG, "ORIGINAL_FAILED wallpaperId=" + wallpaperId
             + " reason=mediaplayer-prepare-failed will_try_transcoder=true path=" + input.getAbsolutePath());
-        Log.i(TAG, "TRANSCODE_STARTED wallpaperId=" + wallpaperId + " input=" + input.getAbsolutePath());
+        Log.i(TAG, "TRANSCODE_START wallpaperId=" + wallpaperId
+            + " input=" + input.getAbsolutePath()
+            + " mode=single_safe_conversion noAggressivePass=true noSecondPass=true noFpsForcing=true");
         WallpaperVideoTranscoder.transcode(getContext(), input, new WallpaperVideoTranscoder.Callback() {
             @Override
             public void onSuccess(File output) {
-                Log.i(TAG, "TRANSCODE_SUCCESS wallpaperId=" + wallpaperId
+                Log.i(TAG, "TRANSCODE_OK wallpaperId=" + wallpaperId
                     + " output=" + output.getAbsolutePath()
                     + " outputExists=" + output.exists() + " outputSize=" + output.length());
                 persistConvertedCandidate(output.getAbsolutePath());
                 if (canPrepareWithMediaPlayer(output, wallpaperId, "CONVERTED")) {
-                    Log.i(TAG, "USING_CONVERTED wallpaperId=" + wallpaperId
-                        + " reason=converted-mediaplayer-ok path=" + output.getAbsolutePath());
-                    persistVideoPath(output.getAbsolutePath());
+                    Log.i(TAG, "USING_ORIGINAL wallpaperId=" + wallpaperId
+                        + " reason=original-exoplayer-before-converted path=" + input.getAbsolutePath()
+                        + " convertedReady=" + output.getAbsolutePath());
+                    persistVideoPath(input.getAbsolutePath());
                     WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), output.getAbsolutePath());
-                    resolveSaved(call, output, true, sourceUri, "converted-mediaplayer-ok");
+                    resolveSaved(call, input, false, sourceUri, "original-first-converted-ready");
                     return;
                 }
-                Log.e(TAG, "TRANSCODE_FAILED wallpaperId=" + wallpaperId
-                    + " reason=converted-mediaplayer-prepare-failed fallbackOriginal=true");
+                Log.w(TAG, "CONVERTED_MEDIAPLAYER_FAILED wallpaperId=" + wallpaperId
+                    + " reason=converted-mediaplayer-prepare-failed exoplayer-may-still-work=true");
                 Log.i(TAG, "USING_ORIGINAL wallpaperId=" + wallpaperId
                     + " reason=converted-failed-exoplayer-will-try path=" + input.getAbsolutePath());
                 persistVideoPath(input.getAbsolutePath());
@@ -351,7 +358,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             @Override
             public void onFailure(Exception error) {
                 Log.e(TAG, "TRANSCODE_FAILED wallpaperId=" + wallpaperId
-                    + " fallbackOriginal=true", error);
+                    + " fallbackOriginal=true noBlocking=true", error);
                 SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
                 prefs.edit()
                     .putString("last_transcode_error", error.getMessage() == null ? "unknown" : error.getMessage())
