@@ -40,6 +40,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
     private class VideoEngine extends Engine {
 
         private ExoPlayer player;
+        private MediaPlayer fallbackPlayer;
+        private Uri lastUri;
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
