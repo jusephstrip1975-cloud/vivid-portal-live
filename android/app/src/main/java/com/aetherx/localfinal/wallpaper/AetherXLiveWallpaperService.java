@@ -314,7 +314,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     parsedDurationUs = 5_000_000L;
                 }
                 final long durationUs = parsedDurationUs;
-                final long frameStepUs = 83_333L; // 12 fps: stable for wallpaper preview surfaces.
+                final long frameStepUs = 33_333L; // 30 fps fallback for fluid motion.
                 final long[] positionUs = new long[] {0L};
                 frameLoop = new Runnable() {
                     @Override
