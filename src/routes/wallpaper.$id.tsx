@@ -306,3 +306,32 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function humanizeWallpaperError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? "");
+  const r = raw.toLowerCase();
+  if (r.includes("missing-url")) return "URL del vídeo vacía. Reporta este fondo.";
+  if (r.includes("too-many-redirects")) return "Demasiadas redirecciones al descargar el vídeo.";
+  if (r.includes("http-404")) return "Vídeo no encontrado en el servidor (404).";
+  if (r.includes("http-403")) return "Acceso al vídeo denegado por el servidor (403).";
+  if (r.match(/http-5\d\d/)) return "Servidor caído al descargar el vídeo. Reintenta.";
+  if (r.includes("download-failed") || r.includes("timeout") || r.includes("timed out"))
+    return "Descarga fallida o tiempo de espera agotado. Revisa tu conexión.";
+  if (r.includes("empty-download") || r.includes("file-too-small"))
+    return "Descarga incompleta: el vídeo llegó vacío.";
+  if (r.includes("video-corrupt") || r.includes("mediaplayer-prepare-failed"))
+    return "Vídeo corrupto o no preparable en este dispositivo.";
+  if (r.includes("codec-not-h264") || r.includes("decoder") || r.includes("unsupported"))
+    return "Samsung rechazó el decoder de este vídeo.";
+  if (r.includes("transcode-failed"))
+    return "Transcoder falló tras pase agresivo. Prueba otro fondo.";
+  if (r.includes("permission") || r.includes("denied"))
+    return "Permiso denegado por Android para aplicar el fondo.";
+  if (r.includes("path") && (r.includes("empty") || r.includes("missing") || r.includes("null")))
+    return "Ruta del vídeo vacía tras la descarga.";
+  if (r.includes("save-failed")) return "No se pudo guardar el vídeo en el almacenamiento.";
+  if (r.includes("open-picker-failed")) return "Android no abrió el selector de fondos.";
+  if (r.includes("pick-video-cancelled") || r === "cancelled") return "Selección cancelada.";
+  if (r.includes("unsupported-platform")) return "Esta plataforma no soporta live wallpapers.";
+  return raw ? `No se pudo aplicar: ${raw}` : "No se pudo aplicar. Inténtalo de nuevo.";
+}
