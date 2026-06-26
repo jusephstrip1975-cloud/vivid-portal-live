@@ -38,6 +38,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String PREFS = "aetherx_live_wallpaper";
     public static final String KEY_VIDEO_PATH = "video_path";
     public static final String KEY_ORIGINAL_PATH = "original_path";
+    public static final String KEY_CONVERTED_PATH = "converted_path";
     public static final String KEY_VIDEO_URI = "video_uri";
     public static final String KEY_VIDEO_VERSION = "video_version";
     private static final int MAX_REDIRECTS = 5;
@@ -326,6 +327,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 Log.i(TAG, "TRANSCODE_SUCCESS wallpaperId=" + wallpaperId
                     + " output=" + output.getAbsolutePath()
                     + " outputExists=" + output.exists() + " outputSize=" + output.length());
+                persistConvertedCandidate(output.getAbsolutePath());
                 if (canPrepareWithMediaPlayer(output, wallpaperId, "CONVERTED")) {
                     Log.i(TAG, "USING_CONVERTED wallpaperId=" + wallpaperId
                         + " reason=converted-mediaplayer-ok path=" + output.getAbsolutePath());
@@ -339,7 +341,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 Log.i(TAG, "USING_ORIGINAL wallpaperId=" + wallpaperId
                     + " reason=converted-failed-exoplayer-will-try path=" + input.getAbsolutePath());
                 persistVideoPath(input.getAbsolutePath());
-                WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), input.getAbsolutePath());
                 resolveSaved(call, input, false, sourceUri, "original-after-converted-failed");
             }
 
@@ -476,6 +477,16 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " verifyRead=" + prefs.getString(KEY_VIDEO_PATH, null));
         deleteIfStale(previous, absolutePath, "previous-video-path");
         WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), absolutePath);
+    }
+
+    private void persistConvertedCandidate(String absolutePath) {
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String previous = prefs.getString(KEY_CONVERTED_PATH, null);
+        prefs.edit().putString(KEY_CONVERTED_PATH, absolutePath).commit();
+        Log.i(TAG, "persistConvertedCandidate previous=" + previous + " new=" + absolutePath);
+        if (previous != null && !previous.equals(absolutePath)) {
+            deleteIfStale(previous, absolutePath, "previous-converted-candidate");
+        }
     }
 
     private void deleteIfStale(String candidate, String keep, String label) {
