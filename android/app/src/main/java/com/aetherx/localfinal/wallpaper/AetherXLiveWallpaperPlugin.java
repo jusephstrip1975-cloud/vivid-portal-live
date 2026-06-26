@@ -251,6 +251,40 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         return new File(dir, fileName);
     }
 
+    /** Transcode the downloaded MP4 to Samsung-friendly H.264/AAC, fall back to original on failure. */
+    private void transcodeAndResolve(final File input, final PluginCall call) {
+        transcodeAndResolve(input, call, null);
+    }
+
+    private void transcodeAndResolve(final File input, final PluginCall call, final String sourceUri) {
+        Log.i(TAG, "transcodeAndResolve start input=" + input.getAbsolutePath());
+        WallpaperVideoTranscoder.transcode(getContext(), input, new WallpaperVideoTranscoder.Callback() {
+            @Override
+            public void onSuccess(File output) {
+                persistVideoPath(output.getAbsolutePath());
+                JSObject ret = new JSObject();
+                ret.put("path", output.getAbsolutePath());
+                ret.put("bytes", output.length());
+                ret.put("transcoded", true);
+                if (sourceUri != null) ret.put("sourceUri", sourceUri);
+                call.resolve(ret);
+            }
+
+            @Override
+            public void onFailure(Exception error) {
+                Log.w(TAG, "Transcode failed, falling back to original file: " + error.getMessage());
+                persistVideoPath(input.getAbsolutePath());
+                JSObject ret = new JSObject();
+                ret.put("path", input.getAbsolutePath());
+                ret.put("bytes", input.length());
+                ret.put("transcoded", false);
+                ret.put("transcodeError", error.getMessage() == null ? "unknown" : error.getMessage());
+                if (sourceUri != null) ret.put("sourceUri", sourceUri);
+                call.resolve(ret);
+            }
+        });
+    }
+
     private void persistVideoPath(String absolutePath) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         prefs.edit().putString(KEY_VIDEO_PATH, absolutePath).commit();
