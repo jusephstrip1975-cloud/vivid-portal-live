@@ -93,13 +93,16 @@ public final class WallpaperVideoTranscoder {
                 + " inputBytes=" + input.length());
 
             MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(input));
+            final int targetHeight = inputStats.height > 0
+                ? Math.min(inputStats.height, SAFE_OUTPUT_HEIGHT)
+                : SAFE_OUTPUT_HEIGHT;
             // Preserve original timestamps/cadence. Do NOT request a fixed output
             // frame rate here: Media3 may duplicate/drop frames to satisfy the
             // request. We only cap resolution for Samsung decoder compatibility.
             EditedMediaItem editedMediaItem = new EditedMediaItem.Builder(mediaItem)
                 .setEffects(new Effects(
                     Collections.emptyList(),
-                    Collections.singletonList(Presentation.createForHeight(SAFE_OUTPUT_HEIGHT))))
+                    Collections.singletonList(Presentation.createForHeight(targetHeight))))
                 .build();
             Log.i(TAG, "Transcoder frameRateMode=PRESERVE_SOURCE_TIMESTAMPS noFrameRateOverride=true sourceFps="
                 + inputStats.fps);
@@ -189,7 +192,7 @@ public final class WallpaperVideoTranscoder {
 
             Log.i(TAG, "Transformer.start input=" + input.getAbsolutePath()
                 + " output=" + output.getAbsolutePath()
-                + " targetHeight=" + SAFE_OUTPUT_HEIGHT
+                + " targetHeight=" + targetHeight
                 + " targetBitrate=" + targetBitrate
                 + " fpsMode=preserve-source-timestamps");
             currentTransformer = transformer;
