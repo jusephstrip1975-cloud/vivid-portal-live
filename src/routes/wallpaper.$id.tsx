@@ -167,7 +167,7 @@ function WallpaperDetail() {
         <div className="absolute inset-0 bg-gradient-to-b from-space-black/40 via-transparent to-space-black" />
 
         {/* Top bar */}
-        <div className="absolute inset-x-4 top-4 flex items-center justify-between">
+        <div className="absolute inset-x-4 flex items-center justify-between" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }}>
           <button
             type="button"
             onClick={() => router.history.back()}
