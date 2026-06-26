@@ -65,6 +65,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private boolean preserveFailedPathsOnNextStart = false;
+        private volatile boolean restoreInProgress = false;
         private final Handler main = new Handler(Looper.getMainLooper());
         private SharedPreferences prefs;
         private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
@@ -187,6 +188,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
                         expectedCurrent = getCurrentWallpaperFile();
                         logServicePath("startPlayer-after-restore", path, expectedCurrent);
+                    } else if (scheduleRestoreFromLastSource("service-startPlayer", expectedCurrent)) {
+                        paintLoading("Cargando vídeo...");
+                        return;
                     }
                 }
                 if (path == null || !path.equals(currentPath) || version != currentVersion) {
@@ -374,7 +378,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     + " lastValidSize=" + (lastValid.exists() ? lastValid.length() : -1));
                 if (!lastValid.exists() || !lastValid.canRead() || lastValid.length() <= MIN_VALID_VIDEO_BYTES) {
                     Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=last-valid-unusable stage=" + stage);
-                    return attemptRestoreFromLastSource(stage, current);
+                    return false;
                 }
                 copyFile(lastValid, current);
                 if (!current.exists() || !current.canRead() || current.length() <= MIN_VALID_VIDEO_BYTES) {
@@ -408,6 +412,35 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED stage=" + stage, t);
                 return false;
             }
+        }
+
+        private boolean scheduleRestoreFromLastSource(String stage, File current) {
+            if (restoreInProgress) {
+                Log.w(TAG, "CURRENT_MP4_RESTORE_SKIPPED reason=already-running stage=" + stage);
+                return true;
+            }
+            if (prefs == null) return false;
+            String sourceUrl = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URL, null);
+            String sourceUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URI, null);
+            if ((sourceUrl == null || sourceUrl.isEmpty()) && (sourceUri == null || sourceUri.isEmpty())) {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=no-last-download-or-uri stage=" + stage);
+                return false;
+            }
+            restoreInProgress = true;
+            File target = current;
+            new Thread(() -> {
+                boolean restored = attemptRestoreFromLastSource(stage, target);
+                restoreInProgress = false;
+                main.post(() -> {
+                    if (restored) {
+                        releasePlayer();
+                        startPlayer();
+                    } else {
+                        paintMessage("Archivo de wallpaper no encontrado");
+                    }
+                });
+            }).start();
+            return true;
         }
 
         private boolean attemptRestoreFromLastSource(String stage, File current) {
