@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
+import { WallpaperDiagnosticPanel } from "@/components/WallpaperDiagnosticPanel";
 import {
   applyPickedVideo,
   isNative,
@@ -177,6 +178,7 @@ function HomePage() {
             {pickToast}
           </div>
         )}
+        <WallpaperDiagnosticPanel />
       </section>
 
 

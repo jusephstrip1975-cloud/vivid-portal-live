@@ -1,15 +1,15 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.aetherx.localfinal"
+    namespace = "com.aetherx.livewallpaper"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.aetherx.livewallpaper"
-        setProperty("archivesBaseName", "aetherx")
+        setProperty("archivesBaseName", "AETHERX")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 200
-        versionName "2.0.0"
+        versionCode 201
+        versionName "2.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
@@ -43,7 +43,11 @@ android {
         }
         debug {
             minifyEnabled false
-            debuggable true
+            debuggable false
+            def ksFile = file(System.getenv("AETHERX_KEYSTORE_PATH") ?: "release.keystore")
+            if (ksFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
@@ -101,7 +105,7 @@ try {
 tasks.register('verifyAetherXLiveWallpaperSetup') {
     doLast {
         def manifest = file("$projectDir/src/main/AndroidManifest.xml").getText('UTF-8')
-        if (!manifest.contains('com.aetherx.localfinal.wallpaper.AetherXLiveWallpaperService')) {
+        if (!manifest.contains('com.aetherx.livewallpaper.wallpaper.AetherXLiveWallpaperService')) {
             throw new GradleException('AetherXLiveWallpaperService must be declared in AndroidManifest.xml')
         }
         if (!manifest.contains('android.permission.BIND_WALLPAPER')) {
@@ -110,8 +114,8 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
         if (!manifest.contains('android.service.wallpaper.WallpaperService')) {
             throw new GradleException('Live wallpaper service must declare WallpaperService intent-filter')
         }
-        def service = file("$projectDir/src/main/java/com/aetherx/localfinal/wallpaper/AetherXLiveWallpaperService.java")
-        def plugin = file("$projectDir/src/main/java/com/aetherx/localfinal/wallpaper/AetherXLiveWallpaperPlugin.java")
+        def service = file("$projectDir/src/main/java/com/aetherx/livewallpaper/wallpaper/AetherXLiveWallpaperService.java")
+        def plugin = file("$projectDir/src/main/java/com/aetherx/livewallpaper/wallpaper/AetherXLiveWallpaperPlugin.java")
         if (!service.exists()) throw new GradleException('Missing AetherXLiveWallpaperService.java')
         if (!plugin.exists()) throw new GradleException('Missing AetherXLiveWallpaperPlugin.java')
     }
