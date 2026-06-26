@@ -281,9 +281,28 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     private void persistVideoPath(String absolutePath) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        prefs.edit().putString(KEY_VIDEO_PATH, absolutePath).commit();
-        Log.i(TAG, "persistVideoPath savedWallpaperVideo=" + absolutePath
+        String previous = prefs.getString(KEY_VIDEO_PATH, null);
+        long version = prefs.getLong(KEY_VIDEO_VERSION, 0L) + 1L;
+        prefs.edit()
+            .putString(KEY_VIDEO_PATH, absolutePath)
+            .putLong(KEY_VIDEO_VERSION, version)
+            .commit();
+        Log.i(TAG, "persistVideoPath previous=" + previous
+            + " new=" + absolutePath
+            + " version=" + version
             + " verifyRead=" + prefs.getString(KEY_VIDEO_PATH, null));
+        // Best-effort: delete the previously persisted file so the old asset
+        // cannot be reopened by any cached decoder/MediaPlayer.
+        if (previous != null && !previous.equals(absolutePath)) {
+            try {
+                File old = new File(previous);
+                if (old.exists() && old.delete()) {
+                    Log.i(TAG, "Deleted previous wallpaper file=" + previous);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Could not delete previous wallpaper file: " + t.getMessage());
+            }
+        }
     }
 
     private void persistVideoUri(String uri) {
