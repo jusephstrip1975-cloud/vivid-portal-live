@@ -330,7 +330,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " reason=mediaplayer-prepare-failed will_try_transcoder=true path=" + input.getAbsolutePath());
         Log.i(TAG, "TRANSCODE_START wallpaperId=" + wallpaperId
             + " input=" + input.getAbsolutePath()
-            + " mode=single_safe_conversion noAggressivePass=true noSecondPass=true noFpsForcing=true");
+            + " mode=single_safe_conversion singlePassOnly=true noFpsForcing=true");
         WallpaperVideoTranscoder.transcode(getContext(), input, new WallpaperVideoTranscoder.Callback() {
             @Override
             public void onSuccess(File output) {
