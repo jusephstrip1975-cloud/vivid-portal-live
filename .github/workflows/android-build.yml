@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   build-release:
     runs-on: ubuntu-latest
@@ -36,6 +40,18 @@ jobs:
           rm -rf android/.gradle android/app/build android/build node_modules/.cache public/dist dist .capacitor android/app/src/main/assets/public
           rm -rf ~/.gradle/caches ~/.gradle/daemon ~/.gradle/native ~/.gradle/wrapper/dists
           echo "TOTAL_ANDROID_CLEAN_OK"
+
+      - name: Delete previous AETHERX artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate repos/${{ github.repository }}/actions/artifacts --jq '.artifacts[] | select(.name | startswith("AETHERX")) | .id' \
+            | while read -r artifact_id; do
+                if [ -n "$artifact_id" ]; then
+                  gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/$artifact_id
+                  echo "Deleted previous AETHERX artifact id=$artifact_id"
+                fi
+              done
 
       - name: Install dependencies
         run: npm install
