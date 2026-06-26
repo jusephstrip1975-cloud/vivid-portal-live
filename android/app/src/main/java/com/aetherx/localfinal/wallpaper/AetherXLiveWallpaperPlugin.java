@@ -79,11 +79,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 fos.write(data);
             }
             Log.i(TAG, "saveVideo wrote bytes=" + outFile.length() + " path=" + outFile.getAbsolutePath());
-            persistVideoPath(outFile.getAbsolutePath());
-            JSObject ret = new JSObject();
-            ret.put("path", outFile.getAbsolutePath());
-            ret.put("bytes", outFile.length());
-            call.resolve(ret);
+            transcodeAndResolve(outFile, call);
         } catch (Exception e) {
             Log.e(TAG, "saveVideo failed", e);
             call.reject("save-failed: " + e.getMessage(), e);
