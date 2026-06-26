@@ -18,6 +18,7 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
 import android.view.Surface;
@@ -409,6 +410,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             if (prefs == null) return false;
             String sourceUrl = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URL, null);
             String sourceUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URI, null);
+            PowerManager.WakeLock wakeLock = acquireShortWakeLock("serviceRestoreFromLastSource");
             try {
                 if (sourceUrl != null && !sourceUrl.isEmpty()) {
                     Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_DOWNLOAD stage=" + stage
@@ -453,6 +455,33 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             } catch (Throwable t) {
                 Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED source=last-download-or-uri stage=" + stage, t);
                 return false;
+            } finally {
+                releaseWakeLock(wakeLock, "serviceRestoreFromLastSource");
+            }
+        }
+
+        private PowerManager.WakeLock acquireShortWakeLock(String stage) {
+            try {
+                PowerManager pm = (PowerManager) getApplicationContext().getSystemService(Context.POWER_SERVICE);
+                if (pm == null) return null;
+                PowerManager.WakeLock wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AetherX:WallpaperServiceRestore");
+                wakeLock.setReferenceCounted(false);
+                wakeLock.acquire(2 * 60 * 1000L);
+                Log.i(TAG, "WAKE_LOCK_ACQUIRED stage=" + stage);
+                return wakeLock;
+            } catch (Throwable t) {
+                Log.w(TAG, "WAKE_LOCK_ACQUIRE_FAILED stage=" + stage + " err=" + t.getMessage());
+                return null;
+            }
+        }
+
+        private void releaseWakeLock(PowerManager.WakeLock wakeLock, String stage) {
+            if (wakeLock == null) return;
+            try {
+                if (wakeLock.isHeld()) wakeLock.release();
+                Log.i(TAG, "WAKE_LOCK_RELEASED stage=" + stage);
+            } catch (Throwable t) {
+                Log.w(TAG, "WAKE_LOCK_RELEASE_FAILED stage=" + stage + " err=" + t.getMessage());
             }
         }
 
