@@ -69,7 +69,7 @@ public final class WallpaperVideoTranscoder {
 
     private static void runOnMain(final Context context, final File input, final Callback cb) {
         try {
-            File outDir = getConvertedDir(context);
+            getConvertedDir(context);
             final File output = buildUniqueOutput(context);
             final VideoStats inputStats = readVideoStats(context, input);
             logVideoStats("TRANSCODER_INPUT", input, inputStats);
@@ -294,7 +294,7 @@ public final class WallpaperVideoTranscoder {
                     stats.level = getInteger(format, "level");
                     stats.colorFormat = getInteger(format, "color-format");
                     extractor.selectTrack(i);
-                    stats.videoSampleReadable = extractor.readSampleData(java.nio.ByteBuffer.allocate(1), 0) >= 0;
+                    stats.videoSampleReadable = extractor.readSampleData(java.nio.ByteBuffer.allocate(16 * 1024), 0) >= 0;
                     extractor.unselectTrack(i);
                 } else if (mime != null && mime.startsWith("audio/")) {
                     stats.hasAudio = true;
