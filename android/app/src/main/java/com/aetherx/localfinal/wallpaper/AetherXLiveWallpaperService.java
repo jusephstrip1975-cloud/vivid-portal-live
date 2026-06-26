@@ -57,6 +57,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private String currentPath;
         private long currentVersion = -1L;
         private String rendererUsed = "NONE";
+        private boolean triedOriginalFallback = false;
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
