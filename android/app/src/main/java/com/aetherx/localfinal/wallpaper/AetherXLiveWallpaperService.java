@@ -176,6 +176,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
                 Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
                     + " new=" + path + " newVersion=" + version + " savedUri=" + savedUri);
+                if (path == null || !path.equals(currentPath) || version != currentVersion) {
+                    triedOriginalFallback = false;
+                }
                 currentPath = path;
                 currentVersion = version;
 
