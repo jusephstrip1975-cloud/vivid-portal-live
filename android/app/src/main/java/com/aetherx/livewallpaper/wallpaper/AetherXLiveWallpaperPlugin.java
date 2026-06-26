@@ -367,9 +367,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private void openLivePicker(PluginCall call) {
         try {
             File current = getCurrentWallpaperFile();
-            String persisted = getContext()
+            SharedPreferences prefs = getContext()
                 .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getString(KEY_VIDEO_PATH, null);
+            ;
+            String persisted = prefs.getString(KEY_VIDEO_PATH, null);
             Log.i(TAG, "openLivePicker VIDEO_PATH=" + persisted
                 + " CURRENT_EXPECTED=" + current.getAbsolutePath()
                 + " FILE_EXISTS=" + current.exists()
@@ -377,59 +378,58 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 + " FILE_SIZE=" + (current.exists() ? current.length() : -1)
                 + " ABSOLUTE_PATH=" + current.getAbsolutePath());
 
-            ValidationResult validation = validateCurrentMp4ForPlayback("openLivePicker");
-            if (!validation.ok) {
-                String restoreReason = validation.reason;
-                Log.w(TAG, "openLivePicker attempting async restore reason=" + restoreReason);
-                new Thread(() -> {
-                    boolean restored = attemptRestoreCurrentMp4("openLivePicker:" + restoreReason);
-                    new Handler(Looper.getMainLooper()).post(() -> {
-                        if (restored) {
-                            openLivePicker(call);
-                        } else {
-                            File retryCurrent = getCurrentWallpaperFile();
-                            Log.i(TAG, "CURRENT_MP4_EXISTS=" + retryCurrent.exists() + " PATH=" + retryCurrent.getAbsolutePath());
-                            Log.i(TAG, "CURRENT_MP4_CAN_READ=" + retryCurrent.canRead() + " PATH=" + retryCurrent.getAbsolutePath());
-                            Log.e(TAG, "CURRENT_MP4_MISSING reason=" + restoreReason
-                                + " path=" + retryCurrent.getAbsolutePath()
-                                + " exists=" + retryCurrent.exists()
-                                + " canRead=" + retryCurrent.canRead()
-                                + " size=" + (retryCurrent.exists() ? retryCurrent.length() : -1));
-                            call.reject("Archivo de wallpaper no encontrado: " + restoreReason);
-                        }
-                    });
-                }).start();
-                return;
-            }
-            Log.i(TAG, "CURRENT_MP4_EXISTS=" + current.exists() + " PATH=" + current.getAbsolutePath());
-            Log.i(TAG, "CURRENT_MP4_CAN_READ=" + current.canRead() + " PATH=" + current.getAbsolutePath());
-
-            ComponentName comp = new ComponentName(
-                getContext().getPackageName(),
-                AetherXLiveWallpaperService.class.getName()
-            );
-            Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
-            intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, comp);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            Log.i(TAG, "WALLPAPER_OPEN_DELAY ms=500 PATH=" + current.getAbsolutePath());
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                try {
-                    getContext().startActivity(intent);
-                    JSObject ret = new JSObject();
-                    ret.put("applied", false);
-                    ret.put("openedPicker", true);
-                    ret.put("needsConfirmation", true);
-                    ret.put("opened", true);
-                    call.resolve(ret);
-                } catch (Exception e) {
-                    Log.e(TAG, "open-picker-failed-delayed", e);
-                    call.reject("open-picker-failed: " + e.getMessage(), e);
-                }
-            }, 500L);
+            openLivePickerForFinalPath(call, persisted);
         } catch (Exception e) {
+            setLastError("open-picker-failed: " + e.getMessage());
+            setOpenPickerCalled(false);
             Log.e(TAG, "open-picker-failed", e);
             call.reject("open-picker-failed: " + e.getMessage(), e);
         }
+    }
+
+    private void openLivePickerForFinalPath(PluginCall call, String finalPath) {
+        File current = getCurrentWallpaperFile();
+        ValidationResult validation = validateFinalPathBeforePicker(finalPath, "before-intent");
+        if (!validation.ok) {
+            rejectPickerNotReady(call, finalPath, validation.reason);
+            return;
+        }
+
+        Log.i(TAG, "CURRENT_MP4_EXISTS=" + current.exists() + " PATH=" + current.getAbsolutePath());
+        Log.i(TAG, "CURRENT_MP4_CAN_READ=" + current.canRead() + " PATH=" + current.getAbsolutePath());
+
+        ComponentName comp = new ComponentName(
+            getContext().getPackageName(),
+            AetherXLiveWallpaperService.class.getName()
+        );
+        Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+        intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, comp);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Log.i(TAG, "WALLPAPER_OPEN_DELAY ms=500 PATH=" + finalPath);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            try {
+                ValidationResult delayedValidation = validateFinalPathBeforePicker(finalPath, "after-500ms-delay");
+                if (!delayedValidation.ok) {
+                    rejectPickerNotReady(call, finalPath, delayedValidation.reason);
+                    return;
+                }
+                setOpenPickerCalled(true);
+                getContext().startActivity(intent);
+                JSObject ret = new JSObject();
+                ret.put("applied", false);
+                ret.put("openedPicker", true);
+                ret.put("needsConfirmation", true);
+                ret.put("opened", true);
+                ret.put("path", finalPath);
+                ret.put("bytes", new File(finalPath).length());
+                call.resolve(ret);
+            } catch (Exception e) {
+                setLastError("open-picker-failed: " + e.getMessage());
+                setOpenPickerCalled(false);
+                Log.e(TAG, "open-picker-failed-delayed", e);
+                call.reject("open-picker-failed: " + e.getMessage(), e);
+            }
+        }, 500L);
     }
 
     @PluginMethod
