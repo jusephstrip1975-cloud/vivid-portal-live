@@ -305,12 +305,16 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.setLooping(true);
                 fallbackPlayer.setVolume(0f, 0f);
                 fallbackPlayer.setOnErrorListener((mp, what, extra) -> {
-                    Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra);
+                    Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra
+                        + " currentPath=" + currentPath + " triedOriginal=" + triedOriginalFallback);
+                    if (!triedOriginalFallback && tryOriginalFallback()) {
+                        return true;
+                    }
                     if (ENABLE_CANVAS_EMERGENCY_FALLBACK) {
                         Log.w(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED switchingTo=CANVAS_FALLBACK");
                         main.post(() -> startCanvasFrameFallback(uri));
                     } else {
-                        Log.e(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED canvasFallbackDisabled=true");
+                        Log.e(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED canvasFallbackDisabled=true noOriginalFallbackAvailable=true");
                         main.post(() -> paintMessage("Vídeo no soportado por el dispositivo"));
                     }
                     return true;
