@@ -59,6 +59,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private boolean visible = false;
         private final Set<String> failedPlaybackPaths = new HashSet<>();
         private boolean preserveFailedPathsOnNextStart = false;
+        private boolean serviceTranscodeAttempted = false;
         private final Handler main = new Handler(Looper.getMainLooper());
         private SharedPreferences prefs;
         private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
@@ -177,6 +178,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         preserveFailedPathsOnNextStart = false;
                     } else {
                         failedPlaybackPaths.clear();
+                        serviceTranscodeAttempted = false;
                     }
                 }
                 currentPath = path;
@@ -424,6 +426,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     + " error=" + (error == null ? "none" : error.getMessage()));
                 String next = chooseAlternatePath(original, converted);
                 if (next == null) {
+                    if (tryServiceTranscodeOnce(original, converted, reason)) return;
                     paintMessage("Vídeo no soportado por el dispositivo");
                     return;
                 }
@@ -442,6 +445,47 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.e(TAG, "tryAlternateOrFatal failed", t);
                 paintMessage("Vídeo no soportado por el dispositivo");
             }
+        }
+
+        private boolean tryServiceTranscodeOnce(String original, String converted, String reason) {
+            if (serviceTranscodeAttempted || original == null) return false;
+            if (converted != null && failedPlaybackPaths.contains(converted)) return false;
+            File source = new File(original);
+            if (!source.exists() || source.length() <= 0 || !source.canRead()) return false;
+            serviceTranscodeAttempted = true;
+            paintLoading("Preparando wallpaper...");
+            Log.i(TAG, "TRANSCODE_STARTED reason=service-rescue original=" + original
+                + " previousConverted=" + converted
+                + " trigger=" + reason);
+            WallpaperVideoTranscoder.transcode(getApplicationContext(), source, new WallpaperVideoTranscoder.Callback() {
+                @Override
+                public void onSuccess(File output) {
+                    main.post(() -> {
+                        Log.i(TAG, "TRANSCODE_SUCCESS reason=service-rescue output=" + output.getAbsolutePath()
+                            + " bytes=" + output.length());
+                        long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
+                        preserveFailedPathsOnNextStart = true;
+                        prefs.edit()
+                            .putString(AetherXLiveWallpaperPlugin.KEY_CONVERTED_PATH, output.getAbsolutePath())
+                            .putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, output.getAbsolutePath())
+                            .putLong("video_updated_at", System.currentTimeMillis())
+                            .putLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, version)
+                            .commit();
+                        Log.i(TAG, "USING_CONVERTED reason=service-rescue path=" + output.getAbsolutePath());
+                        releasePlayer();
+                        startPlayer();
+                    });
+                }
+
+                @Override
+                public void onFailure(Exception error) {
+                    main.post(() -> {
+                        Log.e(TAG, "TRANSCODE_FAILED reason=service-rescue fatalIfNoAlternate=true", error);
+                        paintMessage("Vídeo no soportado por el dispositivo");
+                    });
+                }
+            });
+            return true;
         }
 
         private String chooseAlternatePath(String original, String converted) {
