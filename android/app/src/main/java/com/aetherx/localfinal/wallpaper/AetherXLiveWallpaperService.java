@@ -169,10 +169,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
                 }
                 String path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
+                String originalPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_ORIGINAL_PATH, null);
+                String convertedPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_CONVERTED_PATH, null);
                 String savedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
                 Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
-                    + " new=" + path + " newVersion=" + version + " savedUri=" + savedUri);
+                    + " new=" + path + " newVersion=" + version + " savedUri=" + savedUri
+                    + " originalPath=" + originalPath + " convertedPath=" + convertedPath);
                 if (path == null || !path.equals(currentPath) || version != currentVersion) {
                     if (preserveFailedPathsOnNextStart) {
                         preserveFailedPathsOnNextStart = false;
@@ -188,8 +191,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     paintMessage("Guarda el vídeo otra vez en la app");
                     return;
                 }
-                File convertedOutput = new File(path);
-                if (!convertedOutput.exists() || convertedOutput.length() <= 0 || !convertedOutput.canRead()) {
+                File selectedOutput = new File(path);
+                if (!selectedOutput.exists() || selectedOutput.length() <= 0 || !selectedOutput.canRead()) {
                     Log.w(TAG, "Persisted wallpaper file missing or unreadable: " + path);
                     paintMessage("Guarda el vídeo otra vez en la app");
                     return;
@@ -236,7 +239,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     + " playable=" + stats.playable
                     + " rendererCandidate=MediaPlayer playbackSpeed=1.0 droppedFrames=unavailable"
                     + " uri=" + uri);
-                Log.i(TAG, "RENDERER_USED=PREPARING_NATIVE preferred=MEDIAPLAYER_SAMSUNG exoFallback=true canvasFallback=false originalPlaybackAllowed=true");
+                Log.i(TAG, "RENDERER_USED=PREPARING_NATIVE preferred=MEDIAPLAYER_SAMSUNG exoFallback=true canvasFallback=false originalPlaybackAllowed=true playbackOrder=MediaPlayerOriginal_ExoOriginal_MediaPlayerConverted_ExoConverted");
                 Log.i(TAG, "MediaPlayer primary media item=" + uri + " size=" + sizeForLog);
                 lastUri = uri;
                 startMediaPlayerFallback(uri);
@@ -276,7 +279,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.setOnErrorListener((mp, what, extra) -> {
                     Log.e(TAG, "MEDIAPLAYER_FAILED what=" + what + " extra=" + extra
                         + " currentPath=" + currentPath);
-                    Log.w(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED switchingTo=EXOPLAYER_FALLBACK");
+                    Log.w(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED switchingTo=EXOPLAYER_SAME_FILE");
                     main.post(() -> startExoPlayerFallback(uri));
                     return true;
                 });
@@ -431,7 +434,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     return;
                 }
                 Log.i(TAG, (next.equals(original) ? "USING_ORIGINAL" : "USING_CONVERTED")
-                    + " reason=renderer-fallback source=" + next);
+                    + " reason=renderer-fallback source=" + next
+                    + " order=MediaPlayerOriginal_ExoOriginal_MediaPlayerConverted_ExoConverted");
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
                 preserveFailedPathsOnNextStart = true;
                 prefs.edit()
@@ -454,14 +458,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             if (!source.exists() || source.length() <= 0 || !source.canRead()) return false;
             serviceTranscodeAttempted = true;
             paintLoading("Preparando wallpaper...");
-            Log.i(TAG, "TRANSCODE_STARTED reason=service-rescue original=" + original
+            Log.i(TAG, "TRANSCODE_START reason=service-rescue original=" + original
                 + " previousConverted=" + converted
-                + " trigger=" + reason);
+                + " trigger=" + reason
+                + " mode=single_safe_conversion noAggressivePass=true noSecondPass=true");
             WallpaperVideoTranscoder.transcode(getApplicationContext(), source, new WallpaperVideoTranscoder.Callback() {
                 @Override
                 public void onSuccess(File output) {
                     main.post(() -> {
-                        Log.i(TAG, "TRANSCODE_SUCCESS reason=service-rescue output=" + output.getAbsolutePath()
+                        Log.i(TAG, "TRANSCODE_OK reason=service-rescue output=" + output.getAbsolutePath()
                             + " bytes=" + output.length());
                         long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
                         preserveFailedPathsOnNextStart = true;
