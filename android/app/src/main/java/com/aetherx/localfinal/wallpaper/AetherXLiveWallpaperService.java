@@ -427,7 +427,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 }
                 automaticReconvertAttempts++;
                 Log.w(TAG, "RECONVERT_REQUEST_FROM_SERVICE originalPlayback=false source=" + original);
-                WallpaperVideoTranscoder.transcode(getApplicationContext(), f, new WallpaperVideoTranscoder.Callback() {
+                WallpaperVideoTranscoder.transcodeAggressive(getApplicationContext(), f, new WallpaperVideoTranscoder.Callback() {
                     @Override
                     public void onSuccess(File output) {
                         main.post(() -> {
