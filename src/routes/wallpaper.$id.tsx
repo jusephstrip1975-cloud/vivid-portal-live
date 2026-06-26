@@ -324,7 +324,7 @@ function humanizeWallpaperError(err: unknown): string {
   if (r.includes("codec-not-h264") || r.includes("decoder") || r.includes("unsupported"))
     return "Samsung rechazó el decoder de este vídeo.";
   if (r.includes("transcode-failed"))
-    return "Transcoder falló tras pase agresivo. Prueba otro fondo.";
+    return "El conversor falló, pero la app intentará usar el vídeo original.";
   if (r.includes("permission") || r.includes("denied"))
     return "Permiso denegado por Android para aplicar el fondo.";
   if (r.includes("path") && (r.includes("empty") || r.includes("missing") || r.includes("null")))

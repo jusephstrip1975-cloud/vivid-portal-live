@@ -7,6 +7,8 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.media.MediaMetadataRetriever;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
@@ -36,9 +38,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String PREFS = "aetherx_live_wallpaper";
     public static final String KEY_VIDEO_PATH = "video_path";
     public static final String KEY_ORIGINAL_PATH = "original_path";
+    public static final String KEY_CONVERTED_PATH = "converted_path";
     public static final String KEY_VIDEO_URI = "video_uri";
     public static final String KEY_VIDEO_VERSION = "video_version";
     private static final int MAX_REDIRECTS = 5;
+    private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
 
     @PluginMethod
     public void saveVideoFromUrl(final PluginCall call) {
@@ -60,13 +64,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     + " downloadedBytes=" + bytes
                     + " exists=" + outFile.exists() + " size=" + outFile.length()
                     + " canRead=" + outFile.canRead());
-                if (!outFile.exists() || outFile.length() < 4096) {
+                if (!outFile.exists() || outFile.length() < MIN_VALID_VIDEO_BYTES) {
                     Log.e(TAG, "saveVideoFromUrl wallpaperId=" + wallpaperId
                         + " file-too-small size=" + outFile.length());
                     call.reject("empty-download: file-too-small size=" + outFile.length());
                     return;
                 }
-                transcodeAndResolve(outFile, call);
+                transcodeAndResolve(outFile, call, null, wallpaperId);
             } catch (Exception e) {
                 Log.e(TAG, "saveVideoFromUrl failed wallpaperId=" + wallpaperId, e);
                 call.reject("download-failed: " + e.getMessage(), e);
@@ -90,7 +94,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 fos.write(data);
             }
             Log.i(TAG, "saveVideo wrote bytes=" + outFile.length() + " path=" + outFile.getAbsolutePath());
-            transcodeAndResolve(outFile, call);
+            transcodeAndResolve(outFile, call, null, fileName);
         } catch (Exception e) {
             Log.e(TAG, "saveVideo failed", e);
             call.reject("save-failed: " + e.getMessage(), e);
@@ -148,7 +152,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             Log.i(TAG, "Copied picked video bytes=" + total + " to=" + outFile.getAbsolutePath()
                 + " exists=" + outFile.exists() + " canRead=" + outFile.canRead());
             persistVideoUri(uri.toString());
-            transcodeAndResolve(outFile, call, uri.toString());
+            transcodeAndResolve(outFile, call, uri.toString(), fileName);
         } catch (Exception e) {
             Log.e(TAG, "pick-video-failed", e);
             call.reject("pick-video-failed: " + e.getMessage(), e);
@@ -206,6 +210,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String path = prefs.getString(KEY_VIDEO_PATH, null);
         String original = prefs.getString(KEY_ORIGINAL_PATH, null);
+        String converted = prefs.getString(KEY_CONVERTED_PATH, null);
         String uri = prefs.getString(KEY_VIDEO_URI, null);
         String lastError = prefs.getString("last_transcode_error", null);
         long version = prefs.getLong(KEY_VIDEO_VERSION, 0L);
@@ -227,10 +232,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " exists=" + exists + " size=" + size + " canRead=" + canRead
             + " fdOk=" + fdOk + " fdErr=" + fdErr
             + " version=" + version + " updatedAt=" + updatedAt
-            + " originalSource=" + original + " lastTranscodeError=" + lastError);
+            + " originalSource=" + original
+            + " convertedCandidate=" + converted
+            + " lastTranscodeError=" + lastError);
         JSObject ret = new JSObject();
         ret.put("savedPath", path);
         ret.put("originalSourcePath", original);
+        ret.put("convertedCandidatePath", converted);
         ret.put("savedUri", uri);
         ret.put("exists", exists);
         ret.put("size", size);
@@ -275,56 +283,194 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         return new File(dir, fileName);
     }
 
-    /** Transcode the downloaded MP4 to Samsung-friendly H.264/AAC. Original MP4 is never used as wallpaper. */
+    /**
+     * Production flow: use the original MP4 first. Transcoding is only a rescue
+     * path when Samsung's native MediaPlayer cannot prepare the original.
+     */
     private void transcodeAndResolve(final File input, final PluginCall call) {
-        transcodeAndResolve(input, call, null);
+        transcodeAndResolve(input, call, null, input == null ? "unknown" : input.getName());
     }
 
     private void transcodeAndResolve(final File input, final PluginCall call, final String sourceUri) {
+        transcodeAndResolve(input, call, sourceUri, input == null ? "unknown" : input.getName());
+    }
+
+    private void transcodeAndResolve(final File input, final PluginCall call, final String sourceUri, final String wallpaperId) {
         Log.i(TAG, "transcodeAndResolve start input=" + input.getAbsolutePath()
-            + " inputExists=" + input.exists() + " inputSize=" + input.length());
-        // Keep the original only as a private reconversion source. It is never
-        // persisted as KEY_VIDEO_PATH and never played by the WallpaperService.
+            + " inputExists=" + input.exists() + " inputSize=" + input.length()
+            + " wallpaperId=" + wallpaperId);
         persistOriginalPath(input.getAbsolutePath());
+
+        VideoProbe originalProbe = validateOriginalForPlayback(input, wallpaperId);
+        if (!originalProbe.ok) {
+            Log.e(TAG, "ORIGINAL_FAILED wallpaperId=" + wallpaperId
+                + " reason=" + originalProbe.reason
+                + " path=" + input.getAbsolutePath());
+            call.reject("video-corrupt: " + originalProbe.reason);
+            return;
+        }
+
+        if (canPrepareWithMediaPlayer(input, wallpaperId, "ORIGINAL")) {
+            Log.i(TAG, "ORIGINAL_OK wallpaperId=" + wallpaperId
+                + " durationMs=" + originalProbe.durationMs
+                + " bytes=" + input.length());
+            Log.i(TAG, "USING_ORIGINAL wallpaperId=" + wallpaperId
+                + " reason=mediaplayer-ok path=" + input.getAbsolutePath());
+            persistVideoPath(input.getAbsolutePath());
+            WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), input.getAbsolutePath());
+            resolveSaved(call, input, false, sourceUri, "original-mediaplayer-ok");
+            return;
+        }
+
+        Log.w(TAG, "ORIGINAL_FAILED wallpaperId=" + wallpaperId
+            + " reason=mediaplayer-prepare-failed will_try_transcoder=true path=" + input.getAbsolutePath());
+        Log.i(TAG, "TRANSCODE_STARTED wallpaperId=" + wallpaperId + " input=" + input.getAbsolutePath());
         WallpaperVideoTranscoder.transcode(getContext(), input, new WallpaperVideoTranscoder.Callback() {
             @Override
             public void onSuccess(File output) {
-                Log.i(TAG, "transcodeAndResolve onSuccess output=" + output.getAbsolutePath()
+                Log.i(TAG, "TRANSCODE_SUCCESS wallpaperId=" + wallpaperId
+                    + " output=" + output.getAbsolutePath()
                     + " outputExists=" + output.exists() + " outputSize=" + output.length());
-                persistVideoPath(output.getAbsolutePath());
-                WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), output.getAbsolutePath());
-                JSObject ret = new JSObject();
-                ret.put("path", output.getAbsolutePath());
-                ret.put("bytes", output.length());
-                ret.put("transcoded", true);
-                if (sourceUri != null) ret.put("sourceUri", sourceUri);
-                call.resolve(ret);
+                persistConvertedCandidate(output.getAbsolutePath());
+                if (canPrepareWithMediaPlayer(output, wallpaperId, "CONVERTED")) {
+                    Log.i(TAG, "USING_CONVERTED wallpaperId=" + wallpaperId
+                        + " reason=converted-mediaplayer-ok path=" + output.getAbsolutePath());
+                    persistVideoPath(output.getAbsolutePath());
+                    WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), output.getAbsolutePath());
+                    resolveSaved(call, output, true, sourceUri, "converted-mediaplayer-ok");
+                    return;
+                }
+                Log.e(TAG, "TRANSCODE_FAILED wallpaperId=" + wallpaperId
+                    + " reason=converted-mediaplayer-prepare-failed fallbackOriginal=true");
+                Log.i(TAG, "USING_ORIGINAL wallpaperId=" + wallpaperId
+                    + " reason=converted-failed-exoplayer-will-try path=" + input.getAbsolutePath());
+                persistVideoPath(input.getAbsolutePath());
+                resolveSaved(call, input, false, sourceUri, "original-after-converted-failed");
             }
 
             @Override
             public void onFailure(Exception error) {
-                Log.e(TAG, "Transcode failed after mandatory primary+aggressive passes; original playback disabled", error);
+                Log.e(TAG, "TRANSCODE_FAILED wallpaperId=" + wallpaperId
+                    + " fallbackOriginal=true", error);
                 SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
                 prefs.edit()
                     .putString("last_transcode_error", error.getMessage() == null ? "unknown" : error.getMessage())
                     .putLong("video_updated_at", System.currentTimeMillis())
                     .commit();
-                call.reject("transcode-failed-no-original-fallback: "
-                    + (error.getMessage() == null ? "unknown" : error.getMessage()), error);
+                Log.i(TAG, "USING_ORIGINAL wallpaperId=" + wallpaperId
+                    + " reason=transcode-failed-exoplayer-will-try path=" + input.getAbsolutePath());
+                persistVideoPath(input.getAbsolutePath());
+                WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), input.getAbsolutePath());
+                resolveSaved(call, input, false, sourceUri, "original-after-transcode-failed");
             }
         });
+    }
+
+    private void resolveSaved(PluginCall call, File file, boolean transcoded, String sourceUri, String reason) {
+        JSObject ret = new JSObject();
+        ret.put("path", file.getAbsolutePath());
+        ret.put("bytes", file.length());
+        ret.put("transcoded", transcoded);
+        ret.put("usingOriginal", !transcoded);
+        ret.put("reason", reason);
+        if (sourceUri != null) ret.put("sourceUri", sourceUri);
+        call.resolve(ret);
+    }
+
+    private VideoProbe validateOriginalForPlayback(File file, String wallpaperId) {
+        if (file == null || !file.exists()) return VideoProbe.fail("file-missing");
+        if (!file.canRead()) return VideoProbe.fail("file-not-readable");
+        if (file.length() < MIN_VALID_VIDEO_BYTES) return VideoProbe.fail("file-too-small:" + file.length());
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(getContext(), Uri.fromFile(file));
+            long durationMs = parseLong(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
+            int width = parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+            int height = parseInt(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+            Log.i(TAG, "ORIGINAL_METADATA wallpaperId=" + wallpaperId
+                + " durationMs=" + durationMs
+                + " size=" + width + "x" + height
+                + " bytes=" + file.length()
+                + " path=" + file.getAbsolutePath());
+            if (durationMs <= 0L) return VideoProbe.fail("duration-zero");
+            return VideoProbe.ok(durationMs);
+        } catch (Throwable t) {
+            Log.e(TAG, "ORIGINAL_METADATA_FAILED wallpaperId=" + wallpaperId
+                + " path=" + file.getAbsolutePath(), t);
+            return VideoProbe.fail("metadata-unreadable:" + t.getMessage());
+        } finally {
+            try { retriever.release(); } catch (Throwable ignored) {}
+        }
+    }
+
+    private boolean canPrepareWithMediaPlayer(File file, String wallpaperId, String label) {
+        MediaPlayer mp = null;
+        try {
+            mp = new MediaPlayer();
+            mp.setDataSource(getContext(), Uri.fromFile(file));
+            mp.setVolume(0f, 0f);
+            mp.prepare();
+            Log.i(TAG, "MEDIAPLAYER_OK wallpaperId=" + wallpaperId
+                + " label=" + label
+                + " durationMs=" + mp.getDuration()
+                + " path=" + file.getAbsolutePath());
+            return true;
+        } catch (Throwable t) {
+            Log.e(TAG, "MEDIAPLAYER_FAILED wallpaperId=" + wallpaperId
+                + " label=" + label
+                + " path=" + (file == null ? "null" : file.getAbsolutePath()), t);
+            return false;
+        } finally {
+            if (mp != null) {
+                try { mp.release(); } catch (Throwable ignored) {}
+            }
+        }
+    }
+
+    private long parseLong(String value) {
+        try { return value == null ? 0L : Long.parseLong(value); }
+        catch (Throwable ignored) { return 0L; }
+    }
+
+    private int parseInt(String value) {
+        try { return value == null ? 0 : Integer.parseInt(value); }
+        catch (Throwable ignored) { return 0; }
+    }
+
+    private static final class VideoProbe {
+        final boolean ok;
+        final String reason;
+        final long durationMs;
+
+        private VideoProbe(boolean ok, String reason, long durationMs) {
+            this.ok = ok;
+            this.reason = reason;
+            this.durationMs = durationMs;
+        }
+
+        static VideoProbe ok(long durationMs) { return new VideoProbe(true, "ok", durationMs); }
+        static VideoProbe fail(String reason) { return new VideoProbe(false, reason, 0L); }
     }
 
     private void persistOriginalPath(String absolutePath) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String previousOriginal = prefs.getString(KEY_ORIGINAL_PATH, null);
+        String previousConverted = prefs.getString(KEY_CONVERTED_PATH, null);
         String currentVideo = prefs.getString(KEY_VIDEO_PATH, null);
-        prefs.edit().putString(KEY_ORIGINAL_PATH, absolutePath).commit();
-        Log.i(TAG, "persistOriginalPath=" + absolutePath);
+        prefs.edit()
+            .putString(KEY_ORIGINAL_PATH, absolutePath)
+            .remove(KEY_CONVERTED_PATH)
+            .commit();
+        Log.i(TAG, "persistOriginalPath=" + absolutePath + " clearedConvertedCandidate=true");
         if (previousOriginal != null
             && !previousOriginal.equals(absolutePath)
             && !previousOriginal.equals(currentVideo)) {
             deleteIfStale(previousOriginal, absolutePath, "previous-original-path");
+        }
+        if (previousConverted != null
+            && !previousConverted.equals(absolutePath)
+            && !previousConverted.equals(currentVideo)) {
+            deleteIfStale(previousConverted, absolutePath, "previous-converted-candidate");
         }
     }
 
@@ -343,7 +489,19 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " version=" + version
             + " verifyRead=" + prefs.getString(KEY_VIDEO_PATH, null));
         deleteIfStale(previous, absolutePath, "previous-video-path");
-        WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), absolutePath);
+        if (absolutePath.contains("/wallpapers/converted/")) {
+            WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), absolutePath);
+        }
+    }
+
+    private void persistConvertedCandidate(String absolutePath) {
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String previous = prefs.getString(KEY_CONVERTED_PATH, null);
+        prefs.edit().putString(KEY_CONVERTED_PATH, absolutePath).commit();
+        Log.i(TAG, "persistConvertedCandidate previous=" + previous + " new=" + absolutePath);
+        if (previous != null && !previous.equals(absolutePath)) {
+            deleteIfStale(previous, absolutePath, "previous-converted-candidate");
+        }
     }
 
     private void deleteIfStale(String candidate, String keep, String label) {
