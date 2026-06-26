@@ -45,6 +45,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_VIDEO_VERSION = "video_version";
     public static final String KEY_LAST_VALID_VIDEO_PATH = "last_valid_video_path";
     public static final String KEY_LAST_SOURCE_URI = "last_source_uri";
+    public static final String KEY_LAST_SOURCE_URL = "last_source_url";
 
     private static final int MAX_REDIRECTS = 5;
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
@@ -127,6 +128,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     + " absolute=" + current.getAbsolutePath());
 
                 current = commitValidatedCurrentMp4(current, wallpaperId, "download");
+                persistLastSourceUrl(url, wallpaperId);
                 resolveSaved(call, current, false, null, "current-mp4-persistent");
             } catch (Exception e) {
                 Log.e(TAG, "SAVE_FAILED wallpaperId=" + wallpaperId
@@ -535,6 +537,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             .commit();
         Log.i(TAG, "persistLastValidPath wallpaperId=" + wallpaperId
             + " KEY_LAST_VALID_VIDEO_PATH=" + prefs.getString(KEY_LAST_VALID_VIDEO_PATH, null));
+    }
+
+    private void persistLastSourceUrl(String url, String wallpaperId) {
+        if (url == null || url.isEmpty()) return;
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        prefs.edit()
+            .putString(KEY_LAST_SOURCE_URL, url)
+            .commit();
+        Log.i(TAG, "persistLastSourceUrl wallpaperId=" + wallpaperId + " hasUrl=true");
     }
 
     private void clearPersistedVideoPath() {
