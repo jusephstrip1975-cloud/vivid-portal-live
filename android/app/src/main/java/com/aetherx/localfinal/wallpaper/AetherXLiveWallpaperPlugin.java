@@ -308,22 +308,30 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
             ValidationResult validation = validateCurrentMp4ForPlayback("openLivePicker");
             if (!validation.ok) {
-                Log.w(TAG, "openLivePicker attempting restore reason=" + validation.reason);
-                if (attemptRestoreCurrentMp4("openLivePicker:" + validation.reason)) {
-                    validation = validateCurrentMp4ForPlayback("openLivePicker-after-restore");
-                }
+                String restoreReason = validation.reason;
+                Log.w(TAG, "openLivePicker attempting async restore reason=" + restoreReason);
+                new Thread(() -> {
+                    boolean restored = attemptRestoreCurrentMp4("openLivePicker:" + restoreReason);
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (restored) {
+                            openLivePicker(call);
+                        } else {
+                            File retryCurrent = getCurrentWallpaperFile();
+                            Log.i(TAG, "CURRENT_MP4_EXISTS=" + retryCurrent.exists() + " PATH=" + retryCurrent.getAbsolutePath());
+                            Log.i(TAG, "CURRENT_MP4_CAN_READ=" + retryCurrent.canRead() + " PATH=" + retryCurrent.getAbsolutePath());
+                            Log.e(TAG, "CURRENT_MP4_MISSING reason=" + restoreReason
+                                + " path=" + retryCurrent.getAbsolutePath()
+                                + " exists=" + retryCurrent.exists()
+                                + " canRead=" + retryCurrent.canRead()
+                                + " size=" + (retryCurrent.exists() ? retryCurrent.length() : -1));
+                            call.reject("Archivo de wallpaper no encontrado: " + restoreReason);
+                        }
+                    });
+                }).start();
+                return;
             }
             Log.i(TAG, "CURRENT_MP4_EXISTS=" + current.exists() + " PATH=" + current.getAbsolutePath());
             Log.i(TAG, "CURRENT_MP4_CAN_READ=" + current.canRead() + " PATH=" + current.getAbsolutePath());
-            if (!validation.ok) {
-                Log.e(TAG, "CURRENT_MP4_MISSING reason=" + validation.reason
-                    + " path=" + current.getAbsolutePath()
-                    + " exists=" + current.exists()
-                    + " canRead=" + current.canRead()
-                    + " size=" + (current.exists() ? current.length() : -1));
-                call.reject("Archivo de wallpaper no encontrado: " + validation.reason);
-                return;
-            }
 
             ComponentName comp = new ComponentName(
                 getContext().getPackageName(),
