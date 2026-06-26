@@ -518,9 +518,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private File getWallpaperDir() {
         File moviesDir = getContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES);
         if (moviesDir == null) {
-            File externalRoot = Environment.getExternalStorageDirectory();
-            moviesDir = new File(externalRoot, "Android/data/" + getContext().getPackageName() + "/files/Movies");
-            Log.w(TAG, "external-movies-dir-unavailable using-package-external-path=" + moviesDir.getAbsolutePath());
+            throw new IllegalStateException("external-movies-dir-unavailable");
         }
         File dir = new File(moviesDir, WALLPAPER_DIR);
         if (!dir.exists() && !dir.mkdirs()) {
