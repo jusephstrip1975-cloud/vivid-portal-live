@@ -877,114 +877,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " removed=" + removed);
     }
 
-    private void cleanLegacyInternalWallpaperDir(String stage) {
-        File legacyDir = new File(getContext().getFilesDir(), "wallpapers");
-        File[] files = legacyDir.listFiles();
-        if (files == null) return;
-        for (File file : files) {
-            deleteLegacyFileOrDir(file, "LEGACY_INTERNAL_CLEANUP " + stage);
-        }
-        boolean removed = legacyDir.delete();
-        Log.i(TAG, "LEGACY_INTERNAL_CLEANUP " + stage
-            + " dir=" + legacyDir.getAbsolutePath()
-            + " removed=" + removed);
-    }
-
-    private void deleteLegacyFileOrDir(File file, String label) {
-        if (file == null) return;
-        try {
-            File root = new File(getContext().getFilesDir(), "wallpapers");
-            String rootPath = root.getCanonicalPath();
-            String targetPath = file.getCanonicalPath();
-            if (!targetPath.startsWith(rootPath)) {
-                Log.w(TAG, label + " refused-outside-legacy-dir path=" + targetPath);
-                return;
-            }
-            if (file.isDirectory()) {
-                File[] inner = file.listFiles();
-                if (inner != null) {
-                    for (File child : inner) deleteLegacyFileOrDir(child, label + " nested");
-                }
-            }
-            boolean existed = file.exists();
-            long size = file.isFile() ? file.length() : -1;
-            boolean deleted = !existed || file.delete();
-            Log.i(TAG, label + " path=" + file.getAbsolutePath()
-                + " existed=" + existed
-                + " size=" + size
-                + " deleted=" + deleted);
-        } catch (Throwable t) {
-            Log.w(TAG, label + " failed path=" + file.getAbsolutePath() + " error=" + t.getMessage());
-        }
-    }
-
-    private boolean attemptRestoreCurrentMp4(String stage) {
-        File current = getCurrentWallpaperFile();
-        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        Log.w(TAG, "CURRENT_MP4_RESTORE_START stage=" + stage
-            + " current=" + current.getAbsolutePath()
-            + " currentExists=" + current.exists()
-            + " currentCanRead=" + current.canRead()
-            + " currentSize=" + (current.exists() ? current.length() : -1));
-        return attemptRestoreFromLastSource(stage, current, prefs);
-    }
-
-    private boolean attemptRestoreFromLastSource(String stage, File current, SharedPreferences prefs) {
-        String sourceUrl = prefs.getString(KEY_LAST_SOURCE_URL, null);
-        String sourceUri = prefs.getString(KEY_LAST_SOURCE_URI, null);
-        PowerManager.WakeLock wakeLock = acquireShortWakeLock("restoreFromLastSource");
-        try {
-            if (sourceUrl != null && !sourceUrl.isEmpty()) {
-                Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_DOWNLOAD stage=" + stage + " current=" + current.getAbsolutePath());
-                downloadFollowingRedirects(sourceUrl, current);
-            } else if (sourceUri != null && !sourceUri.isEmpty()) {
-                Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_CONTENT_URI stage=" + stage + " current=" + current.getAbsolutePath());
-                copyUriToFile(Uri.parse(sourceUri), current);
-            } else {
-                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=no-last-source stage=" + stage);
-                return false;
-            }
-            ValidationResult validation = validatePhysicalFileForPlayback(current, "restore-from-last-source", stage);
-            if (!validation.ok) {
-                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=" + validation.reason
-                    + " source=last-source current=" + current.getAbsolutePath());
-                return false;
-            }
-            persistCurrentPath(current, "restore-last-source-" + stage);
-            Log.i(TAG, "CURRENT_MP4_RECREATED stage=" + stage
-                + " source=last-download-or-uri"
-                + " PATH=" + current.getAbsolutePath()
-                + " EXISTS=" + current.exists()
-                + " CAN_READ=" + current.canRead()
-                + " SIZE=" + current.length()
-                + " ABSOLUTE_PATH=" + current.getAbsolutePath());
-            return true;
-        } catch (Throwable t) {
-            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED source=last-source stage=" + stage, t);
-            return false;
-        } finally {
-            releaseWakeLock(wakeLock, "restoreFromLastSource");
-        }
-    }
-
-    private void copyUriToFile(Uri uri, File to) throws Exception {
-        File parent = to.getParentFile();
-        if (parent != null && !parent.exists() && !parent.mkdirs()) {
-            throw new Exception("mkdirs-failed:" + parent.getAbsolutePath());
-        }
-        ContentResolver resolver = getContext().getContentResolver();
-        try (InputStream in = resolver.openInputStream(uri);
-             FileOutputStream out = new FileOutputStream(to, false)) {
-            if (in == null) throw new Exception("source-uri-open-failed");
-            byte[] buffer = new byte[16384];
-            int read;
-            while ((read = in.read(buffer)) > 0) {
-                out.write(buffer, 0, read);
-            }
-            out.getFD().sync();
-        }
-    }
-
     private PowerManager.WakeLock acquireShortWakeLock(String stage) {
         try {
             PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
@@ -1015,10 +907,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         try {
             int flags = data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
             getContext().getContentResolver().takePersistableUriPermission(uri, flags);
-            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putString(KEY_LAST_SOURCE_URI, uri.toString())
-                .commit();
             Log.i(TAG, "PERSISTABLE_URI_PERMISSION_OK uri=" + uri);
         } catch (Throwable t) {
             Log.w(TAG, "PERSISTABLE_URI_PERMISSION_FAILED uri=" + uri + " err=" + t.getMessage());
