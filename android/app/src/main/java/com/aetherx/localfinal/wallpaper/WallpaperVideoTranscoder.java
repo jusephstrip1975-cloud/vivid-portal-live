@@ -37,6 +37,7 @@ public final class WallpaperVideoTranscoder {
     private static final int SAFE_OUTPUT_HEIGHT = 720;
     private static final int SAFE_OUTPUT_FRAME_RATE = 30;
     private static final int SAFE_OUTPUT_BITRATE = 2_500_000;
+    private static Transformer currentTransformer;
 
     public interface Callback {
         void onSuccess(File output);
@@ -93,6 +94,7 @@ public final class WallpaperVideoTranscoder {
                     public void onCompleted(Composition composition, ExportResult exportResult) {
                         Log.i(TAG, "Transformer onCompleted output=" + output.getAbsolutePath()
                             + " size=" + (output.exists() ? output.length() : -1));
+                        currentTransformer = null;
                         cb.onSuccess(output);
                     }
 
@@ -100,6 +102,7 @@ public final class WallpaperVideoTranscoder {
                     public void onError(Composition composition, ExportResult exportResult, ExportException exportException) {
                         Log.e(TAG, "Transformer onError code=" + exportException.errorCode
                             + " name=" + exportException.getErrorCodeName(), exportException);
+                        currentTransformer = null;
                         cb.onFailure(exportException);
                     }
                 })
@@ -107,6 +110,7 @@ public final class WallpaperVideoTranscoder {
 
             Log.i(TAG, "Transformer.start input=" + input.getAbsolutePath()
                 + " output=" + output.getAbsolutePath());
+            currentTransformer = transformer;
             transformer.start(editedMediaItem, output.getAbsolutePath());
         } catch (Throwable t) {
             Log.e(TAG, "Transformer setup failed", t);
