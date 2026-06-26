@@ -55,13 +55,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 Log.i(TAG, "saveVideoFromUrl downloaded bytes=" + bytes
                     + " exists=" + outFile.exists() + " size=" + outFile.length()
                     + " canRead=" + outFile.canRead());
-                File finalFile = transcodeOrFallback(outFile, "converted-" + fileName);
-                persistVideoPath(finalFile.getAbsolutePath());
+                persistVideoPath(outFile.getAbsolutePath());
                 JSObject ret = new JSObject();
-                ret.put("path", finalFile.getAbsolutePath());
-                ret.put("originalPath", outFile.getAbsolutePath());
-                ret.put("bytes", finalFile.length());
-                ret.put("converted", !finalFile.equals(outFile));
+                ret.put("path", outFile.getAbsolutePath());
+                ret.put("bytes", outFile.length());
                 call.resolve(ret);
             } catch (Exception e) {
                 Log.e(TAG, "saveVideoFromUrl failed", e);
@@ -86,13 +83,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 fos.write(data);
             }
             Log.i(TAG, "saveVideo wrote bytes=" + outFile.length() + " path=" + outFile.getAbsolutePath());
-            File finalFile = transcodeOrFallback(outFile, "converted-" + fileName);
-            persistVideoPath(finalFile.getAbsolutePath());
+            persistVideoPath(outFile.getAbsolutePath());
             JSObject ret = new JSObject();
-            ret.put("path", finalFile.getAbsolutePath());
-            ret.put("originalPath", outFile.getAbsolutePath());
-            ret.put("bytes", finalFile.length());
-            ret.put("converted", !finalFile.equals(outFile));
+            ret.put("path", outFile.getAbsolutePath());
+            ret.put("bytes", outFile.length());
             call.resolve(ret);
         } catch (Exception e) {
             Log.e(TAG, "saveVideo failed", e);
@@ -150,14 +144,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
             Log.i(TAG, "Copied picked video bytes=" + total + " to=" + outFile.getAbsolutePath()
                 + " exists=" + outFile.exists() + " canRead=" + outFile.canRead());
-            File finalFile = transcodeOrFallback(outFile, "converted-" + fileName);
-            persistVideoPath(finalFile.getAbsolutePath());
+            persistVideoPath(outFile.getAbsolutePath());
             persistVideoUri(uri.toString());
             JSObject ret = new JSObject();
-            ret.put("path", finalFile.getAbsolutePath());
-            ret.put("originalPath", outFile.getAbsolutePath());
-            ret.put("bytes", finalFile.length());
-            ret.put("converted", !finalFile.equals(outFile));
+            ret.put("path", outFile.getAbsolutePath());
+            ret.put("bytes", outFile.length());
             ret.put("sourceUri", uri.toString());
             call.resolve(ret);
         } catch (Exception e) {
@@ -266,21 +257,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    /**
-     * Always transcode to an Android-safe MP4 (H.264 baseline + yuv420p + AAC + faststart).
-     * Returns the converted file on success; on failure returns the original so the user still
-     * has a usable wallpaper (and we log the error for diagnostics).
-     */
-    private File transcodeOrFallback(File input, String outName) {
-        try {
-            File out = WallpaperVideoConverter.convertToAndroidSafe(getContext(), input, outName);
-            Log.i(TAG, "transcodeOrFallback OK -> " + out.getAbsolutePath() + " size=" + out.length());
-            return out;
-        } catch (Throwable t) {
-            Log.e(TAG, "transcodeOrFallback failed, using original: " + t.getMessage(), t);
-            return input;
-        }
-    }
 
     private File ensureWallpaperFile(String fileName) {
         File dir = new File(getContext().getFilesDir(), "wallpapers");
