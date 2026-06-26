@@ -134,13 +134,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String savedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
                 Log.i(TAG, "startPlayer savedWallpaperVideo=" + path + " savedUri=" + savedUri);
 
-                File convertedOutput = new File(getApplicationContext().getFilesDir(), "wallpapers/converted/output.mp4");
+                File convertedOutput = WallpaperVideoTranscoder.getOutputFile(getApplicationContext());
                 if (convertedOutput.exists() && convertedOutput.length() > 0 && convertedOutput.canRead()) {
                     path = convertedOutput.getAbsolutePath();
-                    Log.i(TAG, "Using mandatory converted output.mp4 path=" + path
+                    Log.i(TAG, "Using mandatory Samsung-safe converted path=" + path
                         + " size=" + convertedOutput.length());
                 } else {
-                    Log.w(TAG, "Converted output.mp4 missing; refusing to play original unsupported video");
+                    Log.w(TAG, "Samsung-safe converted output missing; refusing to play original unsupported video");
                     paintMessage("Guarda el vídeo otra vez en la app");
                     return;
                 }
