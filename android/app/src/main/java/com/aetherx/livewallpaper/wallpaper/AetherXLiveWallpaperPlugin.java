@@ -22,6 +22,7 @@ import android.util.Log;
 
 import androidx.activity.result.ActivityResult;
 
+import com.aetherx.livewallpaper.BuildConfig;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -53,6 +54,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private static final String CURRENT_MP4 = "current.mp4";
     private static final long MIN_FREE_SPACE_BYTES = 10L * 1024L * 1024L * 1024L; // 10 GB
     private static final String LOW_STORAGE_MESSAGE = "Espacio insuficiente para procesar wallpapers 3D";
+
+    @Override
+    public void load() {
+        super.load();
+        Log.i(TAG, "PLUGIN_LOADED APP_BUILD_VERSION=" + BuildConfig.AETHERX_BUILD_VERSION
+            + " " + BuildConfig.AETHERX_BUILD_MARKER);
+    }
 
     /** Returns null if there is enough space; otherwise the user-facing error message. */
     private String guardStorageOrReject(String stage) {

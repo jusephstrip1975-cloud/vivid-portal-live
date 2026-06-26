@@ -23,6 +23,7 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 
 import androidx.annotation.OptIn;
+import com.aetherx.livewallpaper.BuildConfig;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
@@ -42,7 +43,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
     @Override
     public Engine onCreateEngine() {
-        Log.i(TAG, "onCreateEngine");
+        Log.i(TAG, "onCreateEngine APP_BUILD_VERSION=" + BuildConfig.AETHERX_BUILD_VERSION
+            + " " + BuildConfig.AETHERX_BUILD_MARKER);
         return new VideoEngine();
     }
 
