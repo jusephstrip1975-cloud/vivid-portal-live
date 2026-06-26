@@ -266,6 +266,22 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /**
+     * Always transcode to an Android-safe MP4 (H.264 baseline + yuv420p + AAC + faststart).
+     * Returns the converted file on success; on failure returns the original so the user still
+     * has a usable wallpaper (and we log the error for diagnostics).
+     */
+    private File transcodeOrFallback(File input, String outName) {
+        try {
+            File out = WallpaperVideoConverter.convertToAndroidSafe(getContext(), input, outName);
+            Log.i(TAG, "transcodeOrFallback OK -> " + out.getAbsolutePath() + " size=" + out.length());
+            return out;
+        } catch (Throwable t) {
+            Log.e(TAG, "transcodeOrFallback failed, using original: " + t.getMessage(), t);
+            return input;
+        }
+    }
+
     private File ensureWallpaperFile(String fileName) {
         File dir = new File(getContext().getFilesDir(), "wallpapers");
         if (!dir.exists()) dir.mkdirs();
