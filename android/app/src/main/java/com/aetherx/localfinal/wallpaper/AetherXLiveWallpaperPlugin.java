@@ -503,6 +503,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " CAN_READ=" + current.canRead()
             + " SIZE=" + current.length()
             + " ABSOLUTE_PATH=" + current.getAbsolutePath());
+        Log.i(TAG, "CURRENT_MP4_EXISTS=" + current.exists() + " PATH=" + current.getAbsolutePath());
+        Log.i(TAG, "CURRENT_MP4_CAN_READ=" + current.canRead() + " PATH=" + current.getAbsolutePath());
         Log.i(TAG, "SAVE_SUCCESS wallpaperId=" + wallpaperId
             + " KEY_VIDEO_PATH=" + current.getAbsolutePath()
             + " FILE_EXISTS=" + current.exists()
