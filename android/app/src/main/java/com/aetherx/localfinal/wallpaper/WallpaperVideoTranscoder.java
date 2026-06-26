@@ -1,6 +1,8 @@
 package com.aetherx.localfinal.wallpaper;
 
 import android.content.Context;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Handler;
@@ -69,7 +71,12 @@ public final class WallpaperVideoTranscoder {
             // decoder caches cannot keep handles, and Samsung cannot reuse it.
             deleteAllConvertedOutputs(outDir);
             final File output = buildUniqueOutput(context);
+            final VideoStats inputStats = readVideoStats(context, input);
             Log.i(TAG, "Transcode unique output target=" + output.getAbsolutePath());
+            Log.i(TAG, "Transcoder inputDurationMs=" + inputStats.durationMs
+                + " inputFps=" + inputStats.fps
+                + " inputSize=" + inputStats.width + "x" + inputStats.height
+                + " inputBytes=" + input.length());
 
             MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(input));
             // Do NOT force frame rate: forcing 30fps on a 60fps source causes the
@@ -90,13 +97,23 @@ public final class WallpaperVideoTranscoder {
                 decoderFactory,
                 Clock.DEFAULT);
 
+            VideoEncoderSettings.Builder videoSettings = new VideoEncoderSettings.Builder()
+                .setBitrate(SAFE_OUTPUT_BITRATE)
+                .setiFrameIntervalSeconds(1f);
+            if (inputStats.fps >= 23.0f) {
+                int requestedFrameRate = Math.max(24, Math.min(60, Math.round(inputStats.fps)));
+                // Preserve the source cadence instead of letting the encoder fall back
+                // to a hidden/default 30fps. A 60fps input requests 60fps output.
+                videoSettings.setFrameRate(requestedFrameRate);
+                Log.i(TAG, "Transcoder requestedOutputFps=" + requestedFrameRate
+                    + " sourceFps=" + inputStats.fps);
+            } else {
+                Log.w(TAG, "Transcoder inputFps unknown; not forcing output FPS");
+            }
+
             DefaultEncoderFactory encoderFactory = new DefaultEncoderFactory.Builder(context)
                 .setEnableFallback(false)
-                .setRequestedVideoEncoderSettings(
-                    new VideoEncoderSettings.Builder()
-                        .setBitrate(SAFE_OUTPUT_BITRATE)
-                        .setiFrameIntervalSeconds(1f)
-                        .build())
+                .setRequestedVideoEncoderSettings(videoSettings.build())
                 .build();
 
             Transformer transformer = new Transformer.Builder(context)
@@ -107,14 +124,33 @@ public final class WallpaperVideoTranscoder {
                 .addListener(new Transformer.Listener() {
                     @Override
                     public void onCompleted(Composition composition, ExportResult exportResult) {
+                        VideoStats outputStats = readVideoStats(context, output);
+                        long durationDeltaMs = Math.abs(inputStats.durationMs - outputStats.durationMs);
                         Log.i(TAG, "Transformer onCompleted output=" + output.getAbsolutePath()
                             + " size=" + (output.exists() ? output.length() : -1));
+                        Log.i(TAG, "Transcoder outputDurationMs=" + outputStats.durationMs
+                            + " outputFps=" + outputStats.fps
+                            + " outputSize=" + outputStats.width + "x" + outputStats.height
+                            + " inputDurationMs=" + inputStats.durationMs
+                            + " inputFps=" + inputStats.fps
+                            + " durationDeltaMs=" + durationDeltaMs);
                         currentTransformer = null;
-                        if (isReadableVideo(context, output)) {
-                            cb.onSuccess(output);
-                        } else {
+                        if (!isReadableVideo(context, output)) {
                             cb.onFailure(new IllegalStateException("converted-video-not-readable"));
+                            return;
                         }
+                        if (inputStats.durationMs > 0 && outputStats.durationMs > 0) {
+                            long toleranceMs = Math.max(300L, Math.round(inputStats.durationMs * 0.02f));
+                            if (durationDeltaMs > toleranceMs) {
+                                boolean deleted = output.delete();
+                                Log.e(TAG, "Transcoder duration mismatch rejected inputDurationMs="
+                                    + inputStats.durationMs + " outputDurationMs=" + outputStats.durationMs
+                                    + " toleranceMs=" + toleranceMs + " deleted=" + deleted);
+                                cb.onFailure(new IllegalStateException("transcode-duration-mismatch"));
+                                return;
+                            }
+                        }
+                        cb.onSuccess(output);
                     }
 
                     @Override
@@ -150,28 +186,82 @@ public final class WallpaperVideoTranscoder {
 
     private static boolean isReadableVideo(Context context, File file) {
         if (file == null || !file.exists() || file.length() <= 0) return false;
+        VideoStats stats = readVideoStats(context, file);
+        Log.i(TAG, "Converted metadata width=" + stats.width + " height=" + stats.height
+            + " durationMs=" + stats.durationMs + " fps=" + stats.fps);
+        return stats.width > 0 && stats.height > 0 && stats.durationMs > 0;
+    }
+
+    private static VideoStats readVideoStats(Context context, File file) {
+        VideoStats stats = new VideoStats();
+        if (file == null || !file.exists()) return stats;
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        MediaExtractor extractor = new MediaExtractor();
         try {
             retriever.setDataSource(context, Uri.fromFile(file));
             String width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH);
             String height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT);
             String duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
-            Log.i(TAG, "Converted metadata width=" + width + " height=" + height + " duration=" + duration);
-            return parsePositive(width) && parsePositive(height) && parsePositive(duration);
+            String captureFps = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE);
+            stats.width = parseInt(width);
+            stats.height = parseInt(height);
+            stats.durationMs = parseLong(duration);
+            stats.fps = parseFloat(captureFps);
+
+            extractor.setDataSource(file.getAbsolutePath());
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.containsKey(MediaFormat.KEY_MIME)
+                    ? format.getString(MediaFormat.KEY_MIME)
+                    : "";
+                if (mime != null && mime.startsWith("video/")) {
+                    if (stats.fps <= 0f && format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
+                        stats.fps = format.getInteger(MediaFormat.KEY_FRAME_RATE);
+                    }
+                    if (stats.durationMs <= 0 && format.containsKey(MediaFormat.KEY_DURATION)) {
+                        stats.durationMs = format.getLong(MediaFormat.KEY_DURATION) / 1000L;
+                    }
+                    break;
+                }
+            }
         } catch (Throwable t) {
-            Log.e(TAG, "Converted metadata validation failed", t);
-            return false;
+            Log.e(TAG, "Video metadata read failed file=" + file.getAbsolutePath(), t);
         } finally {
             try { retriever.release(); } catch (Throwable ignored) {}
+            try { extractor.release(); } catch (Throwable ignored) {}
+        }
+        return stats;
+    }
+
+    private static int parseInt(String value) {
+        try {
+            return value == null ? 0 : Integer.parseInt(value);
+        } catch (Throwable ignored) {
+            return 0;
         }
     }
 
-    private static boolean parsePositive(String value) {
+    private static long parseLong(String value) {
         try {
-            return value != null && Long.parseLong(value) > 0;
+            return value == null ? 0L : Long.parseLong(value);
         } catch (Throwable ignored) {
-            return false;
+            return 0L;
         }
+    }
+
+    private static float parseFloat(String value) {
+        try {
+            return value == null ? 0f : Float.parseFloat(value);
+        } catch (Throwable ignored) {
+            return 0f;
+        }
+    }
+
+    private static final class VideoStats {
+        long durationMs;
+        float fps;
+        int width;
+        int height;
     }
 
     private WallpaperVideoTranscoder() {}
