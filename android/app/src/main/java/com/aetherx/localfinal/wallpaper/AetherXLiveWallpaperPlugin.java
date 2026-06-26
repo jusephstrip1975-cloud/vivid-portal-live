@@ -11,7 +11,11 @@ import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+import android.os.PowerManager;
 import android.os.StatFs;
 import android.util.Base64;
 import android.util.Log;
@@ -26,6 +30,7 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -38,11 +43,14 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String PREFS = "aetherx_live_wallpaper";
     public static final String KEY_VIDEO_PATH = "video_path";
     public static final String KEY_VIDEO_VERSION = "video_version";
+    public static final String KEY_LAST_VALID_VIDEO_PATH = "last_valid_video_path";
+    public static final String KEY_LAST_SOURCE_URI = "last_source_uri";
 
     private static final int MAX_REDIRECTS = 5;
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
-    private static final String WALLPAPER_DIR = "wallpapers";
+    private static final String WALLPAPER_DIR = "AetherX";
     private static final String CURRENT_MP4 = "current.mp4";
+    private static final String LAST_VALID_MP4 = "last-valid.mp4";
     private static final long MIN_FREE_SPACE_BYTES = 10L * 1024L * 1024L * 1024L; // 10 GB
     private static final String LOW_STORAGE_MESSAGE = "Espacio insuficiente para procesar wallpapers 3D";
 
@@ -67,7 +75,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
     }
 
-    /** Removes any file in filesDir/wallpapers/ that is not current.mp4. */
+    /** Removes orphan files from Android/data/<package>/files/Movies/AetherX. */
     private void cleanOrphanWallpaperFiles(String stage) {
         File dir = getWallpaperDir();
         File[] entries = dir.listFiles();
@@ -84,6 +92,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 continue;
             }
             if (CURRENT_MP4.equals(entry.getName())) continue;
+            if (LAST_VALID_MP4.equals(entry.getName())) continue;
             deleteFileIfExists(entry, "ORPHAN_CLEANUP " + stage);
         }
     }
@@ -105,6 +114,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         if (storageError != null) { call.reject(storageError); return; }
 
         new Thread(() -> {
+            PowerManager.WakeLock wakeLock = acquireShortWakeLock("saveVideoFromUrl");
             File current = getCurrentWallpaperFile();
             try {
                 prepareForNewWallpaper(wallpaperId);
@@ -124,6 +134,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
                 clearPersistedVideoPath();
                 call.reject("save-failed: " + e.getMessage(), e);
+            } finally {
+                releaseWakeLock(wakeLock, "saveVideoFromUrl");
             }
         }).start();
     }
@@ -142,6 +154,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         if (storageError != null) { call.reject(storageError); return; }
 
         File current = getCurrentWallpaperFile();
+        PowerManager.WakeLock wakeLock = acquireShortWakeLock("saveVideo");
         try {
             prepareForNewWallpaper(fileName);
             byte[] data = Base64.decode(base64, Base64.DEFAULT);
@@ -158,6 +171,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
             clearPersistedVideoPath();
             call.reject("save-failed: " + e.getMessage(), e);
+        } finally {
+            releaseWakeLock(wakeLock, "saveVideo");
         }
     }
 
@@ -170,6 +185,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("video/*");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(call, intent, "onPickVideoResult");
     }
 
@@ -201,7 +217,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
 
         Uri uri = result.getData().getData();
-        Log.i(TAG, "onPickVideoResult selectedVideoUri=" + uri + " note=will-copy-to-filesDir-current-mp4-no-uri-persist");
+        Log.i(TAG, "onPickVideoResult selectedVideoUri=" + uri + " note=will-copy-to-externalMovies-current-mp4-no-final-content-uri");
         if (uri == null) {
             Log.e(TAG, "SAVE_FAILED reason=pick-video-no-uri");
             call.reject("pick-video-no-uri");
@@ -209,7 +225,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
 
         File current = getCurrentWallpaperFile();
+        PowerManager.WakeLock wakeLock = acquireShortWakeLock("pickVideoFromDevice");
         try {
+            persistUriReadPermission(result.getData(), uri);
             prepareForNewWallpaper("picked-video");
             ContentResolver resolver = getContext().getContentResolver();
             long total = 0;
@@ -234,6 +252,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
             clearPersistedVideoPath();
             call.reject("pick-video-failed: " + e.getMessage(), e);
+        } finally {
+            releaseWakeLock(wakeLock, "pickVideoFromDevice");
         }
     }
 
@@ -266,14 +286,24 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             Log.i(TAG, "openLivePicker VIDEO_PATH=" + persisted
                 + " CURRENT_EXPECTED=" + current.getAbsolutePath()
                 + " FILE_EXISTS=" + current.exists()
+                + " CAN_READ=" + current.canRead()
                 + " FILE_SIZE=" + (current.exists() ? current.length() : -1)
                 + " ABSOLUTE_PATH=" + current.getAbsolutePath());
 
             ValidationResult validation = validateCurrentMp4ForPlayback("openLivePicker");
             if (!validation.ok) {
+                Log.w(TAG, "openLivePicker attempting restore reason=" + validation.reason);
+                if (attemptRestoreCurrentMp4("openLivePicker:" + validation.reason)) {
+                    validation = validateCurrentMp4ForPlayback("openLivePicker-after-restore");
+                }
+            }
+            Log.i(TAG, "CURRENT_MP4_EXISTS=" + current.exists() + " PATH=" + current.getAbsolutePath());
+            Log.i(TAG, "CURRENT_MP4_CAN_READ=" + current.canRead() + " PATH=" + current.getAbsolutePath());
+            if (!validation.ok) {
                 Log.e(TAG, "CURRENT_MP4_MISSING reason=" + validation.reason
                     + " path=" + current.getAbsolutePath()
                     + " exists=" + current.exists()
+                    + " canRead=" + current.canRead()
                     + " size=" + (current.exists() ? current.length() : -1));
                 call.reject("Archivo de wallpaper no encontrado: " + validation.reason);
                 return;
@@ -286,13 +316,21 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
             intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, comp);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
-            JSObject ret = new JSObject();
-            ret.put("applied", false);
-            ret.put("openedPicker", true);
-            ret.put("needsConfirmation", true);
-            ret.put("opened", true);
-            call.resolve(ret);
+            Log.i(TAG, "WALLPAPER_OPEN_DELAY ms=500 PATH=" + current.getAbsolutePath());
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    getContext().startActivity(intent);
+                    JSObject ret = new JSObject();
+                    ret.put("applied", false);
+                    ret.put("openedPicker", true);
+                    ret.put("needsConfirmation", true);
+                    ret.put("opened", true);
+                    call.resolve(ret);
+                } catch (Exception e) {
+                    Log.e(TAG, "open-picker-failed-delayed", e);
+                    call.reject("open-picker-failed: " + e.getMessage(), e);
+                }
+            }, 500L);
         } catch (Exception e) {
             Log.e(TAG, "open-picker-failed", e);
             call.reject("open-picker-failed: " + e.getMessage(), e);
@@ -368,7 +406,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private File getWallpaperDir() {
-        File dir = new File(getContext().getFilesDir(), WALLPAPER_DIR);
+        File moviesDir = getContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+        if (moviesDir == null) {
+            throw new IllegalStateException("external-movies-dir-unavailable");
+        }
+        File dir = new File(moviesDir, WALLPAPER_DIR);
         if (!dir.exists() && !dir.mkdirs()) {
             Log.w(TAG, "wallpaper-dir-mkdirs-failed path=" + dir.getAbsolutePath());
         }
@@ -377,6 +419,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     private File getCurrentWallpaperFile() {
         return new File(getWallpaperDir(), CURRENT_MP4);
+    }
+
+    private File getLastValidWallpaperFile() {
+        return new File(getWallpaperDir(), LAST_VALID_MP4);
     }
 
     private void prepareForNewWallpaper(String wallpaperId) {
@@ -403,6 +449,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " source=" + sourceLabel
             + " path=" + current.getAbsolutePath()
             + " exists=" + current.exists()
+            + " canRead=" + current.canRead()
             + " size=" + (current.exists() ? current.length() : -1));
 
         ValidationResult currentValidation = validatePhysicalFileForPlayback(current, "current-before-persist", wallpaperId);
@@ -414,10 +461,25 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             throw new Exception(currentValidation.reason);
         }
 
+        File lastValid = getLastValidWallpaperFile();
+        copyFile(current, lastValid);
+        Log.i(TAG, "LAST_VALID_SOURCE_SAVED path=" + lastValid.getAbsolutePath()
+            + " exists=" + lastValid.exists()
+            + " canRead=" + lastValid.canRead()
+            + " size=" + (lastValid.exists() ? lastValid.length() : -1));
+
         persistCurrentPath(current, wallpaperId);
+        persistLastValidPath(lastValid, wallpaperId);
+        Log.i(TAG, "CURRENT_MP4_SAVE_OK wallpaperId=" + wallpaperId
+            + " PATH=" + current.getAbsolutePath()
+            + " EXISTS=" + current.exists()
+            + " CAN_READ=" + current.canRead()
+            + " SIZE=" + current.length()
+            + " ABSOLUTE_PATH=" + current.getAbsolutePath());
         Log.i(TAG, "SAVE_SUCCESS wallpaperId=" + wallpaperId
             + " KEY_VIDEO_PATH=" + current.getAbsolutePath()
             + " FILE_EXISTS=" + current.exists()
+            + " CAN_READ=" + current.canRead()
             + " FILE_SIZE=" + current.length()
             + " ABSOLUTE_PATH=" + current.getAbsolutePath());
         return current;
@@ -437,6 +499,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " version=" + version);
     }
 
+    private void persistLastValidPath(File lastValid, String wallpaperId) {
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        prefs.edit()
+            .putString(KEY_LAST_VALID_VIDEO_PATH, lastValid.getAbsolutePath())
+            .commit();
+        Log.i(TAG, "persistLastValidPath wallpaperId=" + wallpaperId
+            + " KEY_LAST_VALID_VIDEO_PATH=" + prefs.getString(KEY_LAST_VALID_VIDEO_PATH, null));
+    }
+
     private void clearPersistedVideoPath() {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         long version = prefs.getLong(KEY_VIDEO_VERSION, 0L) + 1L;
@@ -451,9 +522,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String path = prefs.getString(KEY_VIDEO_PATH, null);
         File current = getCurrentWallpaperFile();
-        Log.i(TAG, "VIDEO_PATH=" + path);
-        Log.i(TAG, "FILE_EXISTS=" + current.exists());
-        Log.i(TAG, "FILE_SIZE=" + (current.exists() ? current.length() : -1));
+        Log.i(TAG, "PATH=" + path);
+        Log.i(TAG, "EXISTS=" + current.exists());
+        Log.i(TAG, "CAN_READ=" + current.canRead());
+        Log.i(TAG, "SIZE=" + (current.exists() ? current.length() : -1));
         Log.i(TAG, "ABSOLUTE_PATH=" + current.getAbsolutePath());
         if (path == null) return ValidationResult.fail("key-video-path-empty");
         try {
@@ -470,9 +542,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         if (file == null) return ValidationResult.fail("file-null");
         Log.i(TAG, "validatePhysicalFile label=" + label
             + " wallpaperId=" + wallpaperId
-            + " VIDEO_PATH=" + file.getAbsolutePath()
-            + " FILE_EXISTS=" + file.exists()
-            + " FILE_SIZE=" + (file.exists() ? file.length() : -1)
+            + " PATH=" + file.getAbsolutePath()
+            + " EXISTS=" + file.exists()
+            + " CAN_READ=" + file.canRead()
+            + " SIZE=" + (file.exists() ? file.length() : -1)
             + " ABSOLUTE_PATH=" + file.getAbsolutePath()
             + " canRead=" + file.canRead());
         if (!file.exists()) return ValidationResult.fail("file-missing");
@@ -549,11 +622,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private void deleteFileIfExists(File file, String label) {
         if (file == null) return;
         try {
-            File root = getContext().getFilesDir();
+            File root = getWallpaperDir();
             String rootPath = root.getCanonicalPath();
             String targetPath = file.getCanonicalPath();
             if (!targetPath.startsWith(rootPath)) {
-                Log.w(TAG, label + " refused-outside-filesDir path=" + targetPath);
+                Log.w(TAG, label + " refused-outside-wallpaper-dir path=" + targetPath);
                 return;
             }
             boolean existed = file.exists();
@@ -578,6 +651,103 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         boolean removed = convertedDir.delete();
         Log.i(TAG, "DELETE_OLD_WALLPAPER converted-dir path=" + convertedDir.getAbsolutePath()
             + " removed=" + removed);
+    }
+
+    private boolean attemptRestoreCurrentMp4(String stage) {
+        File current = getCurrentWallpaperFile();
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String lastPath = prefs.getString(KEY_LAST_VALID_VIDEO_PATH, null);
+        File lastValid = lastPath == null ? getLastValidWallpaperFile() : new File(lastPath);
+        Log.w(TAG, "CURRENT_MP4_RESTORE_START stage=" + stage
+            + " current=" + current.getAbsolutePath()
+            + " currentExists=" + current.exists()
+            + " lastValid=" + lastValid.getAbsolutePath()
+            + " lastValidExists=" + lastValid.exists()
+            + " lastValidCanRead=" + lastValid.canRead()
+            + " lastValidSize=" + (lastValid.exists() ? lastValid.length() : -1));
+        if (!lastValid.exists() || !lastValid.canRead() || lastValid.length() <= MIN_VALID_VIDEO_BYTES) {
+            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=last-valid-missing stage=" + stage);
+            return false;
+        }
+        PowerManager.WakeLock wakeLock = acquireShortWakeLock("restoreCurrentMp4");
+        try {
+            copyFile(lastValid, current);
+            ValidationResult validation = validatePhysicalFileForPlayback(current, "restore-current", stage);
+            if (!validation.ok) {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=" + validation.reason
+                    + " current=" + current.getAbsolutePath());
+                return false;
+            }
+            persistCurrentPath(current, "restore-" + stage);
+            Log.i(TAG, "CURRENT_MP4_RECREATED stage=" + stage
+                + " PATH=" + current.getAbsolutePath()
+                + " EXISTS=" + current.exists()
+                + " CAN_READ=" + current.canRead()
+                + " SIZE=" + current.length()
+                + " ABSOLUTE_PATH=" + current.getAbsolutePath());
+            return true;
+        } catch (Throwable t) {
+            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED stage=" + stage, t);
+            return false;
+        } finally {
+            releaseWakeLock(wakeLock, "restoreCurrentMp4");
+        }
+    }
+
+    private void copyFile(File from, File to) throws Exception {
+        File parent = to.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new Exception("mkdirs-failed:" + parent.getAbsolutePath());
+        }
+        try (FileInputStream in = new FileInputStream(from);
+             FileOutputStream out = new FileOutputStream(to, false)) {
+            byte[] buffer = new byte[16384];
+            int read;
+            while ((read = in.read(buffer)) > 0) {
+                out.write(buffer, 0, read);
+            }
+            out.getFD().sync();
+        }
+    }
+
+    private PowerManager.WakeLock acquireShortWakeLock(String stage) {
+        try {
+            PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            if (pm == null) return null;
+            PowerManager.WakeLock wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AetherX:WallpaperSave");
+            wakeLock.setReferenceCounted(false);
+            wakeLock.acquire(2 * 60 * 1000L);
+            Log.i(TAG, "WAKE_LOCK_ACQUIRED stage=" + stage);
+            return wakeLock;
+        } catch (Throwable t) {
+            Log.w(TAG, "WAKE_LOCK_ACQUIRE_FAILED stage=" + stage + " err=" + t.getMessage());
+            return null;
+        }
+    }
+
+    private void releaseWakeLock(PowerManager.WakeLock wakeLock, String stage) {
+        if (wakeLock == null) return;
+        try {
+            if (wakeLock.isHeld()) wakeLock.release();
+            Log.i(TAG, "WAKE_LOCK_RELEASED stage=" + stage);
+        } catch (Throwable t) {
+            Log.w(TAG, "WAKE_LOCK_RELEASE_FAILED stage=" + stage + " err=" + t.getMessage());
+        }
+    }
+
+    private void persistUriReadPermission(Intent data, Uri uri) {
+        if (uri == null || data == null || !"content".equalsIgnoreCase(uri.getScheme())) return;
+        try {
+            int flags = data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
+            getContext().getContentResolver().takePersistableUriPermission(uri, flags);
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_LAST_SOURCE_URI, uri.toString())
+                .commit();
+            Log.i(TAG, "PERSISTABLE_URI_PERMISSION_OK uri=" + uri);
+        } catch (Throwable t) {
+            Log.w(TAG, "PERSISTABLE_URI_PERMISSION_FAILED uri=" + uri + " err=" + t.getMessage());
+        }
     }
 
     private String sanitizeFileName(String name) {
