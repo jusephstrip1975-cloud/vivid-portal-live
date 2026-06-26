@@ -96,7 +96,7 @@ export async function pickDeviceVideo(): Promise<
   }
 }
 
-/** Aplica el último vídeo guardado en filesDir al destino indicado. */
+/** Aplica el último vídeo guardado en almacenamiento externo privado persistente al destino indicado. */
 export async function applyPickedVideo(
   target: WallpaperTarget = "home",
 ): Promise<SaveResult> {
@@ -222,7 +222,7 @@ export async function saveWallpaperToDevice(
       await Filesystem.writeFile({
         path: fileName,
         data: base64,
-        directory: Directory.Cache,
+        directory: Directory.Documents,
       });
       return { ok: true, reason: "ios-saved" };
     }

@@ -1,6 +1,7 @@
 package com.aetherx.localfinal.wallpaper;
 
 import android.content.Context;
+import android.content.ContentResolver;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -14,8 +15,10 @@ import android.media.MediaMetadataRetriever;
 import android.media.PlaybackParams;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
 import android.view.Surface;
@@ -34,11 +37,16 @@ import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
+    private static final int MAX_REDIRECTS = 5;
     @Override
     public Engine onCreateEngine() {
         Log.i(TAG, "onCreateEngine");
@@ -57,6 +65,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private boolean preserveFailedPathsOnNextStart = false;
+        private volatile boolean restoreInProgress = false;
         private final Handler main = new Handler(Looper.getMainLooper());
         private SharedPreferences prefs;
         private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
@@ -168,13 +177,22 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
                 File expectedCurrent = getCurrentWallpaperFile();
-                Log.i(TAG, "VIDEO_PATH=" + path);
-                Log.i(TAG, "FILE_EXISTS=" + expectedCurrent.exists());
-                Log.i(TAG, "FILE_SIZE=" + (expectedCurrent.exists() ? expectedCurrent.length() : -1));
-                Log.i(TAG, "ABSOLUTE_PATH=" + expectedCurrent.getAbsolutePath());
+                logServicePath("startPlayer-initial", path, expectedCurrent);
                 Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
                     + " new=" + path + " newVersion=" + version
                     + " expectedCurrent=" + expectedCurrent.getAbsolutePath());
+                if (!isCurrentPathUsable(path, expectedCurrent, "startPlayer-initial")) {
+                    Log.w(TAG, "CURRENT_MP4_MISSING service attempting restore path=" + path);
+                    if (attemptRestoreCurrentMp4("service-startPlayer")) {
+                        path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
+                        version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
+                        expectedCurrent = getCurrentWallpaperFile();
+                        logServicePath("startPlayer-after-restore", path, expectedCurrent);
+                    } else if (scheduleRestoreFromLastSource("service-startPlayer", expectedCurrent)) {
+                        paintLoading("Cargando vídeo...");
+                        return;
+                    }
+                }
                 if (path == null || !path.equals(currentPath) || version != currentVersion) {
                     if (preserveFailedPathsOnNextStart) {
                         preserveFailedPathsOnNextStart = false;
@@ -208,10 +226,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 boolean selectedExists = selectedOutput.exists();
                 long selectedSize = selectedExists ? selectedOutput.length() : -1L;
                 boolean selectedCanRead = selectedExists && selectedOutput.canRead();
-                Log.i(TAG, "VIDEO_PATH=" + path);
-                Log.i(TAG, "FILE_EXISTS=" + selectedExists);
-                Log.i(TAG, "FILE_SIZE=" + selectedSize);
+                Log.i(TAG, "PATH=" + path);
+                Log.i(TAG, "EXISTS=" + selectedExists);
+                Log.i(TAG, "CAN_READ=" + selectedCanRead);
+                Log.i(TAG, "SIZE=" + selectedSize);
                 Log.i(TAG, "ABSOLUTE_PATH=" + selectedOutput.getAbsolutePath());
+                Log.i(TAG, "WALLPAPER_SERVICE_PATH=" + selectedOutput.getAbsolutePath());
                 if (!selectedExists || !selectedCanRead) {
                     Log.e(TAG, "CURRENT_MP4_MISSING reason=file-missing-or-not-readable VIDEO_PATH=" + path
                         + " FILE_EXISTS=" + selectedExists
@@ -289,6 +309,241 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             } catch (Throwable t) {
                 Log.e(TAG, "startPlayer failed for persistent current.mp4", t);
                 fatalPlaybackFailure("startPlayer-exception", t);
+            }
+        }
+
+        private void logServicePath(String stage, String path, File current) {
+            File selected = path == null ? current : new File(path);
+            boolean exists = selected.exists();
+            boolean canRead = exists && selected.canRead();
+            long size = exists ? selected.length() : -1L;
+            Log.i(TAG, "WALLPAPER_SERVICE_PATH=" + selected.getAbsolutePath() + " stage=" + stage);
+            Log.i(TAG, "PATH=" + path);
+            Log.i(TAG, "EXISTS=" + exists);
+            Log.i(TAG, "CAN_READ=" + canRead);
+            Log.i(TAG, "SIZE=" + size);
+            Log.i(TAG, "ABSOLUTE_PATH=" + selected.getAbsolutePath());
+        }
+
+        private boolean isCurrentPathUsable(String path, File expectedCurrent, String stage) {
+            if (path == null) {
+                Log.e(TAG, "CURRENT_MP4_MISSING reason=KEY_VIDEO_PATH_EMPTY stage=" + stage);
+                return false;
+            }
+            File selected = new File(path);
+            try {
+                if (!selected.getCanonicalPath().equals(expectedCurrent.getCanonicalPath())) {
+                    Log.e(TAG, "CURRENT_MP4_MISSING reason=KEY_VIDEO_PATH_NOT_CURRENT stage=" + stage
+                        + " PATH=" + path
+                        + " expected=" + expectedCurrent.getCanonicalPath());
+                    return false;
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "CURRENT_MP4_MISSING reason=canonical-check-failed stage=" + stage
+                    + " PATH=" + path, t);
+                return false;
+            }
+            boolean exists = selected.exists();
+            boolean canRead = exists && selected.canRead();
+            long size = exists ? selected.length() : -1L;
+            if (!exists || !canRead || size <= MIN_VALID_VIDEO_BYTES) {
+                Log.e(TAG, "CURRENT_MP4_MISSING reason=file-unusable stage=" + stage
+                    + " PATH=" + path
+                    + " EXISTS=" + exists
+                    + " CAN_READ=" + canRead
+                    + " SIZE=" + size
+                    + " ABSOLUTE_PATH=" + selected.getAbsolutePath());
+                return false;
+            }
+            return true;
+        }
+
+        private boolean attemptRestoreCurrentMp4(String stage) {
+            try {
+                if (prefs == null) {
+                    prefs = getApplicationContext()
+                        .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                }
+                File current = getCurrentWallpaperFile();
+                Log.w(TAG, "CURRENT_MP4_RESTORE_START stage=" + stage
+                    + " current=" + current.getAbsolutePath()
+                    + " currentExists=" + current.exists()
+                    + " currentCanRead=" + current.canRead()
+                    + " currentSize=" + (current.exists() ? current.length() : -1));
+                return false;
+            } catch (Throwable t) {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED stage=" + stage, t);
+                return false;
+            }
+        }
+
+        private boolean scheduleRestoreFromLastSource(String stage, File current) {
+            if (restoreInProgress) {
+                Log.w(TAG, "CURRENT_MP4_RESTORE_SKIPPED reason=already-running stage=" + stage);
+                return true;
+            }
+            if (prefs == null) return false;
+            String sourceUrl = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URL, null);
+            String sourceUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URI, null);
+            if ((sourceUrl == null || sourceUrl.isEmpty()) && (sourceUri == null || sourceUri.isEmpty())) {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=no-last-download-or-uri stage=" + stage);
+                return false;
+            }
+            restoreInProgress = true;
+            File target = current;
+            new Thread(() -> {
+                boolean restored = attemptRestoreFromLastSource(stage, target);
+                restoreInProgress = false;
+                main.post(() -> {
+                    if (restored) {
+                        releasePlayer();
+                        startPlayer();
+                    } else {
+                        paintMessage("Archivo de wallpaper no encontrado");
+                    }
+                });
+            }).start();
+            return true;
+        }
+
+        private boolean attemptRestoreFromLastSource(String stage, File current) {
+            if (prefs == null) return false;
+            String sourceUrl = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URL, null);
+            String sourceUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URI, null);
+            PowerManager.WakeLock wakeLock = acquireShortWakeLock("serviceRestoreFromLastSource");
+            try {
+                if (sourceUrl != null && !sourceUrl.isEmpty()) {
+                    Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_DOWNLOAD stage=" + stage
+                        + " PATH=" + current.getAbsolutePath());
+                    downloadFollowingRedirects(sourceUrl, current);
+                } else if (sourceUri != null && !sourceUri.isEmpty()) {
+                    Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_CONTENT_URI stage=" + stage
+                        + " PATH=" + current.getAbsolutePath());
+                    copyUriToFile(Uri.parse(sourceUri), current);
+                } else {
+                    Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=no-last-download-or-uri stage=" + stage);
+                    return false;
+                }
+                if (!current.exists() || !current.canRead() || current.length() <= MIN_VALID_VIDEO_BYTES) {
+                    Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=source-copy-unusable stage=" + stage
+                        + " PATH=" + current.getAbsolutePath()
+                        + " EXISTS=" + current.exists()
+                        + " CAN_READ=" + current.canRead()
+                        + " SIZE=" + (current.exists() ? current.length() : -1));
+                    return false;
+                }
+                if (!testMediaPlayerPrepare(current, "SERVICE_RESTORE_LAST_SOURCE")) {
+                    Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=mediaplayer-prepare-failed source=last-source stage=" + stage
+                        + " PATH=" + current.getAbsolutePath());
+                    return false;
+                }
+                long newVersion = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
+                prefs.edit()
+                    .putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, current.getAbsolutePath())
+                    .putLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, newVersion)
+                    .putLong("video_updated_at", System.currentTimeMillis())
+                    .commit();
+                Log.i(TAG, "CURRENT_MP4_RECREATED stage=" + stage
+                    + " source=last-download-or-uri"
+                    + " PATH=" + current.getAbsolutePath()
+                    + " EXISTS=" + current.exists()
+                    + " CAN_READ=" + current.canRead()
+                    + " SIZE=" + current.length()
+                    + " ABSOLUTE_PATH=" + current.getAbsolutePath()
+                    + " version=" + newVersion);
+                return true;
+            } catch (Throwable t) {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED source=last-download-or-uri stage=" + stage, t);
+                return false;
+            } finally {
+                releaseWakeLock(wakeLock, "serviceRestoreFromLastSource");
+            }
+        }
+
+        private PowerManager.WakeLock acquireShortWakeLock(String stage) {
+            try {
+                PowerManager pm = (PowerManager) getApplicationContext().getSystemService(Context.POWER_SERVICE);
+                if (pm == null) return null;
+                PowerManager.WakeLock wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AetherX:WallpaperServiceRestore");
+                wakeLock.setReferenceCounted(false);
+                wakeLock.acquire(2 * 60 * 1000L);
+                Log.i(TAG, "WAKE_LOCK_ACQUIRED stage=" + stage);
+                return wakeLock;
+            } catch (Throwable t) {
+                Log.w(TAG, "WAKE_LOCK_ACQUIRE_FAILED stage=" + stage + " err=" + t.getMessage());
+                return null;
+            }
+        }
+
+        private void releaseWakeLock(PowerManager.WakeLock wakeLock, String stage) {
+            if (wakeLock == null) return;
+            try {
+                if (wakeLock.isHeld()) wakeLock.release();
+                Log.i(TAG, "WAKE_LOCK_RELEASED stage=" + stage);
+            } catch (Throwable t) {
+                Log.w(TAG, "WAKE_LOCK_RELEASE_FAILED stage=" + stage + " err=" + t.getMessage());
+            }
+        }
+
+        private void copyUriToFile(Uri uri, File to) throws Exception {
+            File parent = to.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                throw new Exception("mkdirs-failed:" + parent.getAbsolutePath());
+            }
+            ContentResolver resolver = getApplicationContext().getContentResolver();
+            try (InputStream in = resolver.openInputStream(uri);
+                 FileOutputStream out = new FileOutputStream(to, false)) {
+                if (in == null) throw new Exception("source-uri-open-failed");
+                byte[] buffer = new byte[16384];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, read);
+                }
+                out.getFD().sync();
+            }
+        }
+
+        private long downloadFollowingRedirects(String urlStr, File out) throws Exception {
+            int redirects = 0;
+            String currentUrl = urlStr;
+            while (true) {
+                URL url = new URL(currentUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setInstanceFollowRedirects(false);
+                conn.setConnectTimeout(20000);
+                conn.setReadTimeout(60000);
+                conn.setRequestProperty("User-Agent", "AetherX/1.0");
+                int code = conn.getResponseCode();
+                Log.i(TAG, "restore-download HTTP " + code + " <- " + currentUrl);
+                if (code >= 300 && code < 400) {
+                    String loc = conn.getHeaderField("Location");
+                    conn.disconnect();
+                    if (loc == null || ++redirects > MAX_REDIRECTS) throw new Exception("too-many-redirects");
+                    currentUrl = loc;
+                    continue;
+                }
+                if (code < 200 || code >= 300) {
+                    conn.disconnect();
+                    throw new Exception("http-" + code);
+                }
+                File parent = out.getParentFile();
+                if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                    throw new Exception("mkdirs-failed:" + parent.getAbsolutePath());
+                }
+                long total = 0L;
+                try (InputStream in = conn.getInputStream();
+                     FileOutputStream fos = new FileOutputStream(out, false)) {
+                    byte[] buf = new byte[16384];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        fos.write(buf, 0, n);
+                        total += n;
+                    }
+                    fos.getFD().sync();
+                } finally {
+                    conn.disconnect();
+                }
+                return total;
             }
         }
 
@@ -499,13 +754,28 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             Log.e(TAG, "CURRENT_MP4_MISSING playback-failed reason=" + reason
                 + " VIDEO_PATH=" + currentPath
                 + " FILE_EXISTS=" + current.exists()
+                + " CAN_READ=" + current.canRead()
                 + " FILE_SIZE=" + (current.exists() ? current.length() : -1)
                 + " ABSOLUTE_PATH=" + current.getAbsolutePath(), error);
             paintMessage("Archivo de wallpaper no encontrado");
         }
 
         private File getCurrentWallpaperFile() {
-            return new File(new File(getApplicationContext().getFilesDir(), "wallpapers"), "current.mp4");
+            return new File(getWallpaperDir(), "current.mp4");
+        }
+
+        private File getWallpaperDir() {
+            File moviesDir = getApplicationContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+            if (moviesDir == null) {
+                File externalRoot = Environment.getExternalStorageDirectory();
+                moviesDir = new File(externalRoot, "Android/data/" + getApplicationContext().getPackageName() + "/files/Movies");
+                Log.w(TAG, "external-movies-dir-unavailable using-package-external-path=" + moviesDir.getAbsolutePath());
+            }
+            File dir = new File(moviesDir, "AetherX");
+            if (!dir.exists() && !dir.mkdirs()) {
+                Log.w(TAG, "wallpaper-dir-mkdirs-failed path=" + dir.getAbsolutePath());
+            }
+            return dir;
         }
 
         private void paintLoading(String text) {
