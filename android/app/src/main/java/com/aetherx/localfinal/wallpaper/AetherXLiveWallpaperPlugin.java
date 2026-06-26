@@ -270,6 +270,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 Log.i(TAG, "transcodeAndResolve onSuccess output=" + output.getAbsolutePath()
                     + " outputExists=" + output.exists() + " outputSize=" + output.length());
                 persistVideoPath(output.getAbsolutePath());
+                WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), output.getAbsolutePath());
                 JSObject ret = new JSObject();
                 ret.put("path", output.getAbsolutePath());
                 ret.put("bytes", output.length());
@@ -298,8 +299,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     private void persistOriginalPath(String absolutePath) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String previousOriginal = prefs.getString(KEY_ORIGINAL_PATH, null);
+        String currentVideo = prefs.getString(KEY_VIDEO_PATH, null);
         prefs.edit().putString(KEY_ORIGINAL_PATH, absolutePath).commit();
         Log.i(TAG, "persistOriginalPath=" + absolutePath);
+        if (previousOriginal != null
+            && !previousOriginal.equals(absolutePath)
+            && !previousOriginal.equals(currentVideo)) {
+            deleteIfStale(previousOriginal, absolutePath, "previous-original-path");
+        }
     }
 
     private void persistVideoPath(String absolutePath) {
@@ -308,23 +316,33 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         long version = prefs.getLong(KEY_VIDEO_VERSION, 0L) + 1L;
         prefs.edit()
             .putString(KEY_VIDEO_PATH, absolutePath)
+            .putLong("video_updated_at", System.currentTimeMillis())
             .putLong(KEY_VIDEO_VERSION, version)
             .commit();
         Log.i(TAG, "persistVideoPath previous=" + previous
             + " new=" + absolutePath
             + " version=" + version
             + " verifyRead=" + prefs.getString(KEY_VIDEO_PATH, null));
-        // Best-effort: delete the previously persisted file so the old asset
-        // cannot be reopened by any cached decoder/MediaPlayer.
-        if (previous != null && !previous.equals(absolutePath)) {
-            try {
-                File old = new File(previous);
-                if (old.exists() && old.delete()) {
-                    Log.i(TAG, "Deleted previous wallpaper file=" + previous);
-                }
-            } catch (Throwable t) {
-                Log.w(TAG, "Could not delete previous wallpaper file: " + t.getMessage());
+        deleteIfStale(previous, absolutePath, "previous-video-path");
+        WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), absolutePath);
+    }
+
+    private void deleteIfStale(String candidate, String keep, String label) {
+        if (candidate == null || candidate.equals(keep)) return;
+        try {
+            File old = new File(candidate);
+            File filesRoot = getContext().getFilesDir();
+            String root = filesRoot.getCanonicalPath();
+            String target = old.getCanonicalPath();
+            if (!target.startsWith(root)) {
+                Log.w(TAG, "Not deleting stale " + label + " outside app filesDir: " + target);
+                return;
             }
+            if (old.exists() && old.delete()) {
+                Log.i(TAG, "Deleted stale " + label + "=" + candidate);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not delete stale " + label + ": " + t.getMessage());
         }
     }
 
