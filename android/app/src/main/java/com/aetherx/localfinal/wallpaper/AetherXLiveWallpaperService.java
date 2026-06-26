@@ -38,6 +38,7 @@ import java.io.File;
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
+    private static final boolean ENABLE_CANVAS_EMERGENCY_FALLBACK = false;
 
     @Override
     public Engine onCreateEngine() {
@@ -55,6 +56,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private Uri lastUri;
         private String currentPath;
         private long currentVersion = -1L;
+        private String rendererUsed = "NONE";
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
@@ -124,7 +126,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     if (v) {
                         if (player != null) { player.setPlayWhenReady(true); player.play(); }
                         if (fallbackPlayer != null) fallbackPlayer.start();
-                        if (frameRetriever != null && frameLoop != null) main.post(frameLoop);
+                        if (ENABLE_CANVAS_EMERGENCY_FALLBACK && frameRetriever != null && frameLoop != null) {
+                            main.post(frameLoop);
+                        }
                     } else {
                         if (player != null) { player.setPlayWhenReady(false); player.pause(); }
                         if (fallbackPlayer != null && fallbackPlayer.isPlaying()) fallbackPlayer.pause();
@@ -216,6 +220,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     + " inputFps=" + stats.fps
                     + " inputSize=" + stats.width + "x" + stats.height
                     + " uri=" + uri);
+                Log.i(TAG, "RENDERER_USED=PREPARING_NATIVE preferred=EXOPLAYER canvasEnabled=" + ENABLE_CANVAS_EMERGENCY_FALLBACK);
                 Log.i(TAG, "ExoPlayer media item=" + uri + " size=" + sizeForLog);
                 lastUri = uri;
 
@@ -245,12 +250,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     public void onPlayerError(PlaybackException error) {
                         Log.e(TAG, "ExoPlayer error code=" + error.errorCode
                                 + " name=" + error.getErrorCodeName(), error);
+                        Log.w(TAG, "RENDERER_USED=EXOPLAYER_FAILED switchingTo=MEDIAPLAYER");
                         Log.i(TAG, "Falling back to native MediaPlayer due to ExoPlayer failure");
                         main.post(() -> startMediaPlayerFallback(lastUri));
                     }
 
                     @Override
                     public void onRenderedFirstFrame() {
+                        rendererUsed = "EXOPLAYER";
+                        Log.i(TAG, "RENDERER_USED=EXOPLAYER");
                         Log.i(TAG, "renderer=ExoPlayer onRenderedFirstFrame playbackSpeed="
                             + player.getPlaybackParameters().speed);
                     }
@@ -264,7 +272,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player.prepare();
                 player.setPlayWhenReady(true);
                 player.play();
-                Log.i(TAG, "ExoPlayer.prepare+play issued");
+                Log.i(TAG, "ExoPlayer.prepare+play issued playbackSpeed=1.0 noManualTimers=true noFrameExtraction=true");
             } catch (Throwable t) {
                 Log.e(TAG, "startPlayer failed, trying MediaPlayer fallback", t);
                 startMediaPlayerFallback(lastUri);
@@ -286,21 +294,35 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 VideoStats stats = readVideoStats(uri);
                 Log.i(TAG, "renderer=MediaPlayer start uri=" + uri
                     + " inputDurationMs=" + stats.durationMs
-                    + " inputFps=" + stats.fps);
+                    + " inputFps=" + stats.fps
+                    + " noManualTimers=true noFrameExtraction=true");
                 fallbackPlayer = new MediaPlayer();
                 fallbackPlayer.setSurface(currentHolder.getSurface());
                 fallbackPlayer.setLooping(true);
                 fallbackPlayer.setVolume(0f, 0f);
                 fallbackPlayer.setOnErrorListener((mp, what, extra) -> {
                     Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra);
-                    main.post(() -> startCanvasFrameFallback(uri));
+                    if (ENABLE_CANVAS_EMERGENCY_FALLBACK) {
+                        Log.w(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED switchingTo=CANVAS_FALLBACK");
+                        main.post(() -> startCanvasFrameFallback(uri));
+                    } else {
+                        Log.e(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED canvasFallbackDisabled=true");
+                        main.post(() -> paintMessage("Vídeo no soportado por el dispositivo"));
+                    }
                     return true;
+                });
+                fallbackPlayer.setOnInfoListener((mp, what, extra) -> {
+                    if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                        rendererUsed = "MEDIAPLAYER";
+                        Log.i(TAG, "RENDERER_USED=MEDIAPLAYER");
+                    }
+                    return false;
                 });
                 fallbackPlayer.setOnPreparedListener(mp -> {
                     Log.i(TAG, "renderer=MediaPlayer prepared, starting playback");
                     try {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            mp.setPlaybackParams(new PlaybackParams().setSpeed(1.0f));
+                            mp.setPlaybackParams(new PlaybackParams().setSpeed(1.0f).setPitch(1.0f));
                             Log.i(TAG, "renderer=MediaPlayer playbackSpeed=" + mp.getPlaybackParams().getSpeed());
                         } else {
                             Log.i(TAG, "renderer=MediaPlayer playbackSpeed=1.0 sdkNoPlaybackParams");
@@ -312,7 +334,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.prepareAsync();
             } catch (Throwable t) {
                 Log.e(TAG, "MediaPlayer fallback failed", t);
-                startCanvasFrameFallback(uri);
+                if (ENABLE_CANVAS_EMERGENCY_FALLBACK) {
+                    startCanvasFrameFallback(uri);
+                } else {
+                    Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true");
+                    paintMessage("Vídeo no soportado por el dispositivo");
+                }
             }
         }
 
@@ -329,6 +356,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     return;
                 }
                 VideoStats stats = readVideoStats(uri);
+                Log.w(TAG, "RENDERER_USED=CANVAS_FALLBACK emergencyOnly=true");
                 Log.i(TAG, "renderer=Canvas start uri=" + uri
                     + " inputDurationMs=" + stats.durationMs
                     + " inputFps=" + stats.fps);
@@ -485,6 +513,10 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         }
 
         private void releasePlayer() {
+            Log.i(TAG, "releasePlayer rendererUsed=" + rendererUsed
+                + " hasExoPlayer=" + (player != null)
+                + " hasMediaPlayer=" + (fallbackPlayer != null)
+                + " hasCanvasFallback=" + (frameRetriever != null));
             if (frameLoop != null) {
                 main.removeCallbacks(frameLoop);
                 frameLoop = null;

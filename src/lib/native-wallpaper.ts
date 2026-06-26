@@ -179,7 +179,9 @@ export async function saveWallpaperToDevice(
 
     if (platform === "android") {
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-      await LiveWallpaper.saveVideoFromUrl({ url: resolveDownloadUrl(videoUrl), fileName });
+      const saved = await LiveWallpaper.saveVideoFromUrl({ url: resolveDownloadUrl(videoUrl), fileName });
+      const previewUrl = Capacitor.convertFileSrc(saved.path);
+      void runInternalSpeedProbe(previewUrl, saved.path);
       return applyPickedVideo(target);
     }
 
@@ -241,4 +243,42 @@ function blobToBase64(blob: Blob): Promise<string> {
     r.onerror = reject;
     r.readAsDataURL(blob);
   });
+}
+
+async function runInternalSpeedProbe(previewUrl: string, savedPath: string) {
+  if (typeof document === "undefined") return;
+  const video = document.createElement("video");
+  video.src = previewUrl;
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.loop = true;
+  video.playbackRate = 1;
+  video.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px";
+  document.body.appendChild(video);
+  try {
+    await new Promise<void>((resolve) => {
+      const done = () => resolve();
+      video.addEventListener("loadedmetadata", done, { once: true });
+      window.setTimeout(done, 1500);
+    });
+    await video.play().catch(() => undefined);
+    const start = video.currentTime;
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    const delta = video.currentTime - start;
+    console.info("AETHERX_SPEED_TEST_CONVERTED_APP", {
+      savedPath,
+      duration: Number.isFinite(video.duration) ? video.duration : null,
+      playbackRate: video.playbackRate,
+      elapsedVideoSeconds: delta,
+      expectedElapsedSeconds: 1,
+    });
+  } catch (err) {
+    console.warn("AETHERX_SPEED_TEST_CONVERTED_APP failed", err);
+  } finally {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    video.remove();
+  }
 }

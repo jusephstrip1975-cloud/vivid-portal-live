@@ -79,24 +79,16 @@ public final class WallpaperVideoTranscoder {
                 + " inputBytes=" + input.length());
 
             MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(input));
-            // Do NOT force frame rate: forcing 30fps on a 60fps source causes the
-            // visible "slow-motion" effect on Samsung. Keep the source FPS and only
-            // cap resolution for decoder compatibility.
-            EditedMediaItem.Builder editedMediaItemBuilder = new EditedMediaItem.Builder(mediaItem)
+            // Preserve original timestamps/cadence. Do NOT request a fixed output
+            // frame rate here: Media3 may duplicate/drop frames to satisfy the
+            // request. We only cap resolution for Samsung decoder compatibility.
+            EditedMediaItem editedMediaItem = new EditedMediaItem.Builder(mediaItem)
                 .setEffects(new Effects(
                     Collections.emptyList(),
-                    Collections.singletonList(Presentation.createForHeight(SAFE_OUTPUT_HEIGHT))));
-            if (inputStats.fps >= 23.0f) {
-                int requestedFrameRate = Math.max(24, Math.min(60, Math.round(inputStats.fps)));
-                // Keep the original cadence. A 60fps input requests 60fps output;
-                // this does not change timestamps or duration.
-                editedMediaItemBuilder.setFrameRate(requestedFrameRate);
-                Log.i(TAG, "Transcoder requestedOutputFps=" + requestedFrameRate
-                    + " sourceFps=" + inputStats.fps);
-            } else {
-                Log.w(TAG, "Transcoder inputFps unknown; not forcing output FPS");
-            }
-            EditedMediaItem editedMediaItem = editedMediaItemBuilder.build();
+                    Collections.singletonList(Presentation.createForHeight(SAFE_OUTPUT_HEIGHT))))
+                .build();
+            Log.i(TAG, "Transcoder frameRateMode=PRESERVE_SOURCE_TIMESTAMPS noFrameRateOverride=true sourceFps="
+                + inputStats.fps);
 
             DefaultDecoderFactory decoderFactory = new DefaultDecoderFactory.Builder(context)
                 .setEnableDecoderFallback(true)
@@ -140,7 +132,7 @@ public final class WallpaperVideoTranscoder {
                             return;
                         }
                         if (inputStats.durationMs > 0 && outputStats.durationMs > 0) {
-                            long toleranceMs = Math.max(300L, Math.round(inputStats.durationMs * 0.02f));
+                            long toleranceMs = Math.max(150L, Math.round(inputStats.durationMs * 0.01f));
                             if (durationDeltaMs > toleranceMs) {
                                 boolean deleted = output.delete();
                                 Log.e(TAG, "Transcoder duration mismatch rejected inputDurationMs="
@@ -149,6 +141,10 @@ public final class WallpaperVideoTranscoder {
                                 cb.onFailure(new IllegalStateException("transcode-duration-mismatch"));
                                 return;
                             }
+                            Log.i(TAG, "TRANSCODER_DURATION_CHECK=OK inputDurationMs=" + inputStats.durationMs
+                                + " outputDurationMs=" + outputStats.durationMs
+                                + " toleranceMs=" + toleranceMs
+                                + " durationDeltaMs=" + durationDeltaMs);
                         }
                         cb.onSuccess(output);
                     }
