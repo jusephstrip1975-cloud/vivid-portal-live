@@ -7,7 +7,6 @@ import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.OptIn;
-import androidx.media3.common.Effects;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.Clock;
@@ -18,6 +17,7 @@ import androidx.media3.transformer.DefaultAssetLoaderFactory;
 import androidx.media3.transformer.DefaultDecoderFactory;
 import androidx.media3.transformer.DefaultEncoderFactory;
 import androidx.media3.transformer.EditedMediaItem;
+import androidx.media3.transformer.Effects;
 import androidx.media3.transformer.ExportException;
 import androidx.media3.transformer.ExportResult;
 import androidx.media3.transformer.Transformer;
@@ -74,8 +74,7 @@ public final class WallpaperVideoTranscoder {
             DefaultAssetLoaderFactory assetLoaderFactory = new DefaultAssetLoaderFactory(
                 context,
                 decoderFactory,
-                Clock.DEFAULT,
-                null);
+                Clock.DEFAULT);
 
             DefaultEncoderFactory encoderFactory = new DefaultEncoderFactory.Builder(context)
                 .setRequestedVideoEncoderSettings(
