@@ -339,12 +339,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     + " outputExists=" + output.exists() + " outputSize=" + output.length());
                 persistConvertedCandidate(output.getAbsolutePath());
                 if (canPrepareWithMediaPlayer(output, wallpaperId, "CONVERTED")) {
-                    Log.i(TAG, "USING_ORIGINAL wallpaperId=" + wallpaperId
-                        + " reason=original-exoplayer-before-converted path=" + input.getAbsolutePath()
-                        + " convertedReady=" + output.getAbsolutePath());
-                    persistVideoPath(input.getAbsolutePath());
+                    Log.i(TAG, "USING_CONVERTED wallpaperId=" + wallpaperId
+                        + " reason=original-mediaplayer-failed-converted-mediaplayer-ok path=" + output.getAbsolutePath());
+                    persistVideoPath(output.getAbsolutePath());
                     WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), output.getAbsolutePath());
-                    resolveSaved(call, input, false, sourceUri, "original-first-converted-ready");
+                    resolveSaved(call, output, true, sourceUri, "converted-mediaplayer-ok");
                     return;
                 }
                 Log.w(TAG, "CONVERTED_MEDIAPLAYER_FAILED wallpaperId=" + wallpaperId
