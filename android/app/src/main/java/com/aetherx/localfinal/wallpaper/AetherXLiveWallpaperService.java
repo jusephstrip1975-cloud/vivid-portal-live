@@ -327,7 +327,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                                 frame.recycle();
                             }
                             positionUs[0] = (positionUs[0] + frameStepUs) % durationUs;
-                            main.postDelayed(this, 83L);
+                            main.postDelayed(this, 33L);
                         } catch (Throwable t) {
                             Log.e(TAG, "Canvas frame fallback failed while drawing", t);
                             paintMessage("Vídeo no soportado por el dispositivo");
