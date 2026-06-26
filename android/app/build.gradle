@@ -57,7 +57,7 @@ dependencies {
     implementation "androidx.media3:media3-common:1.4.1"
 
     // FFmpegKit for transcoding videos to Android-safe format (Samsung-compatible)
-    implementation "com.arthenica:ffmpeg-kit-full-gpl:6.0"
+    implementation "com.arthenica:ffmpeg-kit-full:6.0"
 
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
