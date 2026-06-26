@@ -34,6 +34,8 @@ import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
+import java.util.HashSet;
+import java.util.Set;
 
 public class AetherXLiveWallpaperService extends WallpaperService {
 
@@ -55,6 +57,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private String rendererUsed = "NONE";
         private SurfaceHolder currentHolder;
         private boolean visible = false;
+        private final Set<String> failedPlaybackPaths = new HashSet<>();
         private final Handler main = new Handler(Looper.getMainLooper());
         private SharedPreferences prefs;
         private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
@@ -169,6 +172,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
                     + " new=" + path + " newVersion=" + version + " savedUri=" + savedUri);
                 if (path == null || !path.equals(currentPath) || version != currentVersion) {
+                    failedPlaybackPaths.clear();
                 }
                 currentPath = path;
                 currentVersion = version;
@@ -230,8 +234,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 lastUri = uri;
                 startMediaPlayerFallback(uri);
             } catch (Throwable t) {
-                Log.e(TAG, "startPlayer failed; trying original fallback if available", t);
-                tryOriginalOrFatal("startPlayer-exception", t);
+                Log.e(TAG, "startPlayer failed; trying alternate fallback if available", t);
+                tryAlternateOrFatal("startPlayer-exception", t);
             }
         }
 
@@ -359,7 +363,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         Log.e(TAG, "EXOPLAYER_FAILED currentPath=" + currentPath
                             + " code=" + error.getErrorCodeName());
                         Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true originalPlaybackAllowed=true");
-                        main.post(() -> tryOriginalOrFatal(error.getErrorCodeName(), error));
+                        main.post(() -> tryAlternateOrFatal(error.getErrorCodeName(), error));
                     }
 
                     @Override
@@ -394,47 +398,65 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             } catch (Throwable t) {
                 Log.e(TAG, "EXOPLAYER_FAILED setup path=" + currentPath, t);
                 Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true originalPlaybackAllowed=true");
-                tryOriginalOrFatal("exo-setup-failed", t);
+                tryAlternateOrFatal("exo-setup-failed", t);
             }
         }
 
-        private void tryOriginalOrFatal(String reason, Throwable error) {
+        private void tryAlternateOrFatal(String reason, Throwable error) {
             try {
                 if (prefs == null) {
                     prefs = getApplicationContext()
                         .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
                 }
                 String original = prefs.getString(AetherXLiveWallpaperPlugin.KEY_ORIGINAL_PATH, null);
-                Log.w(TAG, "tryOriginalOrFatal reason=" + reason
+                String converted = prefs.getString(AetherXLiveWallpaperPlugin.KEY_CONVERTED_PATH, null);
+                if (currentPath != null) failedPlaybackPaths.add(currentPath);
+                Log.w(TAG, "tryAlternateOrFatal reason=" + reason
                     + " current=" + currentPath
                     + " originalSource=" + original
+                    + " convertedCandidate=" + converted
+                    + " failedPaths=" + failedPlaybackPaths.size()
                     + " error=" + (error == null ? "none" : error.getMessage()));
-                if (original == null || original.equals(currentPath)) {
+                String next = chooseAlternatePath(original, converted);
+                if (next == null) {
                     paintMessage("Vídeo no soportado por el dispositivo");
                     return;
                 }
-                File f = new File(original);
-                if (!f.exists() || f.length() <= 0 || !f.canRead()) {
-                    Log.w(TAG, "Original fallback source not usable size="
-                        + (f.exists() ? f.length() : -1));
-                    paintMessage("Guarda el vídeo otra vez en la app");
-                    return;
-                }
-                Log.i(TAG, "USING_ORIGINAL reason=renderer-fallback source=" + original);
+                Log.i(TAG, (next.equals(original) ? "USING_ORIGINAL" : "USING_CONVERTED")
+                    + " reason=renderer-fallback source=" + next);
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
-                String previous = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
                 prefs.edit()
-                    .putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, original)
+                    .putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, next)
                     .putLong("video_updated_at", System.currentTimeMillis())
                     .putLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, version)
                     .commit();
-                deletePreviousConverted(previous, original);
                 releasePlayer();
                 startPlayer();
             } catch (Throwable t) {
-                Log.e(TAG, "tryOriginalOrFatal failed", t);
+                Log.e(TAG, "tryAlternateOrFatal failed", t);
                 paintMessage("Vídeo no soportado por el dispositivo");
             }
+        }
+
+        private String chooseAlternatePath(String original, String converted) {
+            String[] candidates;
+            if (currentPath != null && currentPath.equals(original)) {
+                candidates = new String[] { converted };
+            } else if (currentPath != null && currentPath.equals(converted)) {
+                candidates = new String[] { original };
+            } else {
+                candidates = new String[] { original, converted };
+            }
+            for (String candidate : candidates) {
+                if (candidate == null || candidate.equals(currentPath) || failedPlaybackPaths.contains(candidate)) continue;
+                File f = new File(candidate);
+                if (f.exists() && f.length() > 0 && f.canRead()) return candidate;
+                Log.w(TAG, "Alternate playback path not usable path=" + candidate
+                    + " exists=" + f.exists()
+                    + " size=" + (f.exists() ? f.length() : -1)
+                    + " canRead=" + f.canRead());
+            }
+            return null;
         }
 
         private void deletePreviousConverted(String previous, String keep) {
