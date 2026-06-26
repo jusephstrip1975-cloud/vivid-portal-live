@@ -1,8 +1,8 @@
-package com.aetherx.localfinal;
+package com.aetherx.livewallpaper;
 
 import android.os.Bundle;
 
-import com.aetherx.localfinal.wallpaper.AetherXLiveWallpaperPlugin;
+import com.aetherx.livewallpaper.wallpaper.AetherXLiveWallpaperPlugin;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {

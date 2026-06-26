@@ -1,7 +1,6 @@
 # AetherX release ProGuard rules
 
--keepattributes SourceFile,LineNumberTable,*Annotation*,InnerClasses,Signature,Exceptions
--renamesourcefileattribute SourceFile
+-keepattributes *Annotation*,InnerClasses,Signature,Exceptions
 
 # Capacitor
 -keep class com.getcapacitor.** { *; }
@@ -12,7 +11,7 @@
 }
 
 # AetherX native wallpaper layer
--keep class com.aetherx.localfinal.** { *; }
+-keep class com.aetherx.livewallpaper.** { *; }
 
 # Media3 / ExoPlayer
 -keep class androidx.media3.** { *; }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
+import { WallpaperDiagnosticPanel } from "@/components/WallpaperDiagnosticPanel";
 import {
   checkWallpaperCompatibility,
   isNative,
@@ -288,6 +289,8 @@ function WallpaperDetail() {
           </ol>
         </div>
 
+        <WallpaperDiagnosticPanel />
+
         {toast && (
           <div className="glass-nav fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full px-5 py-3 text-xs font-bold uppercase tracking-[0.2em] text-electric-blue shadow-2xl">
             {toast}
@@ -330,6 +333,7 @@ function humanizeWallpaperError(err: unknown): string {
   if (r.includes("path") && (r.includes("empty") || r.includes("missing") || r.includes("null")))
     return "Ruta del vídeo vacía tras la descarga.";
   if (r.includes("save-failed")) return "No se pudo guardar el vídeo en el almacenamiento.";
+  if (r.includes("current_mp4_not_ready")) return "Archivo no guardado: no se abre el selector.";
   if (r.includes("open-picker-failed")) return "Android no abrió el selector de fondos.";
   if (r.includes("pick-video-cancelled") || r === "cancelled") return "Selección cancelada.";
   if (r.includes("unsupported-platform")) return "Esta plataforma no soporta live wallpapers.";

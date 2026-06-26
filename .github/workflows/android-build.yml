@@ -38,10 +38,8 @@ jobs:
         run: chmod +x android/gradlew
 
       # ----- Signing setup -----
-      # Uses real keystore if ANDROID_KEYSTORE_BASE64 secret is set.
-      # Otherwise auto-generates an INTERNAL TEST keystore (NOT valid for Play Store,
-      # only for sideload/internal testing). The keystore is uploaded as an artifact
-      # so subsequent builds can reuse the same signing identity if desired.
+      # Release builds must use a real stable keystore. Test keystores are blocked
+      # because they make the APK look like an internal/prototype build.
       - name: Prepare release keystore
         id: keystore
         env:
@@ -50,39 +48,16 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Using provided release keystore from secrets."
-            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
-            echo "ks_password=$KEYSTORE_PASSWORD" >> "$GITHUB_OUTPUT"
-            echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
-            echo "key_password=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
-            echo "is_test_keystore=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret found. Generating INTERNAL TEST keystore."
-            echo "::warning::This APK/AAB is for sideload/internal testing only. NOT valid for Play Store upload."
-            TEST_PASS="aetherx-internal-test"
-            TEST_ALIAS="aetherx-test"
-            keytool -genkeypair -v \
-              -keystore android/app/release.keystore \
-              -alias "$TEST_ALIAS" \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass "$TEST_PASS" -keypass "$TEST_PASS" \
-              -dname "CN=AETHERX Internal Test, OU=Dev, O=AETHERX, L=NA, ST=NA, C=ES"
-            echo "ks_password=$TEST_PASS" >> "$GITHUB_OUTPUT"
-            echo "key_alias=$TEST_ALIAS" >> "$GITHUB_OUTPUT"
-            echo "key_password=$TEST_PASS" >> "$GITHUB_OUTPUT"
-            echo "is_test_keystore=true" >> "$GITHUB_OUTPUT"
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Missing release signing secrets. Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD."
+            exit 1
           fi
+          echo "Using provided release keystore from secrets."
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          echo "ks_password=$KEYSTORE_PASSWORD" >> "$GITHUB_OUTPUT"
+          echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
+          echo "key_password=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
           echo "Keystore size: $(stat -c%s android/app/release.keystore) bytes"
-
-      - name: Upload keystore (test only)
-        if: steps.keystore.outputs.is_test_keystore == 'true'
-
-        uses: actions/upload-artifact@v4
-        with:
-          name: AETHERX-test-keystore
-          path: android/app/release.keystore
-          if-no-files-found: error
 
       # ----- RELEASE APK (signed, minified, shrunk) -----
       - name: Build release APK

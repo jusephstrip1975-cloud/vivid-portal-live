@@ -25,7 +25,7 @@
         android:theme="@style/AppTheme">
 
         <activity
-            android:name="com.aetherx.localfinal.MainActivity"
+            android:name="com.aetherx.livewallpaper.MainActivity"
             android:label="@string/title_activity_main"
             android:launchMode="singleTask"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
@@ -40,7 +40,7 @@
         </activity>
 
         <service
-            android:name="com.aetherx.localfinal.wallpaper.AetherXLiveWallpaperService"
+            android:name="com.aetherx.livewallpaper.wallpaper.AetherXLiveWallpaperService"
             android:label="@string/wallpaper_label"
             android:description="@string/wallpaper_description"
             android:icon="@mipmap/ic_launcher"

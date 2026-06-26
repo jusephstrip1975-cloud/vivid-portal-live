@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "=========================================="
-echo "  AetherX Local Final — Android Build Script"
+echo "  AETHERX — Android Build Script"
 echo "=========================================="
 
 # 1. Build the full AetherX SPA (galería 3D + rutas) into public/dist
@@ -27,10 +27,10 @@ bunx cap sync android
 
 # 4. Enforce native MainActivity and package id.
 echo ""
-echo "🧩  Step 4/5: Locking native local-final Android project..."
+echo "🧩  Step 4/5: Verifying native Android project..."
 node scripts/lock-android-local-final.mjs
-echo "    ✓ package/applicationId: com.aetherx.localfinal"
-echo "    ✓ app_name: AetherX Local Final"
+echo "    ✓ applicationId: com.aetherx.livewallpaper"
+echo "    ✓ app_name: AETHERX"
 echo "    ✓ pantalla nativa local sin navegador externo."
 
 # 5. Open Android Studio
@@ -38,10 +38,10 @@ echo ""
 echo "🚀  Step 5/5: Listo. Para compilar el APK ejecuta:"
 echo ""
 echo "    cd android"
-echo "    ./gradlew clean assembleDebug      # Linux/macOS"
-echo "    .\\gradlew.bat clean assembleDebug  # Windows"
+echo "    ./gradlew clean assembleRelease bundleRelease      # Linux/macOS"
+echo "    .\\gradlew.bat clean assembleRelease bundleRelease  # Windows"
 echo ""
-echo "    El APK quedará en android/app/build/outputs/apk/debug/app-aetherx-localfinal-debug.apk"
+echo "    El APK quedará en android/app/build/outputs/apk/release/"
 echo ""
 echo "    O abre Android Studio con: bunx cap open android"
 echo "=========================================="

@@ -56,9 +56,9 @@ const steps = [
     number: 4,
     title: "Descarga el APK",
     description:
-      "Cuando el workflow Build Android APK termine con una palomita verde, abre el run, baja a Artifacts y descarga app-debug.apk.",
+      "Cuando el workflow Build AETHERX Release termine con una palomita verde, abre el run, baja a Artifacts y descarga AETHERX-release-apk.",
     icon: Download,
-    tip: "El archivo se descarga como ZIP: descomprímelo para obtener el .apk.",
+    tip: "El archivo se descarga como ZIP: descomprímelo para obtener el APK release firmado.",
   },
   {
     number: 5,
