@@ -131,6 +131,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             } catch (Exception e) {
                 Log.e(TAG, "SAVE_FAILED wallpaperId=" + wallpaperId
                     + " current=" + current.getAbsolutePath(), e);
+                Log.e(TAG, "CURRENT_MP4_SAVE_FAILED wallpaperId=" + wallpaperId
+                    + " PATH=" + current.getAbsolutePath()
+                    + " EXISTS=" + current.exists()
+                    + " CAN_READ=" + current.canRead()
+                    + " SIZE=" + (current.exists() ? current.length() : -1)
+                    + " ABSOLUTE_PATH=" + current.getAbsolutePath(), e);
                 deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
                 clearPersistedVideoPath();
                 call.reject("save-failed: " + e.getMessage(), e);
@@ -168,6 +174,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         } catch (Exception e) {
             Log.e(TAG, "SAVE_FAILED fileName=" + fileName
                 + " current=" + current.getAbsolutePath(), e);
+            Log.e(TAG, "CURRENT_MP4_SAVE_FAILED fileName=" + fileName
+                + " PATH=" + current.getAbsolutePath()
+                + " EXISTS=" + current.exists()
+                + " CAN_READ=" + current.canRead()
+                + " SIZE=" + (current.exists() ? current.length() : -1)
+                + " ABSOLUTE_PATH=" + current.getAbsolutePath(), e);
             deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
             clearPersistedVideoPath();
             call.reject("save-failed: " + e.getMessage(), e);
@@ -249,6 +261,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         } catch (Exception e) {
             Log.e(TAG, "SAVE_FAILED reason=pick-video-failed"
                 + " current=" + current.getAbsolutePath(), e);
+            Log.e(TAG, "CURRENT_MP4_SAVE_FAILED source=picked-video"
+                + " PATH=" + current.getAbsolutePath()
+                + " EXISTS=" + current.exists()
+                + " CAN_READ=" + current.canRead()
+                + " SIZE=" + (current.exists() ? current.length() : -1)
+                + " ABSOLUTE_PATH=" + current.getAbsolutePath(), e);
             deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
             clearPersistedVideoPath();
             call.reject("pick-video-failed: " + e.getMessage(), e);
@@ -408,7 +426,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private File getWallpaperDir() {
         File moviesDir = getContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES);
         if (moviesDir == null) {
-            throw new IllegalStateException("external-movies-dir-unavailable");
+            File externalRoot = Environment.getExternalStorageDirectory();
+            moviesDir = new File(externalRoot, "Android/data/" + getContext().getPackageName() + "/files/Movies");
+            Log.w(TAG, "external-movies-dir-unavailable using-package-external-path=" + moviesDir.getAbsolutePath());
         }
         File dir = new File(moviesDir, WALLPAPER_DIR);
         if (!dir.exists() && !dir.mkdirs()) {
@@ -458,6 +478,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 + " path=" + current.getAbsolutePath()
                 + " exists=" + current.exists()
                 + " size=" + (current.exists() ? current.length() : -1));
+            Log.e(TAG, "CURRENT_MP4_SAVE_FAILED wallpaperId=" + wallpaperId
+                + " reason=" + currentValidation.reason
+                + " PATH=" + current.getAbsolutePath()
+                + " EXISTS=" + current.exists()
+                + " CAN_READ=" + current.canRead()
+                + " SIZE=" + (current.exists() ? current.length() : -1)
+                + " ABSOLUTE_PATH=" + current.getAbsolutePath());
             throw new Exception(currentValidation.reason);
         }
 
