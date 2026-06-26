@@ -476,7 +476,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " version=" + version
             + " verifyRead=" + prefs.getString(KEY_VIDEO_PATH, null));
         deleteIfStale(previous, absolutePath, "previous-video-path");
-        WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), absolutePath);
+        if (absolutePath.contains("/wallpapers/converted/")) {
+            WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), absolutePath);
+        }
     }
 
     private void persistConvertedCandidate(String absolutePath) {
