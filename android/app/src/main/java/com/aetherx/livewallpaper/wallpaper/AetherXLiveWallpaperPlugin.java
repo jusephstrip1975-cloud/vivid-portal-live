@@ -436,6 +436,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public void getStatus(PluginCall call) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String path = prefs.getString(KEY_VIDEO_PATH, null);
+        String lastDownloadUrl = prefs.getString(KEY_LAST_SOURCE_URL, null);
+        long lastDownloadBytes = prefs.getLong(KEY_LAST_DOWNLOAD_BYTES, 0L);
+        String lastError = prefs.getString(KEY_LAST_ERROR, null);
+        boolean openPickerCalled = prefs.getBoolean(KEY_OPEN_PICKER_CALLED, false);
         long version = prefs.getLong(KEY_VIDEO_VERSION, 0L);
         long updatedAt = prefs.getLong("video_updated_at", 0L);
         File current = getCurrentWallpaperFile();
@@ -464,6 +468,15 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " updatedAt=" + updatedAt);
 
         JSObject ret = new JSObject();
+        ret.put("finalPath", current.getAbsolutePath());
+        ret.put("fileExists", current.exists());
+        ret.put("fileSize", current.exists() ? current.length() : 0L);
+        ret.put("canRead", current.exists() && current.canRead());
+        ret.put("KEY_VIDEO_PATH", path);
+        ret.put("lastDownloadUrl", lastDownloadUrl);
+        ret.put("lastDownloadBytes", lastDownloadBytes);
+        ret.put("lastError", lastError);
+        ret.put("openPickerCalled", openPickerCalled);
         ret.put("savedPath", path);
         ret.put("expectedCurrentPath", current.getAbsolutePath());
         ret.put("exists", exists);
