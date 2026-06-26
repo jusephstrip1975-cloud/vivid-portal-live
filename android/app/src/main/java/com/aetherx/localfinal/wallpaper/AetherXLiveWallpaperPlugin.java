@@ -196,7 +196,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public void getStatus(PluginCall call) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String path = prefs.getString(KEY_VIDEO_PATH, null);
+        String original = prefs.getString(KEY_ORIGINAL_PATH, null);
         String uri = prefs.getString(KEY_VIDEO_URI, null);
+        String lastError = prefs.getString("last_transcode_error", null);
+        long version = prefs.getLong(KEY_VIDEO_VERSION, 0L);
+        long updatedAt = prefs.getLong("video_updated_at", 0L);
         File f = path == null ? null : new File(path);
         boolean exists = f != null && f.exists();
         long size = f != null && f.exists() ? f.length() : 0;
@@ -212,14 +216,23 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
         Log.i(TAG, "getStatus path=" + path + " uri=" + uri
             + " exists=" + exists + " size=" + size + " canRead=" + canRead
-            + " fdOk=" + fdOk + " fdErr=" + fdErr);
+            + " fdOk=" + fdOk + " fdErr=" + fdErr
+            + " version=" + version + " updatedAt=" + updatedAt
+            + " originalSource=" + original + " lastTranscodeError=" + lastError);
         JSObject ret = new JSObject();
         ret.put("savedPath", path);
+        ret.put("originalSourcePath", original);
         ret.put("savedUri", uri);
         ret.put("exists", exists);
         ret.put("size", size);
         ret.put("canRead", canRead);
         ret.put("fdOk", fdOk);
+        ret.put("version", version);
+        ret.put("updatedAt", updatedAt);
+        ret.put("renderer", "native-wallpaper-service");
+        ret.put("playbackSpeed", 1.0);
+        ret.put("droppedFrames", "logged-by-renderer");
+        if (lastError != null) ret.put("lastTranscodeError", lastError);
         if (fdErr != null) ret.put("fdError", fdErr);
         call.resolve(ret);
     }
@@ -253,7 +266,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         return new File(dir, fileName);
     }
 
-    /** Transcode the downloaded MP4 to Samsung-friendly H.264/AAC, fall back to original on failure. */
+    /** Transcode the downloaded MP4 to Samsung-friendly H.264/AAC. Original MP4 is never used as wallpaper. */
     private void transcodeAndResolve(final File input, final PluginCall call) {
         transcodeAndResolve(input, call, null);
     }
@@ -261,8 +274,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private void transcodeAndResolve(final File input, final PluginCall call, final String sourceUri) {
         Log.i(TAG, "transcodeAndResolve start input=" + input.getAbsolutePath()
             + " inputExists=" + input.exists() + " inputSize=" + input.length());
-        // Always persist the original as a fallback so the service can play it
-        // if the converted output fails on this device.
+        // Keep the original only as a private reconversion source. It is never
+        // persisted as KEY_VIDEO_PATH and never played by the WallpaperService.
         persistOriginalPath(input.getAbsolutePath());
         WallpaperVideoTranscoder.transcode(getContext(), input, new WallpaperVideoTranscoder.Callback() {
             @Override
@@ -281,18 +294,14 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
             @Override
             public void onFailure(Exception error) {
-                Log.w(TAG, "Transcode failed; falling back to ORIGINAL video as wallpaper source", error);
-                // Don't block playback. Persist the original; the service will try
-                // ExoPlayer -> MediaPlayer on it.
-                persistVideoPath(input.getAbsolutePath());
-                JSObject ret = new JSObject();
-                ret.put("path", input.getAbsolutePath());
-                ret.put("bytes", input.length());
-                ret.put("transcoded", false);
-                ret.put("fallback", "original");
-                ret.put("transcodeError", error.getMessage() == null ? "unknown" : error.getMessage());
-                if (sourceUri != null) ret.put("sourceUri", sourceUri);
-                call.resolve(ret);
+                Log.e(TAG, "Transcode failed after mandatory primary+aggressive passes; original playback disabled", error);
+                SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                prefs.edit()
+                    .putString("last_transcode_error", error.getMessage() == null ? "unknown" : error.getMessage())
+                    .putLong("video_updated_at", System.currentTimeMillis())
+                    .commit();
+                call.reject("transcode-failed-no-original-fallback: "
+                    + (error.getMessage() == null ? "unknown" : error.getMessage()), error);
             }
         });
     }
@@ -316,6 +325,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         long version = prefs.getLong(KEY_VIDEO_VERSION, 0L) + 1L;
         prefs.edit()
             .putString(KEY_VIDEO_PATH, absolutePath)
+            .remove("last_transcode_error")
             .putLong("video_updated_at", System.currentTimeMillis())
             .putLong(KEY_VIDEO_VERSION, version)
             .commit();

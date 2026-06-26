@@ -2,11 +2,9 @@ package com.aetherx.localfinal.wallpaper;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Rect;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaExtractor;
@@ -40,7 +38,7 @@ import java.io.File;
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
-    private static final boolean ENABLE_CANVAS_EMERGENCY_FALLBACK = false;
+    private static final int MAX_AUTOMATIC_RECONVERT_ATTEMPTS = 1;
 
     @Override
     public Engine onCreateEngine() {
@@ -53,13 +51,11 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
         private ExoPlayer player;
         private MediaPlayer fallbackPlayer;
-        private MediaMetadataRetriever frameRetriever;
-        private Runnable frameLoop;
         private Uri lastUri;
         private String currentPath;
         private long currentVersion = -1L;
         private String rendererUsed = "NONE";
-        private boolean triedOriginalFallback = false;
+        private int automaticReconvertAttempts = 0;
         private SurfaceHolder currentHolder;
         private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
@@ -103,7 +99,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             currentHolder = holder;
             Log.i(TAG, "onSurfaceChanged " + width + "x" + height + " format=" + format);
             main.post(() -> {
-                if (player == null && fallbackPlayer == null && frameRetriever == null) {
+                if (player == null && fallbackPlayer == null) {
                     startPlayer();
                 } else {
                     try {
@@ -122,7 +118,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             visible = v;
             Log.i(TAG, "onVisibilityChanged visible=" + v + " player=" + (player != null));
             main.post(() -> {
-                if (player == null && fallbackPlayer == null && frameRetriever == null) {
+                if (player == null && fallbackPlayer == null) {
                     if (v) startPlayer();
                     return;
                 }
@@ -130,13 +126,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     if (v) {
                         if (player != null) { player.setPlayWhenReady(true); player.play(); }
                         if (fallbackPlayer != null) fallbackPlayer.start();
-                        if (ENABLE_CANVAS_EMERGENCY_FALLBACK && frameRetriever != null && frameLoop != null) {
-                            main.post(frameLoop);
-                        }
                     } else {
                         if (player != null) { player.setPlayWhenReady(false); player.pause(); }
                         if (fallbackPlayer != null && fallbackPlayer.isPlaying()) fallbackPlayer.pause();
-                        if (frameLoop != null) main.removeCallbacks(frameLoop);
                     }
                 } catch (Throwable ignored) {}
             });
@@ -180,7 +172,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
                     + " new=" + path + " newVersion=" + version + " savedUri=" + savedUri);
                 if (path == null || !path.equals(currentPath) || version != currentVersion) {
-                    triedOriginalFallback = false;
+                    automaticReconvertAttempts = 0;
                 }
                 currentPath = path;
                 currentVersion = version;
@@ -235,14 +227,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     + " audio=" + stats.audioMime
                     + " decoder=" + stats.decoderName
                     + " playable=" + stats.playable
+                    + " rendererCandidate=MediaPlayer playbackSpeed=1.0 droppedFrames=unavailable"
                     + " uri=" + uri);
-                Log.i(TAG, "RENDERER_USED=PREPARING_NATIVE preferred=MEDIAPLAYER_SAMSUNG exoFallback=true canvasEnabled=" + ENABLE_CANVAS_EMERGENCY_FALLBACK);
+                Log.i(TAG, "RENDERER_USED=PREPARING_NATIVE preferred=MEDIAPLAYER_SAMSUNG exoFallback=true canvasFallback=false originalPlayback=false");
                 Log.i(TAG, "MediaPlayer primary media item=" + uri + " size=" + sizeForLog);
                 lastUri = uri;
                 startMediaPlayerFallback(uri);
             } catch (Throwable t) {
-                Log.e(TAG, "startPlayer failed, trying native fallback chain", t);
-                startMediaPlayerFallback(lastUri);
+                Log.e(TAG, "startPlayer failed; scheduling reconvert/retry", t);
+                scheduleReconvertOrRetry("startPlayer-exception", t);
             }
         }
 
@@ -275,7 +268,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.setVolume(0f, 0f);
                 fallbackPlayer.setOnErrorListener((mp, what, extra) -> {
                     Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra
-                        + " currentPath=" + currentPath + " triedOriginal=" + triedOriginalFallback);
+                        + " currentPath=" + currentPath
+                        + " automaticReconvertAttempts=" + automaticReconvertAttempts);
                     Log.w(TAG, "RENDERER_USED=MEDIAPLAYER_FAILED switchingTo=EXOPLAYER_FALLBACK");
                     main.post(() -> startExoPlayerFallback(uri));
                     return true;
@@ -299,7 +293,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     try {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                             mp.setPlaybackParams(new PlaybackParams().setSpeed(1.0f).setPitch(1.0f));
-                            Log.i(TAG, "renderer=MediaPlayer playbackSpeed=" + mp.getPlaybackParams().getSpeed());
+                            Log.i(TAG, "AETHERX_INTERNAL_PLAYBACK_TEST renderer=MediaPlayer playbackSpeed="
+                                + mp.getPlaybackParams().getSpeed()
+                                + " durationMs=" + mp.getDuration()
+                                + " fps=" + stats.fps
+                                + " droppedFrames=unavailable"
+                                + " path=" + currentPath);
                         } else {
                             Log.i(TAG, "renderer=MediaPlayer playbackSpeed=1.0 sdkNoPlaybackParams");
                         }
@@ -337,7 +336,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     + " profile=" + stats.profile
                     + " level=" + stats.level
                     + " decoder=" + stats.decoderName
-                    + " playbackSpeed=1.0");
+                    + " playbackSpeed=1.0 droppedFrames=unavailable");
 
                 DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(getApplicationContext())
                     .setEnableDecoderFallback(true);
@@ -362,17 +361,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         Log.e(TAG, "ExoPlayer error code=" + error.errorCode
                                 + " name=" + error.getErrorCodeName()
                                 + " currentPath=" + currentPath
-                                + " triedOriginal=" + triedOriginalFallback, error);
-                        if (!triedOriginalFallback && tryOriginalFallback()) {
-                            return;
-                        }
-                        if (ENABLE_CANVAS_EMERGENCY_FALLBACK) {
-                            Log.w(TAG, "RENDERER_USED=EXOPLAYER_FAILED switchingTo=CANVAS_FALLBACK");
-                            main.post(() -> startCanvasFrameFallback(uri));
-                        } else {
-                            Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true");
-                            main.post(() -> paintMessage("Vídeo no soportado por el dispositivo"));
-                        }
+                                + " automaticReconvertAttempts=" + automaticReconvertAttempts, error);
+                        Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true originalPlaybackDisabled=true");
+                        main.post(() -> scheduleReconvertOrRetry(error.getErrorCodeName(), error));
                     }
 
                     @Override
@@ -381,7 +372,16 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         Log.i(TAG, "RENDERER_USED=EXOPLAYER_FALLBACK");
                         Log.i(TAG, "renderer=ExoPlayer onRenderedFirstFrame playbackSpeed="
                             + player.getPlaybackParameters().speed
+                            + " durationMs=" + player.getDuration()
+                            + " fps=" + stats.fps
+                            + " droppedFrames=unavailable"
                             + " currentWallpaperPath=" + currentPath);
+                        Log.i(TAG, "AETHERX_INTERNAL_PLAYBACK_TEST renderer=ExoPlayer playbackSpeed="
+                            + player.getPlaybackParameters().speed
+                            + " durationMs=" + player.getDuration()
+                            + " fps=" + stats.fps
+                            + " droppedFrames=unavailable"
+                            + " path=" + currentPath);
                     }
 
                     @Override
@@ -396,115 +396,82 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.i(TAG, "ExoPlayer.prepare+play fallback issued playbackSpeed=1.0 noManualTimers=true noFrameExtraction=true");
             } catch (Throwable t) {
                 Log.e(TAG, "ExoPlayer fallback failed", t);
-                if (!triedOriginalFallback && tryOriginalFallback()) {
-                    return;
-                }
-                if (ENABLE_CANVAS_EMERGENCY_FALLBACK) {
-                    startCanvasFrameFallback(uri);
-                } else {
-                    Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true");
-                    paintMessage("Vídeo no soportado por el dispositivo");
-                }
+                Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true originalPlaybackDisabled=true");
+                scheduleReconvertOrRetry("exo-setup-failed", t);
             }
         }
 
-        /**
-         * Last-resort fallback: re-point the wallpaper service to the ORIGINAL (un-transcoded)
-         * file if it exists and differs from what we just tried. Returns true if a retry was scheduled.
-         */
-        private boolean tryOriginalFallback() {
+        private void scheduleReconvertOrRetry(String reason, Throwable error) {
             try {
-                if (prefs == null) return false;
+                paintLoading("Preparando wallpaper...");
+                if (prefs == null) {
+                    prefs = getApplicationContext()
+                        .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                }
                 String original = prefs.getString(AetherXLiveWallpaperPlugin.KEY_ORIGINAL_PATH, null);
-                Log.i(TAG, "tryOriginalFallback original=" + original + " current=" + currentPath);
-                if (original == null) return false;
+                Log.w(TAG, "scheduleReconvertOrRetry reason=" + reason
+                    + " current=" + currentPath
+                    + " originalSource=" + original
+                    + " attempts=" + automaticReconvertAttempts
+                    + " error=" + (error == null ? "none" : error.getMessage()));
+                if (automaticReconvertAttempts >= MAX_AUTOMATIC_RECONVERT_ATTEMPTS || original == null) {
+                    paintMessage("Preparación del vídeo fallida");
+                    return;
+                }
                 File f = new File(original);
                 if (!f.exists() || f.length() <= 0 || !f.canRead()) {
-                    Log.w(TAG, "tryOriginalFallback: original file not usable size="
+                    Log.w(TAG, "Reconversion source not usable size="
                         + (f.exists() ? f.length() : -1));
-                    return false;
+                    paintMessage("Guarda el vídeo otra vez en la app");
+                    return;
                 }
-                if (original.equals(currentPath)) {
-                    Log.w(TAG, "tryOriginalFallback: already playing original, nothing to retry");
-                    return false;
-                }
-                triedOriginalFallback = true;
-                Log.w(TAG, "RENDERER_USED=RETRY_WITH_ORIGINAL_FILE path=" + original);
-                long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
-                prefs.edit()
-                    .putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, original)
-                    .putLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, version)
-                    .commit();
-                main.post(() -> {
-                    releasePlayer();
-                    startPlayer();
+                automaticReconvertAttempts++;
+                Log.w(TAG, "RECONVERT_REQUEST_FROM_SERVICE originalPlayback=false source=" + original);
+                WallpaperVideoTranscoder.transcodeAggressive(getApplicationContext(), f, new WallpaperVideoTranscoder.Callback() {
+                    @Override
+                    public void onSuccess(File output) {
+                        main.post(() -> {
+                            Log.i(TAG, "RECONVERT_SUCCESS_FROM_SERVICE output=" + output.getAbsolutePath()
+                                + " bytes=" + output.length());
+                            long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
+                            String previous = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
+                            prefs.edit()
+                                .putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, output.getAbsolutePath())
+                                .putLong("video_updated_at", System.currentTimeMillis())
+                                .putLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, version)
+                                .commit();
+                            deletePreviousConverted(previous, output.getAbsolutePath());
+                            WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getApplicationContext(), output.getAbsolutePath());
+                            releasePlayer();
+                            startPlayer();
+                        });
+                    }
+
+                    @Override
+                    public void onFailure(Exception error) {
+                        main.post(() -> {
+                            Log.e(TAG, "RECONVERT_FAILED_FROM_SERVICE originalPlaybackDisabled=true", error);
+                            paintMessage("Preparación del vídeo fallida");
+                        });
+                    }
                 });
-                return true;
             } catch (Throwable t) {
-                Log.e(TAG, "tryOriginalFallback failed", t);
-                return false;
+                Log.e(TAG, "scheduleReconvertOrRetry failed", t);
+                paintMessage("Preparación del vídeo fallida");
             }
         }
 
-        private void startCanvasFrameFallback(Uri uri) {
+        private void deletePreviousConverted(String previous, String keep) {
             try {
-                releasePlayer();
-                if (uri == null) {
-                    paintMessage("Vídeo no disponible");
-                    return;
+                if (previous == null || previous.equals(keep)) return;
+                File old = new File(previous);
+                File root = getApplicationContext().getFilesDir();
+                if (!old.getCanonicalPath().startsWith(root.getCanonicalPath())) return;
+                if (old.exists() && old.delete()) {
+                    Log.i(TAG, "Deleted previous converted wallpaper=" + previous);
                 }
-                if (currentHolder == null || currentHolder.getSurface() == null
-                        || !currentHolder.getSurface().isValid()) {
-                    Log.w(TAG, "Canvas frame fallback: surface not valid");
-                    return;
-                }
-                VideoStats stats = readVideoStats(uri);
-                Log.w(TAG, "RENDERER_USED=CANVAS_FALLBACK emergencyOnly=true");
-                Log.i(TAG, "renderer=Canvas start uri=" + uri
-                    + " inputDurationMs=" + stats.durationMs
-                    + " inputFps=" + stats.fps);
-                frameRetriever = new MediaMetadataRetriever();
-                frameRetriever.setDataSource(getApplicationContext(), uri);
-                String durationValue = frameRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
-                long parsedDurationUs;
-                try {
-                    parsedDurationUs = Math.max(1_000_000L, Long.parseLong(durationValue) * 1000L);
-                } catch (Throwable ignored) {
-                    parsedDurationUs = 5_000_000L;
-                }
-                final long durationUs = parsedDurationUs;
-                final int targetFps = stats.fps >= 50f
-                    ? 60
-                    : (stats.fps >= 23f ? Math.max(24, Math.round(stats.fps)) : 60);
-                final long frameStepUs = Math.max(1L, 1_000_000L / targetFps);
-                final long frameDelayMs = Math.max(1L, 1000L / targetFps);
-                Log.i(TAG, "renderer=Canvas playbackSpeed=1.0 targetFps=" + targetFps
-                    + " frameStepUs=" + frameStepUs
-                    + " frameDelayMs=" + frameDelayMs
-                    + " durationUs=" + durationUs);
-                final long[] positionUs = new long[] {0L};
-                frameLoop = new Runnable() {
-                    @Override
-                    public void run() {
-                        if (frameRetriever == null || currentHolder == null || !visible) return;
-                        try {
-                            Bitmap frame = frameRetriever.getFrameAtTime(positionUs[0], MediaMetadataRetriever.OPTION_CLOSEST);
-                            if (frame != null) {
-                                drawFrame(frame);
-                                frame.recycle();
-                            }
-                            positionUs[0] = (positionUs[0] + frameStepUs) % durationUs;
-                            main.postDelayed(this, frameDelayMs);
-                        } catch (Throwable t) {
-                            Log.e(TAG, "Canvas frame fallback failed while drawing", t);
-                            paintMessage("Vídeo no soportado por el dispositivo");
-                        }
-                    }
-                };
-                frameLoop.run();
             } catch (Throwable t) {
-                Log.e(TAG, "Canvas frame fallback setup failed", t);
-                paintMessage("Vídeo no soportado por el dispositivo");
+                Log.w(TAG, "deletePreviousConverted failed: " + t.getMessage());
             }
         }
 
@@ -525,30 +492,6 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 c.drawText(text == null ? "" : text, 40f, c.getHeight() / 2f, p);
                 currentHolder.unlockCanvasAndPost(c);
             } catch (Throwable ignored) {
-            }
-        }
-
-        private void drawFrame(Bitmap frame) {
-            Canvas c = null;
-            try {
-                if (currentHolder == null) return;
-                c = currentHolder.lockCanvas();
-                if (c == null) return;
-                c.drawColor(Color.BLACK);
-                int canvasW = c.getWidth();
-                int canvasH = c.getHeight();
-                int frameW = frame.getWidth();
-                int frameH = frame.getHeight();
-                float scale = Math.max(canvasW / (float) frameW, canvasH / (float) frameH);
-                int outW = Math.round(frameW * scale);
-                int outH = Math.round(frameH * scale);
-                int left = (canvasW - outW) / 2;
-                int top = (canvasH - outH) / 2;
-                c.drawBitmap(frame, null, new Rect(left, top, left + outW, top + outH), null);
-            } finally {
-                try {
-                    if (c != null && currentHolder != null) currentHolder.unlockCanvasAndPost(c);
-                } catch (Throwable ignored) {}
             }
         }
 
@@ -704,15 +647,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             Log.i(TAG, "releasePlayer rendererUsed=" + rendererUsed
                 + " hasExoPlayer=" + (player != null)
                 + " hasMediaPlayer=" + (fallbackPlayer != null)
-                + " hasCanvasFallback=" + (frameRetriever != null));
-            if (frameLoop != null) {
-                main.removeCallbacks(frameLoop);
-                frameLoop = null;
-            }
-            if (frameRetriever != null) {
-                try { frameRetriever.release(); } catch (Throwable ignored) {}
-                frameRetriever = null;
-            }
+                + " hasCanvasFallback=false");
             if (player != null) {
                 try {
                     player.stop();
