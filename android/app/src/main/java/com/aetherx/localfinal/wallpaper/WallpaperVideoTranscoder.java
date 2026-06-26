@@ -29,7 +29,8 @@ import java.util.Collections;
 
 /**
  * Transcodes an arbitrary MP4 to a Samsung-friendly H.264 AVC + AAC MP4 using
- * AndroidX Media3 Transformer (no FFmpeg, pure MediaCodec under the hood).
+ * AndroidX Media3 Transformer. Generates a UNIQUE output file per call so the
+ * live wallpaper service is always forced to pick up a brand-new asset.
  */
 @OptIn(markerClass = UnstableApi.class)
 public final class WallpaperVideoTranscoder {
@@ -38,7 +39,8 @@ public final class WallpaperVideoTranscoder {
     private static final int SAFE_OUTPUT_HEIGHT = 720;
     private static final int SAFE_OUTPUT_FRAME_RATE = 30;
     private static final int SAFE_OUTPUT_BITRATE = 1_800_000;
-    public static final String OUTPUT_FILE_NAME = "output-samsung-safe-v4.mp4";
+    public static final String OUTPUT_PREFIX = "output-samsung-safe-";
+    public static final String OUTPUT_SUFFIX = ".mp4";
     private static Transformer currentTransformer;
 
     public interface Callback {
@@ -50,24 +52,28 @@ public final class WallpaperVideoTranscoder {
         new Handler(Looper.getMainLooper()).post(() -> runOnMain(context, input, cb));
     }
 
-    public static File getOutputFile(Context context) {
-        return new File(new File(context.getFilesDir(), "wallpapers/converted"), OUTPUT_FILE_NAME);
+    public static File getConvertedDir(Context context) {
+        File dir = new File(context.getFilesDir(), "wallpapers/converted");
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+
+    private static File buildUniqueOutput(Context context) {
+        return new File(getConvertedDir(context),
+            OUTPUT_PREFIX + System.currentTimeMillis() + OUTPUT_SUFFIX);
     }
 
     private static void runOnMain(final Context context, final File input, final Callback cb) {
         try {
-            File outDir = new File(context.getFilesDir(), "wallpapers/converted");
-            if (!outDir.exists()) outDir.mkdirs();
-            deleteOldConvertedOutputs(outDir);
-            final File output = getOutputFile(context);
-            if (output.exists() && !output.delete()) {
-                Log.w(TAG, "Could not delete previous converted output, overwriting may fail: " + output.getAbsolutePath());
-            }
+            File outDir = getConvertedDir(context);
+            // Wipe ALL previous converted outputs so the old file cannot linger,
+            // decoder caches cannot keep handles, and Samsung cannot reuse it.
+            deleteAllConvertedOutputs(outDir);
+            final File output = buildUniqueOutput(context);
+            Log.i(TAG, "Transcode unique output target=" + output.getAbsolutePath());
 
             MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(input));
             EditedMediaItem editedMediaItem = new EditedMediaItem.Builder(mediaItem)
-                // Forces a real re-encode instead of passthrough/remux. Samsung One UI
-                // live wallpapers are much more reliable with <=720p, 30fps AVC.
                 .setFrameRate(SAFE_OUTPUT_FRAME_RATE)
                 .setEffects(new Effects(
                     Collections.emptyList(),
@@ -130,12 +136,13 @@ public final class WallpaperVideoTranscoder {
         }
     }
 
-    private static void deleteOldConvertedOutputs(File outDir) {
+    private static void deleteAllConvertedOutputs(File outDir) {
         File[] files = outDir.listFiles();
         if (files == null) return;
         for (File f : files) {
-            if (f.isFile() && f.getName().startsWith("output") && !OUTPUT_FILE_NAME.equals(f.getName())) {
-                if (!f.delete()) Log.w(TAG, "Could not delete stale converted file: " + f.getAbsolutePath());
+            if (f.isFile() && f.getName().startsWith(OUTPUT_PREFIX)) {
+                boolean ok = f.delete();
+                Log.i(TAG, "Deleting stale converted file=" + f.getAbsolutePath() + " ok=" + ok);
             }
         }
     }
