@@ -103,9 +103,9 @@ jobs:
         working-directory: android
         env:
           AETHERX_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
-          AETHERX_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          AETHERX_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          AETHERX_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          AETHERX_KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.ks_password }}
+          AETHERX_KEY_ALIAS: ${{ steps.keystore.outputs.key_alias }}
+          AETHERX_KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
         run: ./gradlew bundleRelease --no-daemon --stacktrace
 
       - name: Upload release AAB (Google Play)
