@@ -146,11 +146,11 @@ function WallpaperDetail() {
         setActiveTarget(null);
       }, 1800);
     } catch (err) {
-      console.error(err);
+      console.error("[AetherX] apply failed", { wallpaperId: wp.id, video: wp.video, err });
       setDownloadState("idle");
       setActiveTarget(null);
-      setToast("No se pudo aplicar. Inténtalo de nuevo.");
-      setTimeout(() => setToast(null), 2600);
+      setToast(humanizeWallpaperError(err));
+      setTimeout(() => setToast(null), 4200);
     }
   }
 
