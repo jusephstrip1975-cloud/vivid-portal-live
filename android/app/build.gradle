@@ -55,6 +55,10 @@ dependencies {
     // Media3 ExoPlayer for live wallpaper video rendering
     implementation "androidx.media3:media3-exoplayer:1.4.1"
     implementation "androidx.media3:media3-common:1.4.1"
+    // Media3 Transformer for transcoding to Samsung-compatible H.264/AAC (no FFmpeg)
+    implementation "androidx.media3:media3-transformer:1.4.1"
+    implementation "androidx.media3:media3-effect:1.4.1"
+    implementation "androidx.media3:media3-muxer:1.4.1"
 
 
     testImplementation "junit:junit:$junitVersion"
