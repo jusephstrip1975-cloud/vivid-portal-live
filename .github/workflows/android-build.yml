@@ -37,26 +37,58 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # ----- Signing setup (REQUIRED for Play Store distribution) -----
-      - name: Decode release keystore
+      # ----- Signing setup -----
+      # Uses real keystore if ANDROID_KEYSTORE_BASE64 secret is set.
+      # Otherwise auto-generates an INTERNAL TEST keystore (NOT valid for Play Store,
+      # only for sideload/internal testing). The keystore is uploaded as an artifact
+      # so subsequent builds can reuse the same signing identity if desired.
+      - name: Prepare release keystore
+        id: keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::ANDROID_KEYSTORE_BASE64 secret is required for release builds."
-            exit 1
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using provided release keystore from secrets."
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            echo "ks_password=$KEYSTORE_PASSWORD" >> "$GITHUB_OUTPUT"
+            echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
+            echo "key_password=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret found. Generating INTERNAL TEST keystore."
+            echo "::warning::This APK/AAB is for sideload/internal testing only. NOT valid for Play Store upload."
+            TEST_PASS="aetherx-internal-test"
+            TEST_ALIAS="aetherx-test"
+            keytool -genkeypair -v \
+              -keystore android/app/release.keystore \
+              -alias "$TEST_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$TEST_PASS" -keypass "$TEST_PASS" \
+              -dname "CN=AETHERX Internal Test, OU=Dev, O=AETHERX, L=NA, ST=NA, C=ES"
+            echo "ks_password=$TEST_PASS" >> "$GITHUB_OUTPUT"
+            echo "key_alias=$TEST_ALIAS" >> "$GITHUB_OUTPUT"
+            echo "key_password=$TEST_PASS" >> "$GITHUB_OUTPUT"
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
-          echo "Keystore restored: $(stat -c%s android/app/release.keystore) bytes"
+          echo "Keystore size: $(stat -c%s android/app/release.keystore) bytes"
+
+      - name: Upload keystore (test only)
+        if: ${{ !secrets.ANDROID_KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: AETHERX-test-keystore
+          path: android/app/release.keystore
+          if-no-files-found: error
 
       # ----- RELEASE APK (signed, minified, shrunk) -----
       - name: Build release APK
         working-directory: android
         env:
           AETHERX_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
-          AETHERX_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          AETHERX_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          AETHERX_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          AETHERX_KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.ks_password }}
+          AETHERX_KEY_ALIAS: ${{ steps.keystore.outputs.key_alias }}
+          AETHERX_KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
         run: ./gradlew clean assembleRelease --no-daemon --stacktrace
 
       - name: Upload release APK
