@@ -56,8 +56,6 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer:1.4.1"
     implementation "androidx.media3:media3-common:1.4.1"
 
-    // Mobile-FFmpeg for transcoding videos to Android-safe format (Samsung-compatible)
-    implementation "com.arthenica:mobile-ffmpeg-full:4.4"
 
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
