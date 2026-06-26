@@ -221,7 +221,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     paintMessage("Archivo de wallpaper no encontrado");
                     return;
                 }
-                if (selectedSize < MIN_VALID_VIDEO_BYTES) {
+                if (selectedSize <= MIN_VALID_VIDEO_BYTES) {
                     Log.e(TAG, "CURRENT_MP4_MISSING reason=file-too-small VIDEO_PATH=" + path
                         + " FILE_EXISTS=" + selectedExists
                         + " FILE_SIZE=" + selectedSize
@@ -295,7 +295,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private boolean testMediaPlayerPrepare(File file, String label) {
             MediaPlayer mp = null;
             try {
-                if (file == null || !file.exists() || file.length() < MIN_VALID_VIDEO_BYTES || !file.canRead()) {
+                if (file == null || !file.exists() || file.length() <= MIN_VALID_VIDEO_BYTES || !file.canRead()) {
                     Log.e(TAG, "MEDIAPLAYER_PREPARE_FAILED label=" + label
                         + " reason=file-not-usable"
                         + " SELECTED_PATH=" + (file == null ? "null" : file.getAbsolutePath())
