@@ -88,17 +88,19 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             visible = v;
             Log.i(TAG, "onVisibilityChanged visible=" + v + " player=" + (player != null));
             main.post(() -> {
-                if (player == null) {
+                if (player == null && fallbackPlayer == null) {
                     if (v) startPlayer();
                     return;
                 }
-                if (v) {
-                    player.setPlayWhenReady(true);
-                    player.play();
-                } else {
-                    player.setPlayWhenReady(false);
-                    player.pause();
-                }
+                try {
+                    if (v) {
+                        if (player != null) { player.setPlayWhenReady(true); player.play(); }
+                        if (fallbackPlayer != null) fallbackPlayer.start();
+                    } else {
+                        if (player != null) { player.setPlayWhenReady(false); player.pause(); }
+                        if (fallbackPlayer != null && fallbackPlayer.isPlaying()) fallbackPlayer.pause();
+                    }
+                } catch (Throwable ignored) {}
             });
         }
 
