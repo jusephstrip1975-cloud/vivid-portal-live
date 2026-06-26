@@ -10,6 +10,7 @@ interface LiveWallpaperPlugin {
   saveVideoFromUrl(options: {
     url: string;
     fileName?: string;
+    wallpaperId?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
   saveVideo(options: {
     base64: string;
