@@ -36,6 +36,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String PREFS = "aetherx_live_wallpaper";
     public static final String KEY_VIDEO_PATH = "video_path";
     public static final String KEY_VIDEO_URI = "video_uri";
+    public static final String KEY_VIDEO_VERSION = "video_version";
     private static final int MAX_REDIRECTS = 5;
 
     @PluginMethod
