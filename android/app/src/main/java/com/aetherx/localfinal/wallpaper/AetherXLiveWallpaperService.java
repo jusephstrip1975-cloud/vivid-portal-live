@@ -107,7 +107,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     startPlayer();
                 } else {
                     try {
-                        player.setVideoSurface(holder.getSurface());
+                        if (player != null) player.setVideoSurface(holder.getSurface());
+                        if (fallbackPlayer != null) fallbackPlayer.setSurface(holder.getSurface());
                     } catch (Throwable t) {
                         Log.e(TAG, "setVideoSurface on change failed", t);
                     }
