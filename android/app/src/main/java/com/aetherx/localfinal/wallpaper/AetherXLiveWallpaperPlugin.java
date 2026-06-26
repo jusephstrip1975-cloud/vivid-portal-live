@@ -707,7 +707,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " lastValidSize=" + (lastValid.exists() ? lastValid.length() : -1));
         if (!lastValid.exists() || !lastValid.canRead() || lastValid.length() <= MIN_VALID_VIDEO_BYTES) {
             Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=last-valid-missing stage=" + stage);
-            return false;
+            return attemptRestoreFromLastSourceUrl(stage, current, prefs);
         }
         PowerManager.WakeLock wakeLock = acquireShortWakeLock("restoreCurrentMp4");
         try {
@@ -731,6 +731,42 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             return false;
         } finally {
             releaseWakeLock(wakeLock, "restoreCurrentMp4");
+        }
+    }
+
+    private boolean attemptRestoreFromLastSourceUrl(String stage, File current, SharedPreferences prefs) {
+        String sourceUrl = prefs.getString(KEY_LAST_SOURCE_URL, null);
+        if (sourceUrl == null || sourceUrl.isEmpty()) {
+            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=no-last-source-url stage=" + stage);
+            return false;
+        }
+        PowerManager.WakeLock wakeLock = acquireShortWakeLock("restoreFromLastDownload");
+        try {
+            Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_DOWNLOAD stage=" + stage + " current=" + current.getAbsolutePath());
+            downloadFollowingRedirects(sourceUrl, current);
+            ValidationResult validation = validatePhysicalFileForPlayback(current, "restore-from-last-download", stage);
+            if (!validation.ok) {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=" + validation.reason
+                    + " source=last-download current=" + current.getAbsolutePath());
+                return false;
+            }
+            File lastValid = getLastValidWallpaperFile();
+            copyFile(current, lastValid);
+            persistCurrentPath(current, "restore-last-download-" + stage);
+            persistLastValidPath(lastValid, "restore-last-download-" + stage);
+            Log.i(TAG, "CURRENT_MP4_RECREATED stage=" + stage
+                + " source=last-download"
+                + " PATH=" + current.getAbsolutePath()
+                + " EXISTS=" + current.exists()
+                + " CAN_READ=" + current.canRead()
+                + " SIZE=" + current.length()
+                + " ABSOLUTE_PATH=" + current.getAbsolutePath());
+            return true;
+        } catch (Throwable t) {
+            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED source=last-download stage=" + stage, t);
+            return false;
+        } finally {
+            releaseWakeLock(wakeLock, "restoreFromLastDownload");
         }
     }
 
