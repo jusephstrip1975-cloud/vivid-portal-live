@@ -117,8 +117,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             File current = getCurrentWallpaperFile();
             try {
                 prepareForNewWallpaper(wallpaperId);
+                persistLastSourceUrl(url, wallpaperId);
+                clearLastError();
+                setLastDownloadBytes(0L);
+                setOpenPickerCalled(false);
                 Log.i(TAG, "download-start wallpaperId=" + wallpaperId + " current=" + current.getAbsolutePath());
                 long bytes = downloadFollowingRedirects(url, current);
+                setLastDownloadBytes(bytes);
                 Log.i(TAG, "download-complete wallpaperId=" + wallpaperId
                     + " bytes=" + bytes
                     + " exists=" + current.exists()
@@ -126,9 +131,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     + " absolute=" + current.getAbsolutePath());
 
                 current = commitValidatedCurrentMp4(current, wallpaperId, "download");
-                persistLastSourceUrl(url, wallpaperId);
                 resolveSaved(call, current, false, null, "current-mp4-persistent");
             } catch (Exception e) {
+                setLastError(classifySaveError(e) + ": " + e.getMessage());
                 Log.e(TAG, "SAVE_FAILED wallpaperId=" + wallpaperId
                     + " current=" + current.getAbsolutePath(), e);
                 Log.e(TAG, "CURRENT_MP4_SAVE_FAILED wallpaperId=" + wallpaperId
@@ -139,9 +144,73 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     + " ABSOLUTE_PATH=" + current.getAbsolutePath(), e);
                 deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
                 clearPersistedVideoPath();
-                call.reject("save-failed: " + e.getMessage(), e);
+                call.reject(classifySaveError(e), e);
             } finally {
                 releaseWakeLock(wakeLock, "saveVideoFromUrl");
+            }
+        }).start();
+    }
+
+    @PluginMethod
+    public void saveVideoFromUrlAndOpenPicker(final PluginCall call) {
+        final String url = call.getString("url");
+        final String fileName = sanitizeFileName(call.getString("fileName", "wallpaper.mp4"));
+        final String wallpaperId = call.getString("wallpaperId", fileName);
+        Log.i(TAG, "saveVideoFromUrlAndOpenPicker wallpaperId=" + wallpaperId + " url=" + url + " fileName=" + fileName);
+        if (url == null || url.isEmpty()) {
+            setLastError("descarga fallida: missing-url");
+            setOpenPickerCalled(false);
+            call.reject("descarga fallida");
+            return;
+        }
+        String storageError = guardStorageOrReject("saveVideoFromUrlAndOpenPicker");
+        if (storageError != null) {
+            setLastError(storageError);
+            setOpenPickerCalled(false);
+            call.reject(storageError);
+            return;
+        }
+
+        new Thread(() -> {
+            PowerManager.WakeLock wakeLock = acquireShortWakeLock("saveVideoFromUrlAndOpenPicker");
+            File current = getCurrentWallpaperFile();
+            try {
+                prepareForNewWallpaper(wallpaperId);
+                persistLastSourceUrl(url, wallpaperId);
+                clearLastError();
+                setLastDownloadBytes(0L);
+                setOpenPickerCalled(false);
+
+                Log.i(TAG, "download-start wallpaperId=" + wallpaperId + " current=" + current.getAbsolutePath());
+                long bytes = downloadFollowingRedirects(url, current);
+                setLastDownloadBytes(bytes);
+                Log.i(TAG, "download-complete wallpaperId=" + wallpaperId
+                    + " bytes=" + bytes
+                    + " exists=" + current.exists()
+                    + " size=" + current.length()
+                    + " absolute=" + current.getAbsolutePath());
+
+                current = commitValidatedCurrentMp4(current, wallpaperId, "download-and-open");
+                final String finalPath = current.getAbsolutePath();
+                new Handler(Looper.getMainLooper()).post(() -> openLivePickerForFinalPath(call, finalPath));
+            } catch (Exception e) {
+                String userError = classifySaveError(e);
+                setLastError(userError + ": " + e.getMessage());
+                setOpenPickerCalled(false);
+                Log.e(TAG, "SAVE_AND_OPEN_FAILED wallpaperId=" + wallpaperId
+                    + " error=" + userError
+                    + " current=" + current.getAbsolutePath(), e);
+                Log.e(TAG, "CURRENT_MP4_SAVE_FAILED wallpaperId=" + wallpaperId
+                    + " PATH=" + current.getAbsolutePath()
+                    + " EXISTS=" + current.exists()
+                    + " CAN_READ=" + current.canRead()
+                    + " SIZE=" + (current.exists() ? current.length() : -1)
+                    + " ABSOLUTE_PATH=" + current.getAbsolutePath(), e);
+                deleteFileIfExists(current, "SAVE_AND_OPEN_FAILED cleanup-current");
+                clearPersistedVideoPath();
+                call.reject(userError, e);
+            } finally {
+                releaseWakeLock(wakeLock, "saveVideoFromUrlAndOpenPicker");
             }
         }).start();
     }
