@@ -20,9 +20,8 @@ npm install
 
 # 3. Build web normal solicitado y build local Capacitor offline.
 echo ""
-echo "🔨  Step 3/7: npm run build + build Capacitor local..."
+echo "🔨  Step 3/7: npm run build + verify Capacitor local build..."
 npm run build
-npm run build:capacitor
 
 # 4. Add Android platform if missing
 echo ""
