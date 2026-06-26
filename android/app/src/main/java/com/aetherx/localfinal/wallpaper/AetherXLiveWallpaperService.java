@@ -430,12 +430,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.i(TAG, (next.equals(original) ? "USING_ORIGINAL" : "USING_CONVERTED")
                     + " reason=renderer-fallback source=" + next);
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
+                preserveFailedPathsOnNextStart = true;
                 prefs.edit()
                     .putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, next)
                     .putLong("video_updated_at", System.currentTimeMillis())
                     .putLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, version)
                     .commit();
-                preserveFailedPathsOnNextStart = true;
                 releasePlayer();
                 startPlayer();
             } catch (Throwable t) {
