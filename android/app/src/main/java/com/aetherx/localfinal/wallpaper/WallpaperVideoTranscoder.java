@@ -84,9 +84,12 @@ public final class WallpaperVideoTranscoder {
                 Clock.DEFAULT);
 
             DefaultEncoderFactory encoderFactory = new DefaultEncoderFactory.Builder(context)
+                .setEnableFallback(false)
                 .setRequestedVideoEncoderSettings(
                     new VideoEncoderSettings.Builder()
                         .setBitrate(SAFE_OUTPUT_BITRATE)
+                        .setMaxBFrames(0)
+                        .setiFrameIntervalSeconds(1f)
                         .build())
                 .build();
 
