@@ -267,8 +267,16 @@ export async function saveWallpaperToDevice(
     return { ok: false, reason: "unsupported-platform" };
   } catch (err) {
     console.error("saveWallpaperToDevice failed", err);
-    return { ok: false, reason: String(err) };
+    return { ok: false, reason: normalizeWallpaperError(err) };
   }
+}
+
+function normalizeWallpaperError(err: unknown): string {
+  const message = String(err ?? "");
+  if (message.includes("descarga fallida")) return "descarga fallida";
+  if (message.includes("archivo no guardado")) return "archivo no guardado";
+  if (message.includes("CURRENT_MP4_NOT_READY")) return "CURRENT_MP4_NOT_READY";
+  return message;
 }
 
 export function resolveDownloadUrl(url: string): string {
