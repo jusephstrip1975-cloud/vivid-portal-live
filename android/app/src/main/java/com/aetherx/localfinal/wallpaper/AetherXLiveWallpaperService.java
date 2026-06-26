@@ -433,6 +433,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         Log.e(TAG, "ExoPlayer error code=" + error.errorCode
                                 + " name=" + error.getErrorCodeName()
                                 + " currentPath=" + currentPath, error);
+                        Log.e(TAG, "EXOPLAYER_SOURCE_FAILED SELECTED_PATH=" + currentPath
+                            + " code=" + error.getErrorCodeName()
+                            + " message=" + error.getMessage());
                         Log.e(TAG, "EXOPLAYER_FAILED currentPath=" + currentPath
                             + " code=" + error.getErrorCodeName());
                         Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true originalPlaybackAllowed=true");
