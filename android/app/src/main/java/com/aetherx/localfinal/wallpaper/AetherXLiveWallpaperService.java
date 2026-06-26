@@ -40,6 +40,7 @@ import java.util.Set;
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
+    private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
     @Override
     public Engine onCreateEngine() {
         Log.i(TAG, "onCreateEngine");
@@ -173,6 +174,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String convertedPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_CONVERTED_PATH, null);
                 String savedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
+                Log.i(TAG, "ORIGINAL_PATH=" + originalPath);
+                Log.i(TAG, "CONVERTED_PATH=" + convertedPath);
+                Log.i(TAG, "SELECTED_PATH=" + path);
                 Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
                     + " new=" + path + " newVersion=" + version + " savedUri=" + savedUri
                     + " originalPath=" + originalPath + " convertedPath=" + convertedPath);
@@ -192,9 +196,25 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     return;
                 }
                 File selectedOutput = new File(path);
-                if (!selectedOutput.exists() || selectedOutput.length() <= 0 || !selectedOutput.canRead()) {
-                    Log.w(TAG, "Persisted wallpaper file missing or unreadable: " + path);
-                    paintMessage("Guarda el vídeo otra vez en la app");
+                boolean selectedExists = selectedOutput.exists();
+                long selectedSize = selectedExists ? selectedOutput.length() : -1L;
+                boolean selectedCanRead = selectedExists && selectedOutput.canRead();
+                Log.i(TAG, "FILE_EXISTS=" + selectedExists + " SELECTED_PATH=" + path);
+                Log.i(TAG, "FILE_SIZE=" + selectedSize + " SELECTED_PATH=" + path);
+                if (!selectedExists || !selectedCanRead) {
+                    Log.e(TAG, "archivo no encontrado SELECTED_PATH=" + path
+                        + " FILE_EXISTS=" + selectedExists
+                        + " FILE_SIZE=" + selectedSize
+                        + " canRead=" + selectedCanRead);
+                    paintMessage("archivo no encontrado");
+                    return;
+                }
+                if (selectedSize < MIN_VALID_VIDEO_BYTES) {
+                    Log.e(TAG, "archivo no encontrado reason=file-too-small SELECTED_PATH=" + path
+                        + " FILE_EXISTS=" + selectedExists
+                        + " FILE_SIZE=" + selectedSize
+                        + " minBytes=" + MIN_VALID_VIDEO_BYTES);
+                    paintMessage("archivo no encontrado");
                     return;
                 }
 
@@ -220,11 +240,14 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     }
                 }
                 if (uri == null) {
-                    paintMessage("Vídeo convertido no encontrado");
+                    Log.e(TAG, "archivo no encontrado reason=uri-open-failed SELECTED_PATH=" + path);
+                    paintMessage("archivo no encontrado");
                     return;
                 }
 
                 VideoStats stats = readVideoStats(uri);
+                Log.i(TAG, "FILE_DURATION=" + stats.durationMs + " SELECTED_PATH=" + path);
+                Log.i(TAG, "FILE_MIME=" + stats.videoMime + " SELECTED_PATH=" + path);
                 Log.i(TAG, "Wallpaper media stats renderer=prepare inputDurationMs=" + stats.durationMs
                     + " inputFps=" + stats.fps
                     + " estimatedFps=" + stats.estimatedFps
@@ -242,10 +265,47 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.i(TAG, "RENDERER_USED=PREPARING_NATIVE preferred=MEDIAPLAYER_SAMSUNG exoFallback=true canvasFallback=false originalPlaybackAllowed=true playbackOrder=MediaPlayerOriginal_ExoOriginal_MediaPlayerConverted_ExoConverted");
                 Log.i(TAG, "MediaPlayer primary media item=" + uri + " size=" + sizeForLog);
                 lastUri = uri;
-                startMediaPlayerFallback(uri);
+                if (testMediaPlayerPrepare(selectedOutput, "SERVICE_SELECTED_BEFORE_RENDER")) {
+                    startMediaPlayerFallback(uri);
+                } else {
+                    Log.w(TAG, "MEDIAPLAYER_FAILED prepare-test-before-render path=" + currentPath
+                        + " switchingTo=EXOPLAYER_SAME_FILE");
+                    startExoPlayerFallback(uri);
+                }
             } catch (Throwable t) {
                 Log.e(TAG, "startPlayer failed; trying alternate fallback if available", t);
                 tryAlternateOrFatal("startPlayer-exception", t);
+            }
+        }
+
+        private boolean testMediaPlayerPrepare(File file, String label) {
+            MediaPlayer mp = null;
+            try {
+                if (file == null || !file.exists() || file.length() < MIN_VALID_VIDEO_BYTES || !file.canRead()) {
+                    Log.e(TAG, "MEDIAPLAYER_PREPARE_FAILED label=" + label
+                        + " reason=file-not-usable"
+                        + " SELECTED_PATH=" + (file == null ? "null" : file.getAbsolutePath())
+                        + " FILE_EXISTS=" + (file != null && file.exists())
+                        + " FILE_SIZE=" + (file != null && file.exists() ? file.length() : -1)
+                        + " canRead=" + (file != null && file.canRead()));
+                    return false;
+                }
+                mp = new MediaPlayer();
+                mp.setDataSource(file.getAbsolutePath());
+                mp.setVolume(0f, 0f);
+                mp.prepare();
+                Log.i(TAG, "MEDIAPLAYER_PREPARE_OK label=" + label
+                    + " SELECTED_PATH=" + file.getAbsolutePath()
+                    + " durationMs=" + mp.getDuration());
+                return true;
+            } catch (Throwable t) {
+                Log.e(TAG, "MEDIAPLAYER_PREPARE_FAILED label=" + label
+                    + " SELECTED_PATH=" + (file == null ? "null" : file.getAbsolutePath()), t);
+                return false;
+            } finally {
+                if (mp != null) {
+                    try { mp.release(); } catch (Throwable ignored) {}
+                }
             }
         }
 
@@ -291,6 +351,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     return false;
                 });
                 fallbackPlayer.setOnPreparedListener(mp -> {
+                    Log.i(TAG, "MEDIAPLAYER_PREPARE_OK renderer=MediaPlayer asyncPrepared SELECTED_PATH=" + currentPath
+                        + " durationMs=" + mp.getDuration());
                     Log.i(TAG, "MEDIAPLAYER_OK renderer=MediaPlayer prepared, starting playback path=" + currentPath);
                     try {
                         mp.start();
@@ -318,6 +380,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.setDataSource(getApplicationContext(), uri);
                 fallbackPlayer.prepareAsync();
             } catch (Throwable t) {
+                Log.e(TAG, "MEDIAPLAYER_PREPARE_FAILED setup SELECTED_PATH=" + currentPath, t);
                 Log.e(TAG, "MEDIAPLAYER_FAILED setup path=" + currentPath, t);
                 startExoPlayerFallback(uri);
             }
@@ -401,11 +464,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     }
                 });
                 player.setMediaItem(MediaItem.fromUri(uri));
+                Log.i(TAG, "EXOPLAYER_SOURCE_OK SELECTED_PATH=" + currentPath + " uri=" + uri);
                 player.prepare();
                 player.setPlayWhenReady(true);
                 player.play();
                 Log.i(TAG, "ExoPlayer.prepare+play fallback issued playbackSpeed=1.0 noManualTimers=true noFrameExtraction=true");
             } catch (Throwable t) {
+                Log.e(TAG, "EXOPLAYER_SOURCE_FAILED SELECTED_PATH=" + currentPath, t);
                 Log.e(TAG, "EXOPLAYER_FAILED setup path=" + currentPath, t);
                 Log.e(TAG, "RENDERER_USED=NONE nativePlaybackFailed=true canvasFallbackDisabled=true originalPlaybackAllowed=true");
                 tryAlternateOrFatal("exo-setup-failed", t);
@@ -421,6 +486,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String original = prefs.getString(AetherXLiveWallpaperPlugin.KEY_ORIGINAL_PATH, null);
                 String converted = prefs.getString(AetherXLiveWallpaperPlugin.KEY_CONVERTED_PATH, null);
                 if (currentPath != null) failedPlaybackPaths.add(currentPath);
+                Log.i(TAG, "ORIGINAL_PATH=" + original);
+                Log.i(TAG, "CONVERTED_PATH=" + converted);
+                Log.i(TAG, "SELECTED_PATH=" + currentPath);
                 Log.w(TAG, "tryAlternateOrFatal reason=" + reason
                     + " current=" + currentPath
                     + " originalSource=" + original
@@ -430,7 +498,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String next = chooseAlternatePath(original, converted);
                 if (next == null) {
                     if (tryServiceTranscodeOnce(original, converted, reason)) return;
-                    paintMessage("Vídeo no soportado por el dispositivo");
+                    Log.e(TAG, "NO_PLAYABLE_FILE original=" + original
+                        + " converted=" + converted
+                        + " selected=" + currentPath
+                        + " failedPaths=" + failedPlaybackPaths
+                        + " finalReason=" + reason);
+                    paintMessage("archivo no encontrado");
                     return;
                 }
                 Log.i(TAG, (next.equals(original) ? "USING_ORIGINAL" : "USING_CONVERTED")
@@ -486,7 +559,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 public void onFailure(Exception error) {
                     main.post(() -> {
                         Log.e(TAG, "TRANSCODE_FAILED reason=service-rescue fatalIfNoAlternate=true", error);
-                        paintMessage("Vídeo no soportado por el dispositivo");
+                        paintMessage("archivo no encontrado");
                     });
                 }
             });
