@@ -22,6 +22,7 @@ interface LiveWallpaperPlugin {
   openPicker(): Promise<{ opened: boolean }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
   checkCompatibility(): Promise<CompatibilityResult>;
+  checkStorage(): Promise<{ ok: boolean; freeMb: number; requiredMb: number; message: string }>;
 }
 
 export interface CompatibilityResult {
