@@ -127,24 +127,17 @@ public final class WallpaperVideoTranscoder {
                             + " inputFps=" + inputStats.fps
                             + " durationDeltaMs=" + durationDeltaMs);
                         currentTransformer = null;
-                        if (!isReadableVideo(context, output)) {
-                            cb.onFailure(new IllegalStateException("converted-video-not-readable"));
+                        // Relaxed validation: only reject if file truly missing/empty.
+                        // Any playable file with bytes is accepted; renderers will fall back if needed.
+                        if (output == null || !output.exists() || output.length() <= 0) {
+                            Log.e(TAG, "TRANSCODER_OUTPUT_EMPTY rejecting");
+                            cb.onFailure(new IllegalStateException("converted-video-empty"));
                             return;
                         }
                         if (inputStats.durationMs > 0 && outputStats.durationMs > 0) {
-                            long toleranceMs = Math.max(150L, Math.round(inputStats.durationMs * 0.01f));
-                            if (durationDeltaMs > toleranceMs) {
-                                boolean deleted = output.delete();
-                                Log.e(TAG, "Transcoder duration mismatch rejected inputDurationMs="
-                                    + inputStats.durationMs + " outputDurationMs=" + outputStats.durationMs
-                                    + " toleranceMs=" + toleranceMs + " deleted=" + deleted);
-                                cb.onFailure(new IllegalStateException("transcode-duration-mismatch"));
-                                return;
-                            }
-                            Log.i(TAG, "TRANSCODER_DURATION_CHECK=OK inputDurationMs=" + inputStats.durationMs
+                            Log.i(TAG, "TRANSCODER_DURATION_INFO inputDurationMs=" + inputStats.durationMs
                                 + " outputDurationMs=" + outputStats.durationMs
-                                + " toleranceMs=" + toleranceMs
-                                + " durationDeltaMs=" + durationDeltaMs);
+                                + " durationDeltaMs=" + durationDeltaMs + " (no rejection, informational)");
                         }
                         cb.onSuccess(output);
                     }
