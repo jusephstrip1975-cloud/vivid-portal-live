@@ -72,6 +72,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             } catch (Exception e) {
                 Log.e(TAG, "SAVE_FAILED wallpaperId=" + wallpaperId
                     + " current=" + current.getAbsolutePath(), e);
+                deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
                 clearPersistedVideoPath();
                 call.reject("save-failed: " + e.getMessage(), e);
             }
@@ -103,6 +104,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         } catch (Exception e) {
             Log.e(TAG, "SAVE_FAILED fileName=" + fileName
                 + " current=" + current.getAbsolutePath(), e);
+            deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
             clearPersistedVideoPath();
             call.reject("save-failed: " + e.getMessage(), e);
         }
@@ -158,6 +160,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         } catch (Exception e) {
             Log.e(TAG, "SAVE_FAILED reason=pick-video-failed"
                 + " current=" + current.getAbsolutePath(), e);
+            deleteFileIfExists(current, "SAVE_FAILED cleanup-current");
             clearPersistedVideoPath();
             call.reject("pick-video-failed: " + e.getMessage(), e);
         }
