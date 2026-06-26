@@ -5,41 +5,56 @@ echo "=========================================="
 echo "  AETHERX — Android Build Script"
 echo "=========================================="
 
-# 1. Build the full AetherX SPA (galería 3D + rutas) into public/dist
-echo ""
-echo "🔨  Step 1/5: Building full AetherX SPA for Capacitor (hash router, offline)..."
-node scripts/prepare-android-local.mjs --prepare
+export AETHERX_BUILD_VERSION="${AETHERX_BUILD_VERSION:-$(date -u +%Y%m%d%H%M%S)}"
+echo "APP_BUILD_VERSION=$AETHERX_BUILD_VERSION"
 
-# 2. Add Android platform if missing
+# 1. Limpieza total de caches, outputs y assets empaquetados antiguos.
 echo ""
-echo "📱  Step 2/5: Checking Android platform..."
+echo "🧹  Step 1/7: Limpieza total Android/Capacitor..."
+node scripts/clean-android-total.mjs
+
+# 2. Instalación limpia de dependencias por npm, como en el workflow final.
+echo ""
+echo "📦  Step 2/7: npm install..."
+npm install
+
+# 3. Build web normal solicitado y build local Capacitor offline.
+echo ""
+echo "🔨  Step 3/7: npm run build + verify Capacitor local build..."
+npm run build
+
+# 4. Add Android platform if missing
+echo ""
+echo "📱  Step 4/7: Checking Android platform..."
 if [ ! -d "android" ]; then
   echo "    Android platform not found. Adding it now..."
-  bunx cap add android
+  npx cap add android
 else
   echo "    Android platform already present."
 fi
 
-# 3. Sync Capacitor metadata, then lock Android back to native local-final mode.
+# 5. Sync Capacitor metadata, then lock Android back to native local-final mode.
 echo ""
-echo "🔄  Step 3/5: Syncing Capacitor + Android..."
-bunx cap sync android
+echo "🔄  Step 5/7: Syncing Capacitor + Android..."
+npx cap sync android
 
-# 4. Enforce native MainActivity and package id.
+# 6. Enforce native MainActivity and package id.
 echo ""
-echo "🧩  Step 4/5: Verifying native Android project..."
+echo "🧩  Step 6/7: Verifying native Android project and packaged assets..."
 node scripts/lock-android-local-final.mjs
+node scripts/verify-capacitor-assets.mjs
 echo "    ✓ applicationId: com.aetherx.livewallpaper"
 echo "    ✓ app_name: AETHERX"
-echo "    ✓ pantalla nativa local sin navegador externo."
+echo "    ✓ assets nuevos con NEW_BUILD_LOADED_OK."
 
-# 5. Open Android Studio
+# 7. Open Android Studio
 echo ""
-echo "🚀  Step 5/5: Listo. Para compilar el APK ejecuta:"
+echo "🚀  Step 7/7: Listo. Para compilar el APK sin cache ejecuta:"
 echo ""
 echo "    cd android"
-echo "    ./gradlew clean assembleRelease bundleRelease      # Linux/macOS"
-echo "    .\\gradlew.bat clean assembleRelease bundleRelease  # Windows"
+echo "    ./gradlew --stop || true"
+echo "    ./gradlew clean cleanBuildCache assembleRelease bundleRelease --no-daemon --no-build-cache --rerun-tasks"
+echo "    .\\gradlew.bat clean cleanBuildCache assembleRelease bundleRelease --no-daemon --no-build-cache --rerun-tasks"
 echo ""
 echo "    El APK quedará en android/app/build/outputs/apk/release/"
 echo ""

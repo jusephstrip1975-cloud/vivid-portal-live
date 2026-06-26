@@ -42,7 +42,7 @@ function ensureIndexHtml() {
 function prepare() {
   clean();
   console.log("[prepare-android-local] building full SPA via vite.capacitor.config.ts ...");
-  const runner = existsSync(join(root, "bun.lockb")) || existsSync(join(root, "bunfig.toml")) ? "bunx" : "npx";
+  const runner = "npx";
   const res = spawnSync(runner, ["vite", "build", "--config", "vite.capacitor.config.ts"], {
     stdio: "inherit",
     cwd: root,

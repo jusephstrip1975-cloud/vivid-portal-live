@@ -26,3 +26,13 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+tasks.register('cleanBuildCache') {
+    group = 'build'
+    description = 'AETHERX compatibility purge for stale Android build outputs; AGP cleanBuildCache was removed upstream.'
+    doLast {
+        delete rootProject.layout.buildDirectory
+        delete project(':app').layout.buildDirectory
+        println 'AETHERX cleanBuildCache compatibility purge completed (AGP build cache task no longer exists).'
+    }
+}

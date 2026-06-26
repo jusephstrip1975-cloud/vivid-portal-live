@@ -1,15 +1,24 @@
+import java.util.TimeZone
+
 apply plugin: 'com.android.application'
+
+def aetherxBuildVersion = System.getenv("AETHERX_BUILD_VERSION") ?: new Date().format("yyyyMMddHHmmss", TimeZone.getTimeZone("UTC"))
 
 android {
     namespace = "com.aetherx.livewallpaper"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
         applicationId "com.aetherx.livewallpaper"
         setProperty("archivesBaseName", "AETHERX")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 202
-        versionName "2.0.2"
+        versionCode 203
+        versionName "2.0.3-clean"
+        buildConfigField "String", "AETHERX_BUILD_VERSION", "\"${aetherxBuildVersion}\""
+        buildConfigField "String", "AETHERX_BUILD_MARKER", "\"NEW_BUILD_LOADED_OK\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
