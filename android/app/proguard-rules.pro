@@ -20,9 +20,8 @@
 # AndroidX general
 -dontwarn androidx.**
 
-# Remove verbose logs in release
+# Keep info/error logs because AETHERX release APK must expose build and wallpaper diagnostics.
 -assumenosideeffects class android.util.Log {
     public static *** d(...);
     public static *** v(...);
-    public static *** i(...);
 }
