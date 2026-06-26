@@ -1,6 +1,7 @@
 package com.aetherx.localfinal.wallpaper;
 
 import android.content.Context;
+import android.content.ContentResolver;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -37,11 +38,15 @@ import androidx.media3.exoplayer.ExoPlayer;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
+    private static final int MAX_REDIRECTS = 5;
     @Override
     public Engine onCreateEngine() {
         Log.i(TAG, "onCreateEngine");
@@ -369,7 +374,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     + " lastValidSize=" + (lastValid.exists() ? lastValid.length() : -1));
                 if (!lastValid.exists() || !lastValid.canRead() || lastValid.length() <= MIN_VALID_VIDEO_BYTES) {
                     Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=last-valid-unusable stage=" + stage);
-                    return false;
+                    return attemptRestoreFromLastSource(stage, current);
                 }
                 copyFile(lastValid, current);
                 if (!current.exists() || !current.canRead() || current.length() <= MIN_VALID_VIDEO_BYTES) {
@@ -378,6 +383,11 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         + " EXISTS=" + current.exists()
                         + " CAN_READ=" + current.canRead()
                         + " SIZE=" + (current.exists() ? current.length() : -1));
+                    return false;
+                }
+                if (!testMediaPlayerPrepare(current, "SERVICE_RESTORE_LAST_VALID")) {
+                    Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=mediaplayer-prepare-failed stage=" + stage
+                        + " PATH=" + current.getAbsolutePath());
                     return false;
                 }
                 long newVersion = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
@@ -400,6 +410,60 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             }
         }
 
+        private boolean attemptRestoreFromLastSource(String stage, File current) {
+            if (prefs == null) return false;
+            String sourceUrl = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URL, null);
+            String sourceUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_SOURCE_URI, null);
+            try {
+                if (sourceUrl != null && !sourceUrl.isEmpty()) {
+                    Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_DOWNLOAD stage=" + stage
+                        + " PATH=" + current.getAbsolutePath());
+                    downloadFollowingRedirects(sourceUrl, current);
+                } else if (sourceUri != null && !sourceUri.isEmpty()) {
+                    Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_CONTENT_URI stage=" + stage
+                        + " PATH=" + current.getAbsolutePath());
+                    copyUriToFile(Uri.parse(sourceUri), current);
+                } else {
+                    Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=no-last-download-or-uri stage=" + stage);
+                    return false;
+                }
+                if (!current.exists() || !current.canRead() || current.length() <= MIN_VALID_VIDEO_BYTES) {
+                    Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=source-copy-unusable stage=" + stage
+                        + " PATH=" + current.getAbsolutePath()
+                        + " EXISTS=" + current.exists()
+                        + " CAN_READ=" + current.canRead()
+                        + " SIZE=" + (current.exists() ? current.length() : -1));
+                    return false;
+                }
+                if (!testMediaPlayerPrepare(current, "SERVICE_RESTORE_LAST_SOURCE")) {
+                    Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=mediaplayer-prepare-failed source=last-source stage=" + stage
+                        + " PATH=" + current.getAbsolutePath());
+                    return false;
+                }
+                File lastValid = getLastValidWallpaperFile();
+                copyFile(current, lastValid);
+                long newVersion = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
+                prefs.edit()
+                    .putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, current.getAbsolutePath())
+                    .putString(AetherXLiveWallpaperPlugin.KEY_LAST_VALID_VIDEO_PATH, lastValid.getAbsolutePath())
+                    .putLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, newVersion)
+                    .putLong("video_updated_at", System.currentTimeMillis())
+                    .commit();
+                Log.i(TAG, "CURRENT_MP4_RECREATED stage=" + stage
+                    + " source=last-download-or-uri"
+                    + " PATH=" + current.getAbsolutePath()
+                    + " EXISTS=" + current.exists()
+                    + " CAN_READ=" + current.canRead()
+                    + " SIZE=" + current.length()
+                    + " ABSOLUTE_PATH=" + current.getAbsolutePath()
+                    + " version=" + newVersion);
+                return true;
+            } catch (Throwable t) {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED source=last-download-or-uri stage=" + stage, t);
+                return false;
+            }
+        }
+
         private void copyFile(File from, File to) throws Exception {
             File parent = to.getParentFile();
             if (parent != null && !parent.exists() && !parent.mkdirs()) {
@@ -413,6 +477,68 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     out.write(buffer, 0, read);
                 }
                 out.getFD().sync();
+            }
+        }
+
+        private void copyUriToFile(Uri uri, File to) throws Exception {
+            File parent = to.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                throw new Exception("mkdirs-failed:" + parent.getAbsolutePath());
+            }
+            ContentResolver resolver = getApplicationContext().getContentResolver();
+            try (InputStream in = resolver.openInputStream(uri);
+                 FileOutputStream out = new FileOutputStream(to, false)) {
+                if (in == null) throw new Exception("source-uri-open-failed");
+                byte[] buffer = new byte[16384];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, read);
+                }
+                out.getFD().sync();
+            }
+        }
+
+        private long downloadFollowingRedirects(String urlStr, File out) throws Exception {
+            int redirects = 0;
+            String currentUrl = urlStr;
+            while (true) {
+                URL url = new URL(currentUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setInstanceFollowRedirects(false);
+                conn.setConnectTimeout(20000);
+                conn.setReadTimeout(60000);
+                conn.setRequestProperty("User-Agent", "AetherX/1.0");
+                int code = conn.getResponseCode();
+                Log.i(TAG, "restore-download HTTP " + code + " <- " + currentUrl);
+                if (code >= 300 && code < 400) {
+                    String loc = conn.getHeaderField("Location");
+                    conn.disconnect();
+                    if (loc == null || ++redirects > MAX_REDIRECTS) throw new Exception("too-many-redirects");
+                    currentUrl = loc;
+                    continue;
+                }
+                if (code < 200 || code >= 300) {
+                    conn.disconnect();
+                    throw new Exception("http-" + code);
+                }
+                File parent = out.getParentFile();
+                if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                    throw new Exception("mkdirs-failed:" + parent.getAbsolutePath());
+                }
+                long total = 0L;
+                try (InputStream in = conn.getInputStream();
+                     FileOutputStream fos = new FileOutputStream(out, false)) {
+                    byte[] buf = new byte[16384];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        fos.write(buf, 0, n);
+                        total += n;
+                    }
+                    fos.getFD().sync();
+                } finally {
+                    conn.disconnect();
+                }
+                return total;
             }
         }
 
