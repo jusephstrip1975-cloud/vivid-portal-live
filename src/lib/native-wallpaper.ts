@@ -22,6 +22,7 @@ interface LiveWallpaperPlugin {
   openPicker(): Promise<{ opened: boolean }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
   checkCompatibility(): Promise<CompatibilityResult>;
+  checkStorage(): Promise<{ ok: boolean; freeMb: number; requiredMb: number; message: string }>;
 }
 
 export interface CompatibilityResult {
@@ -74,6 +75,16 @@ export async function pickDeviceVideo(): Promise<
       return { ok: false, reason: "unsupported-platform" };
     }
     const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    try {
+      const storage = await LiveWallpaper.checkStorage();
+      console.info("[AetherX] FREE_SPACE_MB", storage.freeMb, "stage=pickDeviceVideo ok=", storage.ok);
+      if (!storage.ok) {
+        console.warn("[AetherX] DOWNLOAD_ABORTED_LOW_STORAGE pickDeviceVideo", storage);
+        return { ok: false, reason: storage.message || "Espacio insuficiente para procesar wallpapers 3D" };
+      }
+    } catch (err) {
+      console.warn("checkStorage failed (continuing)", err);
+    }
     const picked = await LiveWallpaper.pickVideoFromDevice();
     const previewUrl = Capacitor.convertFileSrc(picked.path);
     return { ok: true, video: { ...picked, previewUrl } };
@@ -181,6 +192,16 @@ export async function saveWallpaperToDevice(
 
     if (platform === "android") {
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      try {
+        const storage = await LiveWallpaper.checkStorage();
+        console.info("[AetherX] FREE_SPACE_MB", storage.freeMb, "requiredMb", storage.requiredMb, "ok", storage.ok);
+        if (!storage.ok) {
+          console.warn("[AetherX] DOWNLOAD_ABORTED_LOW_STORAGE", storage);
+          return { ok: false, reason: storage.message || "Espacio insuficiente para procesar wallpapers 3D" };
+        }
+      } catch (err) {
+        console.warn("checkStorage failed (continuing)", err);
+      }
       const resolvedUrl = resolveDownloadUrl(videoUrl);
       console.info("[AetherX] saveVideoFromUrl", { wallpaperId, fileName, resolvedUrl });
       const saved = await LiveWallpaper.saveVideoFromUrl({
