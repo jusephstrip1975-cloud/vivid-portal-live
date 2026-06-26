@@ -70,6 +70,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     call.reject("empty-download: file-too-small size=" + outFile.length());
                     return;
                 }
+                prepareForNewWallpaper(wallpaperId, outFile.getAbsolutePath());
                 transcodeAndResolve(outFile, call, null, wallpaperId);
             } catch (Exception e) {
                 Log.e(TAG, "saveVideoFromUrl failed wallpaperId=" + wallpaperId, e);
@@ -94,6 +95,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 fos.write(data);
             }
             Log.i(TAG, "saveVideo wrote bytes=" + outFile.length() + " path=" + outFile.getAbsolutePath());
+            prepareForNewWallpaper(fileName, outFile.getAbsolutePath());
             transcodeAndResolve(outFile, call, null, fileName);
         } catch (Exception e) {
             Log.e(TAG, "saveVideo failed", e);
@@ -152,6 +154,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             Log.i(TAG, "Copied picked video bytes=" + total + " to=" + outFile.getAbsolutePath()
                 + " exists=" + outFile.exists() + " canRead=" + outFile.canRead());
             persistVideoUri(uri.toString());
+            prepareForNewWallpaper(fileName, outFile.getAbsolutePath());
             transcodeAndResolve(outFile, call, uri.toString(), fileName);
         } catch (Exception e) {
             Log.e(TAG, "pick-video-failed", e);
@@ -339,12 +342,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     + " outputExists=" + output.exists() + " outputSize=" + output.length());
                 persistConvertedCandidate(output.getAbsolutePath());
                 if (canPrepareWithMediaPlayer(output, wallpaperId, "CONVERTED")) {
-                    Log.i(TAG, "USING_ORIGINAL wallpaperId=" + wallpaperId
-                        + " reason=try-exoplayer-original-before-converted path=" + input.getAbsolutePath()
-                        + " convertedReady=" + output.getAbsolutePath());
-                    persistVideoPath(input.getAbsolutePath());
+                    Log.i(TAG, "USING_CONVERTED wallpaperId=" + wallpaperId
+                        + " reason=converted-mediaplayer-ok path=" + output.getAbsolutePath()
+                        + " originalPath=" + input.getAbsolutePath());
+                    persistVideoPath(output.getAbsolutePath());
                     WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), output.getAbsolutePath());
-                    resolveSaved(call, input, false, sourceUri, "original-first-converted-ready");
+                    resolveSaved(call, output, true, sourceUri, "converted-mediaplayer-ok");
                     return;
                 }
                 Log.w(TAG, "CONVERTED_MEDIAPLAYER_FAILED wallpaperId=" + wallpaperId
@@ -413,16 +416,32 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private boolean canPrepareWithMediaPlayer(File file, String wallpaperId, String label) {
         MediaPlayer mp = null;
         try {
+            if (file == null || !file.exists() || file.length() < MIN_VALID_VIDEO_BYTES) {
+                Log.e(TAG, "MEDIAPLAYER_PREPARE_FAILED wallpaperId=" + wallpaperId
+                    + " label=" + label
+                    + " reason=file-missing-or-small"
+                    + " path=" + (file == null ? "null" : file.getAbsolutePath())
+                    + " exists=" + (file != null && file.exists())
+                    + " size=" + (file != null && file.exists() ? file.length() : -1));
+                return false;
+            }
             mp = new MediaPlayer();
             mp.setDataSource(getContext(), Uri.fromFile(file));
             mp.setVolume(0f, 0f);
             mp.prepare();
+            Log.i(TAG, "MEDIAPLAYER_PREPARE_OK wallpaperId=" + wallpaperId
+                + " label=" + label
+                + " durationMs=" + mp.getDuration()
+                + " path=" + file.getAbsolutePath());
             Log.i(TAG, "MEDIAPLAYER_OK wallpaperId=" + wallpaperId
                 + " label=" + label
                 + " durationMs=" + mp.getDuration()
                 + " path=" + file.getAbsolutePath());
             return true;
         } catch (Throwable t) {
+            Log.e(TAG, "MEDIAPLAYER_PREPARE_FAILED wallpaperId=" + wallpaperId
+                + " label=" + label
+                + " path=" + (file == null ? "null" : file.getAbsolutePath()), t);
             Log.e(TAG, "MEDIAPLAYER_FAILED wallpaperId=" + wallpaperId
                 + " label=" + label
                 + " path=" + (file == null ? "null" : file.getAbsolutePath()), t);
@@ -479,6 +498,32 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             && !previousConverted.equals(currentVideo)) {
             deleteIfStale(previousConverted, absolutePath, "previous-converted-candidate");
         }
+    }
+
+    private void prepareForNewWallpaper(String wallpaperId, String nextPath) {
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String previousVideo = prefs.getString(KEY_VIDEO_PATH, null);
+        String previousOriginal = prefs.getString(KEY_ORIGINAL_PATH, null);
+        String previousConverted = prefs.getString(KEY_CONVERTED_PATH, null);
+        long version = prefs.getLong(KEY_VIDEO_VERSION, 0L) + 1L;
+        prefs.edit()
+            .remove(KEY_VIDEO_PATH)
+            .remove(KEY_CONVERTED_PATH)
+            .remove("last_transcode_error")
+            .putLong("video_updated_at", System.currentTimeMillis())
+            .putLong(KEY_VIDEO_VERSION, version)
+            .commit();
+        Log.i(TAG, "prepareForNewWallpaper wallpaperId=" + wallpaperId
+            + " nextPath=" + nextPath
+            + " previousVideo=" + previousVideo
+            + " previousOriginal=" + previousOriginal
+            + " previousConverted=" + previousConverted
+            + " version=" + version
+            + " requestedServiceRelease=true cacheCleanup=true");
+        if (previousConverted != null && !previousConverted.equals(nextPath)) {
+            deleteIfStale(previousConverted, nextPath, "previous-converted-before-new-wallpaper");
+        }
+        WallpaperVideoTranscoder.deleteAllConvertedOutputsExcept(getContext(), null);
     }
 
     private void persistVideoPath(String absolutePath) {
