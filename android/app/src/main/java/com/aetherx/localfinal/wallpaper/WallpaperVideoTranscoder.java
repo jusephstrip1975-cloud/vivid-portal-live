@@ -99,7 +99,7 @@ public final class WallpaperVideoTranscoder {
 
             logVideoStats("TRANSCODER_INPUT_SINGLE_PASS", input, inputStats);
             Log.i(TAG, "TRANSCODER_DECISION=RESCUE_ONLY pass=" + pass
-                + " noAggressivePass=true originalPlaybackAllowed=true"
+                + " singlePassOnly=true originalPlaybackAllowed=true"
                 + " targetHeight=" + targetHeight
                 + " preserveInputFps=true noFrameRateCap=true noFpsForcing=true"
                 + " targetBitrate=" + targetBitrate
