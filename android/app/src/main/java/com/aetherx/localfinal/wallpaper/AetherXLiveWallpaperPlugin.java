@@ -138,6 +138,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             call.reject("missing-base64");
             return;
         }
+        String storageError = guardStorageOrReject("saveVideo");
+        if (storageError != null) { call.reject(storageError); return; }
 
         File current = getCurrentWallpaperFile();
         try {
