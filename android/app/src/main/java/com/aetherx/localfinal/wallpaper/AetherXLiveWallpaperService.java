@@ -2,10 +2,13 @@ package com.aetherx.localfinal.wallpaper;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.media.MediaPlayer;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -42,6 +45,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
         private ExoPlayer player;
         private MediaPlayer fallbackPlayer;
+        private MediaMetadataRetriever frameRetriever;
+        private Runnable frameLoop;
         private Uri lastUri;
         private SurfaceHolder currentHolder;
         private boolean visible = false;
@@ -237,7 +242,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.setVolume(0f, 0f);
                 fallbackPlayer.setOnErrorListener((mp, what, extra) -> {
                     Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra);
-                    paintMessage("Vídeo no soportado por el dispositivo");
+                    main.post(() -> startCanvasFrameFallback(uri));
                     return true;
                 });
                 fallbackPlayer.setOnPreparedListener(mp -> {
@@ -248,6 +253,55 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 fallbackPlayer.prepareAsync();
             } catch (Throwable t) {
                 Log.e(TAG, "MediaPlayer fallback failed", t);
+                startCanvasFrameFallback(uri);
+            }
+        }
+
+        private void startCanvasFrameFallback(Uri uri) {
+            try {
+                releasePlayer();
+                if (uri == null) {
+                    paintMessage("Vídeo no disponible");
+                    return;
+                }
+                if (currentHolder == null || currentHolder.getSurface() == null
+                        || !currentHolder.getSurface().isValid()) {
+                    Log.w(TAG, "Canvas frame fallback: surface not valid");
+                    return;
+                }
+                Log.i(TAG, "Canvas frame fallback start uri=" + uri);
+                frameRetriever = new MediaMetadataRetriever();
+                frameRetriever.setDataSource(getApplicationContext(), uri);
+                String durationValue = frameRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+                final long durationUs;
+                try {
+                    durationUs = Math.max(1_000_000L, Long.parseLong(durationValue) * 1000L);
+                } catch (Throwable ignored) {
+                    durationUs = 5_000_000L;
+                }
+                final long frameStepUs = 83_333L; // 12 fps: stable for wallpaper preview surfaces.
+                final long[] positionUs = new long[] {0L};
+                frameLoop = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (frameRetriever == null || currentHolder == null || !visible) return;
+                        try {
+                            Bitmap frame = frameRetriever.getFrameAtTime(positionUs[0], MediaMetadataRetriever.OPTION_CLOSEST);
+                            if (frame != null) {
+                                drawFrame(frame);
+                                frame.recycle();
+                            }
+                            positionUs[0] = (positionUs[0] + frameStepUs) % durationUs;
+                            main.postDelayed(this, 83L);
+                        } catch (Throwable t) {
+                            Log.e(TAG, "Canvas frame fallback failed while drawing", t);
+                            paintMessage("Vídeo no soportado por el dispositivo");
+                        }
+                    }
+                };
+                frameLoop.run();
+            } catch (Throwable t) {
+                Log.e(TAG, "Canvas frame fallback setup failed", t);
                 paintMessage("Vídeo no soportado por el dispositivo");
             }
         }
@@ -272,7 +326,39 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             }
         }
 
+        private void drawFrame(Bitmap frame) {
+            Canvas c = null;
+            try {
+                if (currentHolder == null) return;
+                c = currentHolder.lockCanvas();
+                if (c == null) return;
+                c.drawColor(Color.BLACK);
+                int canvasW = c.getWidth();
+                int canvasH = c.getHeight();
+                int frameW = frame.getWidth();
+                int frameH = frame.getHeight();
+                float scale = Math.max(canvasW / (float) frameW, canvasH / (float) frameH);
+                int outW = Math.round(frameW * scale);
+                int outH = Math.round(frameH * scale);
+                int left = (canvasW - outW) / 2;
+                int top = (canvasH - outH) / 2;
+                c.drawBitmap(frame, null, new Rect(left, top, left + outW, top + outH), null);
+            } finally {
+                try {
+                    if (c != null && currentHolder != null) currentHolder.unlockCanvasAndPost(c);
+                } catch (Throwable ignored) {}
+            }
+        }
+
         private void releasePlayer() {
+            if (frameLoop != null) {
+                main.removeCallbacks(frameLoop);
+                frameLoop = null;
+            }
+            if (frameRetriever != null) {
+                try { frameRetriever.release(); } catch (Throwable ignored) {}
+                frameRetriever = null;
+            }
             if (player != null) {
                 try {
                     player.stop();
