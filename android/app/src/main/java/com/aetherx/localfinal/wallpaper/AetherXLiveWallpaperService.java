@@ -284,6 +284,14 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 }
                 player = null;
             }
+            if (fallbackPlayer != null) {
+                try {
+                    if (fallbackPlayer.isPlaying()) fallbackPlayer.stop();
+                    fallbackPlayer.release();
+                } catch (Throwable ignored) {
+                }
+                fallbackPlayer = null;
+            }
         }
     }
 }
