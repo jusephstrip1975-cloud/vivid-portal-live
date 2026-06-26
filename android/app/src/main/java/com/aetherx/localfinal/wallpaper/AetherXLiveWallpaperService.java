@@ -174,6 +174,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 }
 
                 Log.i(TAG, "ExoPlayer media item=" + uri + " size=" + sizeForLog);
+                lastUri = uri;
 
                 player = new ExoPlayer.Builder(getApplicationContext()).build();
                 player.setRepeatMode(Player.REPEAT_MODE_ALL);
@@ -192,7 +193,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     public void onPlayerError(PlaybackException error) {
                         Log.e(TAG, "ExoPlayer error code=" + error.errorCode
                                 + " name=" + error.getErrorCodeName(), error);
-                        paintMessage("Error: " + error.getErrorCodeName());
+                        Log.i(TAG, "Falling back to native MediaPlayer due to ExoPlayer failure");
+                        main.post(() -> startMediaPlayerFallback(lastUri));
                     }
 
                     @Override
@@ -211,8 +213,42 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player.play();
                 Log.i(TAG, "ExoPlayer.prepare+play issued");
             } catch (Throwable t) {
-                Log.e(TAG, "startPlayer failed", t);
-                paintMessage("Fallo al iniciar reproductor");
+                Log.e(TAG, "startPlayer failed, trying MediaPlayer fallback", t);
+                startMediaPlayerFallback(lastUri);
+            }
+        }
+
+        private void startMediaPlayerFallback(Uri uri) {
+            try {
+                releasePlayer();
+                if (uri == null) {
+                    paintMessage("Vídeo no disponible");
+                    return;
+                }
+                if (currentHolder == null || currentHolder.getSurface() == null
+                        || !currentHolder.getSurface().isValid()) {
+                    Log.w(TAG, "MediaPlayer fallback: surface not valid");
+                    return;
+                }
+                Log.i(TAG, "MediaPlayer fallback start uri=" + uri);
+                fallbackPlayer = new MediaPlayer();
+                fallbackPlayer.setSurface(currentHolder.getSurface());
+                fallbackPlayer.setLooping(true);
+                fallbackPlayer.setVolume(0f, 0f);
+                fallbackPlayer.setOnErrorListener((mp, what, extra) -> {
+                    Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra);
+                    paintMessage("Vídeo no soportado por el dispositivo");
+                    return true;
+                });
+                fallbackPlayer.setOnPreparedListener(mp -> {
+                    Log.i(TAG, "MediaPlayer prepared, starting playback");
+                    try { mp.start(); } catch (Throwable t) { Log.e(TAG, "MediaPlayer start failed", t); }
+                });
+                fallbackPlayer.setDataSource(getApplicationContext(), uri);
+                fallbackPlayer.prepareAsync();
+            } catch (Throwable t) {
+                Log.e(TAG, "MediaPlayer fallback failed", t);
+                paintMessage("Vídeo no soportado por el dispositivo");
             }
         }
 
