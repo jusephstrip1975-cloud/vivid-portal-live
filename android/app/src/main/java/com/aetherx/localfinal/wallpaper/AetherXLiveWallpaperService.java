@@ -461,7 +461,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             Log.i(TAG, "TRANSCODE_START reason=service-rescue original=" + original
                 + " previousConverted=" + converted
                 + " trigger=" + reason
-                + " mode=single_safe_conversion noAggressivePass=true noSecondPass=true");
+                + " mode=single_safe_conversion singlePassOnly=true");
             WallpaperVideoTranscoder.transcode(getApplicationContext(), source, new WallpaperVideoTranscoder.Callback() {
                 @Override
                 public void onSuccess(File output) {
