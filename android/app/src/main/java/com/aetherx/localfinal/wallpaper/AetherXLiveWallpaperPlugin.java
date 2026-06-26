@@ -253,7 +253,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         return new File(dir, fileName);
     }
 
-    /** Transcode the downloaded MP4 to Samsung-friendly H.264/AAC, fall back to original on failure. */
+    /** Transcode the downloaded MP4 to Samsung-friendly H.264/AAC. Original MP4 is never used as wallpaper. */
     private void transcodeAndResolve(final File input, final PluginCall call) {
         transcodeAndResolve(input, call, null);
     }
@@ -261,8 +261,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private void transcodeAndResolve(final File input, final PluginCall call, final String sourceUri) {
         Log.i(TAG, "transcodeAndResolve start input=" + input.getAbsolutePath()
             + " inputExists=" + input.exists() + " inputSize=" + input.length());
-        // Always persist the original as a fallback so the service can play it
-        // if the converted output fails on this device.
+        // Keep the original only as a private reconversion source. It is never
+        // persisted as KEY_VIDEO_PATH and never played by the WallpaperService.
         persistOriginalPath(input.getAbsolutePath());
         WallpaperVideoTranscoder.transcode(getContext(), input, new WallpaperVideoTranscoder.Callback() {
             @Override
@@ -281,18 +281,14 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
             @Override
             public void onFailure(Exception error) {
-                Log.w(TAG, "Transcode failed; falling back to ORIGINAL video as wallpaper source", error);
-                // Don't block playback. Persist the original; the service will try
-                // ExoPlayer -> MediaPlayer on it.
-                persistVideoPath(input.getAbsolutePath());
-                JSObject ret = new JSObject();
-                ret.put("path", input.getAbsolutePath());
-                ret.put("bytes", input.length());
-                ret.put("transcoded", false);
-                ret.put("fallback", "original");
-                ret.put("transcodeError", error.getMessage() == null ? "unknown" : error.getMessage());
-                if (sourceUri != null) ret.put("sourceUri", sourceUri);
-                call.resolve(ret);
+                Log.e(TAG, "Transcode failed after mandatory primary+aggressive passes; original playback disabled", error);
+                SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                prefs.edit()
+                    .putString("last_transcode_error", error.getMessage() == null ? "unknown" : error.getMessage())
+                    .putLong("video_updated_at", System.currentTimeMillis())
+                    .commit();
+                call.reject("transcode-failed-no-original-fallback: "
+                    + (error.getMessage() == null ? "unknown" : error.getMessage()), error);
             }
         });
     }
