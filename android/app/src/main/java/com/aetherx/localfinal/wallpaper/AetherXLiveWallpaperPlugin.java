@@ -43,6 +43,52 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
     private static final String WALLPAPER_DIR = "wallpapers";
     private static final String CURRENT_MP4 = "current.mp4";
+    private static final long MIN_FREE_SPACE_BYTES = 10L * 1024L * 1024L * 1024L; // 10 GB
+    private static final String LOW_STORAGE_MESSAGE = "Espacio insuficiente para procesar wallpapers 3D";
+
+    /** Returns null if there is enough space; otherwise the user-facing error message. */
+    private String guardStorageOrReject(String stage) {
+        try {
+            File dir = getWallpaperDir();
+            StatFs stat = new StatFs(dir.getAbsolutePath());
+            long freeBytes = stat.getAvailableBytes();
+            long freeMb = freeBytes / (1024L * 1024L);
+            Log.i(TAG, "FREE_SPACE_MB=" + freeMb + " stage=" + stage + " path=" + dir.getAbsolutePath());
+            if (freeBytes < MIN_FREE_SPACE_BYTES) {
+                Log.w(TAG, "LOW_STORAGE_WARNING freeMb=" + freeMb + " requiredMb="
+                    + (MIN_FREE_SPACE_BYTES / (1024L * 1024L)) + " stage=" + stage);
+                Log.e(TAG, "DOWNLOAD_ABORTED_LOW_STORAGE stage=" + stage + " freeMb=" + freeMb);
+                return LOW_STORAGE_MESSAGE + " (libre " + freeMb + " MB)";
+            }
+            return null;
+        } catch (Throwable t) {
+            Log.w(TAG, "storage-check-failed stage=" + stage, t);
+            return null; // do not block on probe failure
+        }
+    }
+
+    /** Removes any file in filesDir/wallpapers/ that is not current.mp4. */
+    private void cleanOrphanWallpaperFiles(String stage) {
+        File dir = getWallpaperDir();
+        File[] entries = dir.listFiles();
+        if (entries == null) return;
+        for (File entry : entries) {
+            if (entry.isDirectory()) {
+                // legacy "converted" or similar — drop entire tree
+                File[] inner = entry.listFiles();
+                if (inner != null) {
+                    for (File f : inner) deleteFileIfExists(f, "ORPHAN_CLEANUP " + stage + " nested");
+                }
+                boolean removed = entry.delete();
+                Log.i(TAG, "ORPHAN_CLEANUP " + stage + " dir=" + entry.getAbsolutePath() + " removed=" + removed);
+                continue;
+            }
+            if (CURRENT_MP4.equals(entry.getName())) continue;
+            deleteFileIfExists(entry, "ORPHAN_CLEANUP " + stage);
+        }
+    }
+
+
 
     @PluginMethod
     public void saveVideoFromUrl(final PluginCall call) {
