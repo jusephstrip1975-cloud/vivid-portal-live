@@ -30,7 +30,6 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -43,7 +42,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String PREFS = "aetherx_live_wallpaper";
     public static final String KEY_VIDEO_PATH = "video_path";
     public static final String KEY_VIDEO_VERSION = "video_version";
-    public static final String KEY_LAST_VALID_VIDEO_PATH = "last_valid_video_path";
     public static final String KEY_LAST_SOURCE_URI = "last_source_uri";
     public static final String KEY_LAST_SOURCE_URL = "last_source_url";
 
@@ -51,7 +49,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
     private static final String WALLPAPER_DIR = "AetherX";
     private static final String CURRENT_MP4 = "current.mp4";
-    private static final String LAST_VALID_MP4 = "last-valid.mp4";
     private static final long MIN_FREE_SPACE_BYTES = 10L * 1024L * 1024L * 1024L; // 10 GB
     private static final String LOW_STORAGE_MESSAGE = "Espacio insuficiente para procesar wallpapers 3D";
 
@@ -93,7 +90,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 continue;
             }
             if (CURRENT_MP4.equals(entry.getName())) continue;
-            if (LAST_VALID_MP4.equals(entry.getName())) continue;
             deleteFileIfExists(entry, "ORPHAN_CLEANUP " + stage);
         }
     }
@@ -443,10 +439,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         return new File(getWallpaperDir(), CURRENT_MP4);
     }
 
-    private File getLastValidWallpaperFile() {
-        return new File(getWallpaperDir(), LAST_VALID_MP4);
-    }
-
     private void prepareForNewWallpaper(String wallpaperId) {
         File current = getCurrentWallpaperFile();
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -490,15 +482,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             throw new Exception(currentValidation.reason);
         }
 
-        File lastValid = getLastValidWallpaperFile();
-        copyFile(current, lastValid);
-        Log.i(TAG, "LAST_VALID_SOURCE_SAVED path=" + lastValid.getAbsolutePath()
-            + " exists=" + lastValid.exists()
-            + " canRead=" + lastValid.canRead()
-            + " size=" + (lastValid.exists() ? lastValid.length() : -1));
-
         persistCurrentPath(current, wallpaperId);
-        persistLastValidPath(lastValid, wallpaperId);
         Log.i(TAG, "CURRENT_MP4_SAVE_OK wallpaperId=" + wallpaperId
             + " PATH=" + current.getAbsolutePath()
             + " EXISTS=" + current.exists()
@@ -528,15 +512,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         Log.i(TAG, "persistCurrentPath wallpaperId=" + wallpaperId
             + " KEY_VIDEO_PATH=" + prefs.getString(KEY_VIDEO_PATH, null)
             + " version=" + version);
-    }
-
-    private void persistLastValidPath(File lastValid, String wallpaperId) {
-        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        prefs.edit()
-            .putString(KEY_LAST_VALID_VIDEO_PATH, lastValid.getAbsolutePath())
-            .commit();
-        Log.i(TAG, "persistLastValidPath wallpaperId=" + wallpaperId
-            + " KEY_LAST_VALID_VIDEO_PATH=" + prefs.getString(KEY_LAST_VALID_VIDEO_PATH, null));
     }
 
     private void persistLastSourceUrl(String url, String wallpaperId) {
@@ -696,66 +671,38 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private boolean attemptRestoreCurrentMp4(String stage) {
         File current = getCurrentWallpaperFile();
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String lastPath = prefs.getString(KEY_LAST_VALID_VIDEO_PATH, null);
-        File lastValid = lastPath == null ? getLastValidWallpaperFile() : new File(lastPath);
         Log.w(TAG, "CURRENT_MP4_RESTORE_START stage=" + stage
             + " current=" + current.getAbsolutePath()
             + " currentExists=" + current.exists()
-            + " lastValid=" + lastValid.getAbsolutePath()
-            + " lastValidExists=" + lastValid.exists()
-            + " lastValidCanRead=" + lastValid.canRead()
-            + " lastValidSize=" + (lastValid.exists() ? lastValid.length() : -1));
-        if (!lastValid.exists() || !lastValid.canRead() || lastValid.length() <= MIN_VALID_VIDEO_BYTES) {
-            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=last-valid-missing stage=" + stage);
-            return attemptRestoreFromLastSourceUrl(stage, current, prefs);
-        }
-        PowerManager.WakeLock wakeLock = acquireShortWakeLock("restoreCurrentMp4");
-        try {
-            copyFile(lastValid, current);
-            ValidationResult validation = validatePhysicalFileForPlayback(current, "restore-current", stage);
-            if (!validation.ok) {
-                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=" + validation.reason
-                    + " current=" + current.getAbsolutePath());
-                return false;
-            }
-            persistCurrentPath(current, "restore-" + stage);
-            Log.i(TAG, "CURRENT_MP4_RECREATED stage=" + stage
-                + " PATH=" + current.getAbsolutePath()
-                + " EXISTS=" + current.exists()
-                + " CAN_READ=" + current.canRead()
-                + " SIZE=" + current.length()
-                + " ABSOLUTE_PATH=" + current.getAbsolutePath());
-            return true;
-        } catch (Throwable t) {
-            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED stage=" + stage, t);
-            return false;
-        } finally {
-            releaseWakeLock(wakeLock, "restoreCurrentMp4");
-        }
+            + " currentCanRead=" + current.canRead()
+            + " currentSize=" + (current.exists() ? current.length() : -1));
+        return attemptRestoreFromLastSource(stage, current, prefs);
     }
 
-    private boolean attemptRestoreFromLastSourceUrl(String stage, File current, SharedPreferences prefs) {
+    private boolean attemptRestoreFromLastSource(String stage, File current, SharedPreferences prefs) {
         String sourceUrl = prefs.getString(KEY_LAST_SOURCE_URL, null);
-        if (sourceUrl == null || sourceUrl.isEmpty()) {
-            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=no-last-source-url stage=" + stage);
-            return false;
-        }
-        PowerManager.WakeLock wakeLock = acquireShortWakeLock("restoreFromLastDownload");
+        String sourceUri = prefs.getString(KEY_LAST_SOURCE_URI, null);
+        PowerManager.WakeLock wakeLock = acquireShortWakeLock("restoreFromLastSource");
         try {
-            Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_DOWNLOAD stage=" + stage + " current=" + current.getAbsolutePath());
-            downloadFollowingRedirects(sourceUrl, current);
-            ValidationResult validation = validatePhysicalFileForPlayback(current, "restore-from-last-download", stage);
-            if (!validation.ok) {
-                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=" + validation.reason
-                    + " source=last-download current=" + current.getAbsolutePath());
+            if (sourceUrl != null && !sourceUrl.isEmpty()) {
+                Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_DOWNLOAD stage=" + stage + " current=" + current.getAbsolutePath());
+                downloadFollowingRedirects(sourceUrl, current);
+            } else if (sourceUri != null && !sourceUri.isEmpty()) {
+                Log.w(TAG, "CURRENT_MP4_RESTORE_FROM_LAST_CONTENT_URI stage=" + stage + " current=" + current.getAbsolutePath());
+                copyUriToFile(Uri.parse(sourceUri), current);
+            } else {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=no-last-source stage=" + stage);
                 return false;
             }
-            File lastValid = getLastValidWallpaperFile();
-            copyFile(current, lastValid);
-            persistCurrentPath(current, "restore-last-download-" + stage);
-            persistLastValidPath(lastValid, "restore-last-download-" + stage);
+            ValidationResult validation = validatePhysicalFileForPlayback(current, "restore-from-last-source", stage);
+            if (!validation.ok) {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=" + validation.reason
+                    + " source=last-source current=" + current.getAbsolutePath());
+                return false;
+            }
+            persistCurrentPath(current, "restore-last-source-" + stage);
             Log.i(TAG, "CURRENT_MP4_RECREATED stage=" + stage
-                + " source=last-download"
+                + " source=last-download-or-uri"
                 + " PATH=" + current.getAbsolutePath()
                 + " EXISTS=" + current.exists()
                 + " CAN_READ=" + current.canRead()
@@ -763,20 +710,22 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 + " ABSOLUTE_PATH=" + current.getAbsolutePath());
             return true;
         } catch (Throwable t) {
-            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED source=last-download stage=" + stage, t);
+            Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED source=last-source stage=" + stage, t);
             return false;
         } finally {
-            releaseWakeLock(wakeLock, "restoreFromLastDownload");
+            releaseWakeLock(wakeLock, "restoreFromLastSource");
         }
     }
 
-    private void copyFile(File from, File to) throws Exception {
+    private void copyUriToFile(Uri uri, File to) throws Exception {
         File parent = to.getParentFile();
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
             throw new Exception("mkdirs-failed:" + parent.getAbsolutePath());
         }
-        try (FileInputStream in = new FileInputStream(from);
+        ContentResolver resolver = getContext().getContentResolver();
+        try (InputStream in = resolver.openInputStream(uri);
              FileOutputStream out = new FileOutputStream(to, false)) {
+            if (in == null) throw new Exception("source-uri-open-failed");
             byte[] buffer = new byte[16384];
             int read;
             while ((read = in.read(buffer)) > 0) {
