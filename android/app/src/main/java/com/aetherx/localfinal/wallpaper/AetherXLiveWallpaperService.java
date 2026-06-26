@@ -14,6 +14,7 @@ import android.media.MediaMetadataRetriever;
 import android.media.PlaybackParams;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.wallpaper.WallpaperService;
@@ -34,6 +35,8 @@ import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 
 public class AetherXLiveWallpaperService extends WallpaperService {
 
@@ -168,13 +171,19 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
                 File expectedCurrent = getCurrentWallpaperFile();
-                Log.i(TAG, "VIDEO_PATH=" + path);
-                Log.i(TAG, "FILE_EXISTS=" + expectedCurrent.exists());
-                Log.i(TAG, "FILE_SIZE=" + (expectedCurrent.exists() ? expectedCurrent.length() : -1));
-                Log.i(TAG, "ABSOLUTE_PATH=" + expectedCurrent.getAbsolutePath());
+                logServicePath("startPlayer-initial", path, expectedCurrent);
                 Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
                     + " new=" + path + " newVersion=" + version
                     + " expectedCurrent=" + expectedCurrent.getAbsolutePath());
+                if (!isCurrentPathUsable(path, expectedCurrent, "startPlayer-initial")) {
+                    Log.w(TAG, "CURRENT_MP4_MISSING service attempting restore path=" + path);
+                    if (attemptRestoreCurrentMp4("service-startPlayer")) {
+                        path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
+                        version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
+                        expectedCurrent = getCurrentWallpaperFile();
+                        logServicePath("startPlayer-after-restore", path, expectedCurrent);
+                    }
+                }
                 if (path == null || !path.equals(currentPath) || version != currentVersion) {
                     if (preserveFailedPathsOnNextStart) {
                         preserveFailedPathsOnNextStart = false;
@@ -208,10 +217,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 boolean selectedExists = selectedOutput.exists();
                 long selectedSize = selectedExists ? selectedOutput.length() : -1L;
                 boolean selectedCanRead = selectedExists && selectedOutput.canRead();
-                Log.i(TAG, "VIDEO_PATH=" + path);
-                Log.i(TAG, "FILE_EXISTS=" + selectedExists);
-                Log.i(TAG, "FILE_SIZE=" + selectedSize);
+                Log.i(TAG, "PATH=" + path);
+                Log.i(TAG, "EXISTS=" + selectedExists);
+                Log.i(TAG, "CAN_READ=" + selectedCanRead);
+                Log.i(TAG, "SIZE=" + selectedSize);
                 Log.i(TAG, "ABSOLUTE_PATH=" + selectedOutput.getAbsolutePath());
+                Log.i(TAG, "WALLPAPER_SERVICE_PATH=" + selectedOutput.getAbsolutePath());
                 if (!selectedExists || !selectedCanRead) {
                     Log.e(TAG, "CURRENT_MP4_MISSING reason=file-missing-or-not-readable VIDEO_PATH=" + path
                         + " FILE_EXISTS=" + selectedExists
@@ -289,6 +300,119 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             } catch (Throwable t) {
                 Log.e(TAG, "startPlayer failed for persistent current.mp4", t);
                 fatalPlaybackFailure("startPlayer-exception", t);
+            }
+        }
+
+        private void logServicePath(String stage, String path, File current) {
+            File selected = path == null ? current : new File(path);
+            boolean exists = selected.exists();
+            boolean canRead = exists && selected.canRead();
+            long size = exists ? selected.length() : -1L;
+            Log.i(TAG, "WALLPAPER_SERVICE_PATH=" + selected.getAbsolutePath() + " stage=" + stage);
+            Log.i(TAG, "PATH=" + path);
+            Log.i(TAG, "EXISTS=" + exists);
+            Log.i(TAG, "CAN_READ=" + canRead);
+            Log.i(TAG, "SIZE=" + size);
+            Log.i(TAG, "ABSOLUTE_PATH=" + selected.getAbsolutePath());
+        }
+
+        private boolean isCurrentPathUsable(String path, File expectedCurrent, String stage) {
+            if (path == null) {
+                Log.e(TAG, "CURRENT_MP4_MISSING reason=KEY_VIDEO_PATH_EMPTY stage=" + stage);
+                return false;
+            }
+            File selected = new File(path);
+            try {
+                if (!selected.getCanonicalPath().equals(expectedCurrent.getCanonicalPath())) {
+                    Log.e(TAG, "CURRENT_MP4_MISSING reason=KEY_VIDEO_PATH_NOT_CURRENT stage=" + stage
+                        + " PATH=" + path
+                        + " expected=" + expectedCurrent.getCanonicalPath());
+                    return false;
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "CURRENT_MP4_MISSING reason=canonical-check-failed stage=" + stage
+                    + " PATH=" + path, t);
+                return false;
+            }
+            boolean exists = selected.exists();
+            boolean canRead = exists && selected.canRead();
+            long size = exists ? selected.length() : -1L;
+            if (!exists || !canRead || size <= MIN_VALID_VIDEO_BYTES) {
+                Log.e(TAG, "CURRENT_MP4_MISSING reason=file-unusable stage=" + stage
+                    + " PATH=" + path
+                    + " EXISTS=" + exists
+                    + " CAN_READ=" + canRead
+                    + " SIZE=" + size
+                    + " ABSOLUTE_PATH=" + selected.getAbsolutePath());
+                return false;
+            }
+            return true;
+        }
+
+        private boolean attemptRestoreCurrentMp4(String stage) {
+            try {
+                if (prefs == null) {
+                    prefs = getApplicationContext()
+                        .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                }
+                File current = getCurrentWallpaperFile();
+                String lastPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_LAST_VALID_VIDEO_PATH, null);
+                File lastValid = lastPath == null ? getLastValidWallpaperFile() : new File(lastPath);
+                Log.w(TAG, "CURRENT_MP4_RESTORE_START stage=" + stage
+                    + " current=" + current.getAbsolutePath()
+                    + " currentExists=" + current.exists()
+                    + " currentCanRead=" + current.canRead()
+                    + " currentSize=" + (current.exists() ? current.length() : -1)
+                    + " lastValid=" + lastValid.getAbsolutePath()
+                    + " lastValidExists=" + lastValid.exists()
+                    + " lastValidCanRead=" + lastValid.canRead()
+                    + " lastValidSize=" + (lastValid.exists() ? lastValid.length() : -1));
+                if (!lastValid.exists() || !lastValid.canRead() || lastValid.length() <= MIN_VALID_VIDEO_BYTES) {
+                    Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=last-valid-unusable stage=" + stage);
+                    return false;
+                }
+                copyFile(lastValid, current);
+                if (!current.exists() || !current.canRead() || current.length() <= MIN_VALID_VIDEO_BYTES) {
+                    Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED reason=current-after-copy-unusable stage=" + stage
+                        + " PATH=" + current.getAbsolutePath()
+                        + " EXISTS=" + current.exists()
+                        + " CAN_READ=" + current.canRead()
+                        + " SIZE=" + (current.exists() ? current.length() : -1));
+                    return false;
+                }
+                long newVersion = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L) + 1L;
+                prefs.edit()
+                    .putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, current.getAbsolutePath())
+                    .putLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, newVersion)
+                    .putLong("video_updated_at", System.currentTimeMillis())
+                    .commit();
+                Log.i(TAG, "CURRENT_MP4_RECREATED stage=" + stage
+                    + " PATH=" + current.getAbsolutePath()
+                    + " EXISTS=" + current.exists()
+                    + " CAN_READ=" + current.canRead()
+                    + " SIZE=" + current.length()
+                    + " ABSOLUTE_PATH=" + current.getAbsolutePath()
+                    + " version=" + newVersion);
+                return true;
+            } catch (Throwable t) {
+                Log.e(TAG, "CURRENT_MP4_RESTORE_FAILED stage=" + stage, t);
+                return false;
+            }
+        }
+
+        private void copyFile(File from, File to) throws Exception {
+            File parent = to.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                throw new Exception("mkdirs-failed:" + parent.getAbsolutePath());
+            }
+            try (FileInputStream in = new FileInputStream(from);
+                 FileOutputStream out = new FileOutputStream(to, false)) {
+                byte[] buffer = new byte[16384];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    out.write(buffer, 0, read);
+                }
+                out.getFD().sync();
             }
         }
 
@@ -499,13 +623,30 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             Log.e(TAG, "CURRENT_MP4_MISSING playback-failed reason=" + reason
                 + " VIDEO_PATH=" + currentPath
                 + " FILE_EXISTS=" + current.exists()
+                + " CAN_READ=" + current.canRead()
                 + " FILE_SIZE=" + (current.exists() ? current.length() : -1)
                 + " ABSOLUTE_PATH=" + current.getAbsolutePath(), error);
             paintMessage("Archivo de wallpaper no encontrado");
         }
 
         private File getCurrentWallpaperFile() {
-            return new File(new File(getApplicationContext().getFilesDir(), "wallpapers"), "current.mp4");
+            return new File(getWallpaperDir(), "current.mp4");
+        }
+
+        private File getLastValidWallpaperFile() {
+            return new File(getWallpaperDir(), "last-valid.mp4");
+        }
+
+        private File getWallpaperDir() {
+            File moviesDir = getApplicationContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+            if (moviesDir == null) {
+                return new File(getApplicationContext().getFilesDir(), "wallpaper-external-unavailable");
+            }
+            File dir = new File(moviesDir, "AetherX");
+            if (!dir.exists() && !dir.mkdirs()) {
+                Log.w(TAG, "wallpaper-dir-mkdirs-failed path=" + dir.getAbsolutePath());
+            }
+            return dir;
         }
 
         private void paintLoading(String text) {
