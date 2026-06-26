@@ -275,12 +275,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 frameRetriever = new MediaMetadataRetriever();
                 frameRetriever.setDataSource(getApplicationContext(), uri);
                 String durationValue = frameRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
-                final long durationUs;
+                long parsedDurationUs;
                 try {
-                    durationUs = Math.max(1_000_000L, Long.parseLong(durationValue) * 1000L);
+                    parsedDurationUs = Math.max(1_000_000L, Long.parseLong(durationValue) * 1000L);
                 } catch (Throwable ignored) {
-                    durationUs = 5_000_000L;
+                    parsedDurationUs = 5_000_000L;
                 }
+                final long durationUs = parsedDurationUs;
                 final long frameStepUs = 83_333L; // 12 fps: stable for wallpaper preview surfaces.
                 final long[] positionUs = new long[] {0L};
                 frameLoop = new Runnable() {
