@@ -325,9 +325,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
             Log.i(TAG, "Copied picked video bytes=" + total + " to=" + current.getAbsolutePath()
                 + " exists=" + current.exists() + " canRead=" + current.canRead());
+            setLastDownloadBytes(total);
             current = commitValidatedCurrentMp4(current, "picked-video", "picked");
             resolveSaved(call, current, false, uri.toString(), "current-mp4-persistent");
         } catch (Exception e) {
+            setLastError("archivo no guardado: " + e.getMessage());
+            setOpenPickerCalled(false);
             Log.e(TAG, "SAVE_FAILED reason=pick-video-failed"
                 + " current=" + current.getAbsolutePath(), e);
             Log.e(TAG, "CURRENT_MP4_SAVE_FAILED source=picked-video"
@@ -368,8 +371,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         try {
             File current = getCurrentWallpaperFile();
             SharedPreferences prefs = getContext()
-                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            ;
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             String persisted = prefs.getString(KEY_VIDEO_PATH, null);
             Log.i(TAG, "openLivePicker VIDEO_PATH=" + persisted
                 + " CURRENT_EXPECTED=" + current.getAbsolutePath()
@@ -542,7 +544,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         deleteFileIfExists(current, "DELETE_OLD_WALLPAPER current.mp4");
         deleteConvertedDirIfExists();
         cleanOrphanWallpaperFiles("prepareForNewWallpaper");
-        cleanLegacyInternalWallpaperDir("prepareForNewWallpaper");
         prefs.edit()
             .remove(KEY_VIDEO_PATH)
             .remove("last_transcode_error")
@@ -552,6 +553,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private File commitValidatedCurrentMp4(File current, String wallpaperId, String sourceLabel) throws Exception {
+        waitForClosedFile(current, wallpaperId, sourceLabel);
+        current = new File(current.getAbsolutePath());
         Log.i(TAG, "CURRENT_MP4_CREATED wallpaperId=" + wallpaperId
             + " source=" + sourceLabel
             + " path=" + current.getAbsolutePath()
@@ -593,6 +596,24 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         return current;
     }
 
+    private void waitForClosedFile(File current, String wallpaperId, String sourceLabel) throws Exception {
+        if (current == null) throw new Exception("archivo no guardado");
+        long firstSize = current.exists() ? current.length() : -1L;
+        try { Thread.sleep(250L); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        File reread = new File(current.getAbsolutePath());
+        long secondSize = reread.exists() ? reread.length() : -1L;
+        Log.i(TAG, "CURRENT_MP4_REREAD wallpaperId=" + wallpaperId
+            + " source=" + sourceLabel
+            + " PATH=" + reread.getAbsolutePath()
+            + " EXISTS=" + reread.exists()
+            + " CAN_READ=" + reread.canRead()
+            + " SIZE_FIRST=" + firstSize
+            + " SIZE_SECOND=" + secondSize);
+        if (!reread.exists()) throw new Exception("archivo no guardado");
+        if (secondSize <= MIN_VALID_VIDEO_BYTES) throw new Exception("archivo no guardado: file-too-small:" + secondSize);
+        if (!reread.canRead()) throw new Exception("archivo no guardado: file-not-readable");
+    }
+
     private void persistCurrentPath(File current, String wallpaperId) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         long version = prefs.getLong(KEY_VIDEO_VERSION, 0L) + 1L;
@@ -614,6 +635,34 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             .putString(KEY_LAST_SOURCE_URL, url)
             .commit();
         Log.i(TAG, "persistLastSourceUrl wallpaperId=" + wallpaperId + " hasUrl=true");
+    }
+
+    private void setLastDownloadBytes(long bytes) {
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(KEY_LAST_DOWNLOAD_BYTES, bytes)
+            .commit();
+    }
+
+    private void setLastError(String error) {
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_LAST_ERROR, error)
+            .commit();
+    }
+
+    private void clearLastError() {
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_LAST_ERROR)
+            .commit();
+    }
+
+    private void setOpenPickerCalled(boolean called) {
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_OPEN_PICKER_CALLED, called)
+            .commit();
     }
 
     private void clearPersistedVideoPath() {
