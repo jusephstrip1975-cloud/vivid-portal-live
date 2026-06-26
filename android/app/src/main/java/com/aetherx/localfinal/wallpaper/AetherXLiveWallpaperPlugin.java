@@ -458,6 +458,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         deleteFileIfExists(current, "DELETE_OLD_WALLPAPER current.mp4");
         deleteConvertedDirIfExists();
         cleanOrphanWallpaperFiles("prepareForNewWallpaper");
+        cleanLegacyInternalWallpaperDir("prepareForNewWallpaper");
         prefs.edit()
             .remove(KEY_VIDEO_PATH)
             .remove("last_transcode_error")
@@ -674,6 +675,47 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         boolean removed = convertedDir.delete();
         Log.i(TAG, "DELETE_OLD_WALLPAPER converted-dir path=" + convertedDir.getAbsolutePath()
             + " removed=" + removed);
+    }
+
+    private void cleanLegacyInternalWallpaperDir(String stage) {
+        File legacyDir = new File(getContext().getFilesDir(), "wallpapers");
+        File[] files = legacyDir.listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            deleteLegacyFileOrDir(file, "LEGACY_INTERNAL_CLEANUP " + stage);
+        }
+        boolean removed = legacyDir.delete();
+        Log.i(TAG, "LEGACY_INTERNAL_CLEANUP " + stage
+            + " dir=" + legacyDir.getAbsolutePath()
+            + " removed=" + removed);
+    }
+
+    private void deleteLegacyFileOrDir(File file, String label) {
+        if (file == null) return;
+        try {
+            File root = new File(getContext().getFilesDir(), "wallpapers");
+            String rootPath = root.getCanonicalPath();
+            String targetPath = file.getCanonicalPath();
+            if (!targetPath.startsWith(rootPath)) {
+                Log.w(TAG, label + " refused-outside-legacy-dir path=" + targetPath);
+                return;
+            }
+            if (file.isDirectory()) {
+                File[] inner = file.listFiles();
+                if (inner != null) {
+                    for (File child : inner) deleteLegacyFileOrDir(child, label + " nested");
+                }
+            }
+            boolean existed = file.exists();
+            long size = file.isFile() ? file.length() : -1;
+            boolean deleted = !existed || file.delete();
+            Log.i(TAG, label + " path=" + file.getAbsolutePath()
+                + " existed=" + existed
+                + " size=" + size
+                + " deleted=" + deleted);
+        } catch (Throwable t) {
+            Log.w(TAG, label + " failed path=" + file.getAbsolutePath() + " error=" + t.getMessage());
+        }
     }
 
     private boolean attemptRestoreCurrentMp4(String stage) {
