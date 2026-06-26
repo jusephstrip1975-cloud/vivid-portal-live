@@ -144,14 +144,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
             Log.i(TAG, "Copied picked video bytes=" + total + " to=" + outFile.getAbsolutePath()
                 + " exists=" + outFile.exists() + " canRead=" + outFile.canRead());
-            File finalFile = transcodeOrFallback(outFile, "converted-" + fileName);
-            persistVideoPath(finalFile.getAbsolutePath());
+            persistVideoPath(outFile.getAbsolutePath());
             persistVideoUri(uri.toString());
             JSObject ret = new JSObject();
-            ret.put("path", finalFile.getAbsolutePath());
-            ret.put("originalPath", outFile.getAbsolutePath());
-            ret.put("bytes", finalFile.length());
-            ret.put("converted", !finalFile.equals(outFile));
+            ret.put("path", outFile.getAbsolutePath());
+            ret.put("bytes", outFile.length());
             ret.put("sourceUri", uri.toString());
             call.resolve(ret);
         } catch (Exception e) {
