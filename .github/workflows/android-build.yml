@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build AETHERX Release
 
 on:
   push:
@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-apk:
+  build-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     steps:
       - name: Checkout code
@@ -37,47 +37,48 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # ----- DEBUG APK (always built — installable on any device) -----
-      - name: Build debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: AetherX-Local-Final-debug-apk
-          path: android/app/build/outputs/apk/debug/app-aetherx-localfinal-debug.apk
-          if-no-files-found: error
-
-      # ----- RELEASE APK (only if signing secrets are configured) -----
-      - name: Decode keystore
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
+      # ----- Signing setup (REQUIRED for Play Store distribution) -----
+      - name: Decode release keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is required for release builds."
+            exit 1
+          fi
           echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          echo "Keystore restored: $(stat -c%s android/app/release.keystore) bytes"
 
-      - name: Build release APK (signed)
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
+      # ----- RELEASE APK (signed, minified, shrunk) -----
+      - name: Build release APK
         working-directory: android
         env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          ./gradlew assembleRelease --no-daemon --stacktrace \
-            -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
-            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+          AETHERX_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
+          AETHERX_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          AETHERX_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          AETHERX_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew clean assembleRelease --no-daemon --stacktrace
 
       - name: Upload release APK
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
-          name: AetherX-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: AETHERX-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      # ----- AAB (Google Play upload format) -----
+      - name: Build release AAB
+        working-directory: android
+        env:
+          AETHERX_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
+          AETHERX_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          AETHERX_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          AETHERX_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Upload release AAB (Google Play)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AETHERX-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
