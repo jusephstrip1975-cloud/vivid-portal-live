@@ -82,11 +82,21 @@ public final class WallpaperVideoTranscoder {
             // Do NOT force frame rate: forcing 30fps on a 60fps source causes the
             // visible "slow-motion" effect on Samsung. Keep the source FPS and only
             // cap resolution for decoder compatibility.
-            EditedMediaItem editedMediaItem = new EditedMediaItem.Builder(mediaItem)
+            EditedMediaItem.Builder editedMediaItemBuilder = new EditedMediaItem.Builder(mediaItem)
                 .setEffects(new Effects(
                     Collections.emptyList(),
-                    Collections.singletonList(Presentation.createForHeight(SAFE_OUTPUT_HEIGHT))))
-                .build();
+                    Collections.singletonList(Presentation.createForHeight(SAFE_OUTPUT_HEIGHT))));
+            if (inputStats.fps >= 23.0f) {
+                int requestedFrameRate = Math.max(24, Math.min(60, Math.round(inputStats.fps)));
+                // Keep the original cadence. A 60fps input requests 60fps output;
+                // this does not change timestamps or duration.
+                editedMediaItemBuilder.setFrameRate(requestedFrameRate);
+                Log.i(TAG, "Transcoder requestedOutputFps=" + requestedFrameRate
+                    + " sourceFps=" + inputStats.fps);
+            } else {
+                Log.w(TAG, "Transcoder inputFps unknown; not forcing output FPS");
+            }
+            EditedMediaItem editedMediaItem = editedMediaItemBuilder.build();
 
             DefaultDecoderFactory decoderFactory = new DefaultDecoderFactory.Builder(context)
                 .setEnableDecoderFallback(true)
@@ -100,16 +110,6 @@ public final class WallpaperVideoTranscoder {
             VideoEncoderSettings.Builder videoSettings = new VideoEncoderSettings.Builder()
                 .setBitrate(SAFE_OUTPUT_BITRATE)
                 .setiFrameIntervalSeconds(1f);
-            if (inputStats.fps >= 23.0f) {
-                int requestedFrameRate = Math.max(24, Math.min(60, Math.round(inputStats.fps)));
-                // Preserve the source cadence instead of letting the encoder fall back
-                // to a hidden/default 30fps. A 60fps input requests 60fps output.
-                videoSettings.setFrameRate(requestedFrameRate);
-                Log.i(TAG, "Transcoder requestedOutputFps=" + requestedFrameRate
-                    + " sourceFps=" + inputStats.fps);
-            } else {
-                Log.w(TAG, "Transcoder inputFps unknown; not forcing output FPS");
-            }
 
             DefaultEncoderFactory encoderFactory = new DefaultEncoderFactory.Builder(context)
                 .setEnableFallback(false)
