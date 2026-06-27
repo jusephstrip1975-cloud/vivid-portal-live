@@ -67,6 +67,21 @@ export interface WallpaperDiagnostic {
   jsBuildId?: string;
   jsBuildTimestamp?: string;
   jsBuildVersion?: string;
+  // Real probe / transcode metadata
+  realCodec?: string | null;
+  realWidth?: number;
+  realHeight?: number;
+  realFps?: number;
+  realBitrate?: number;
+  realHasAudio?: boolean;
+  sourceCodec?: string | null;
+  sourceWidth?: number;
+  sourceHeight?: number;
+  sourceFps?: number;
+  sourceBitrate?: number;
+  sourceHasAudio?: boolean;
+  transcoded?: boolean;
+  lastTranscodeError?: string | null;
 }
 
 export interface CompatibilityResult {
