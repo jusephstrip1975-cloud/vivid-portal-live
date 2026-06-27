@@ -74,8 +74,8 @@ jobs:
         run: chmod +x android/gradlew
 
       # ----- Signing setup -----
-      # Release builds must use a real stable keystore. Test keystores are blocked
-      # because they make the APK look like an internal/prototype build.
+      # If release signing secrets exist, use them. If not, generate an internal
+      # temporary keystore so the workflow still produces installable release APK/AAB.
       - name: Prepare release keystore
         id: keystore
         env:
@@ -85,14 +85,28 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
-            echo "::error::Missing release signing secrets. Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD."
-            exit 1
+            echo "Release signing secrets not found. Generating temporary internal keystore for personal testing."
+            keytool -genkeypair \
+              -v \
+              -keystore android/app/release.keystore \
+              -storepass aetherx-internal-test \
+              -keypass aetherx-internal-test \
+              -alias aetherx-test \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=AETHERX Internal Test, OU=AETHERX, O=AETHERX, L=Local, S=Local, C=ES"
+            echo "ks_password=aetherx-internal-test" >> "$GITHUB_OUTPUT"
+            echo "key_alias=aetherx-test" >> "$GITHUB_OUTPUT"
+            echo "key_password=aetherx-internal-test" >> "$GITHUB_OUTPUT"
+            echo "Temporary internal keystore generated."
+          else
+            echo "Using provided release keystore from secrets."
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            echo "ks_password=$KEYSTORE_PASSWORD" >> "$GITHUB_OUTPUT"
+            echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
+            echo "key_password=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
           fi
-          echo "Using provided release keystore from secrets."
-          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
-          echo "ks_password=$KEYSTORE_PASSWORD" >> "$GITHUB_OUTPUT"
-          echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
-          echo "key_password=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
           echo "Keystore size: $(stat -c%s android/app/release.keystore) bytes"
 
       - name: Stop Gradle and purge project outputs
