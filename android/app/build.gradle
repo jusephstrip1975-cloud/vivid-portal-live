@@ -2,8 +2,8 @@ import java.util.TimeZone
 
 apply plugin: 'com.android.application'
 
-def aetherxVersionCode = 211
-def aetherxVersionName = "2.1.1-validator-fix"
+def aetherxVersionCode = 212
+def aetherxVersionName = "2.1.2-mediaplayer-only"
 def aetherxBuildVersion = System.getenv("AETHERX_BUILD_VERSION") ?: aetherxVersionName
 def aetherxBuildTimestamp = System.getenv("AETHERX_BUILD_TIMESTAMP")
 if (aetherxBuildTimestamp == null || aetherxBuildTimestamp.isEmpty()) {
@@ -100,10 +100,9 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
 
-    // Media3 ExoPlayer for live wallpaper video rendering (fallback after MediaPlayer)
-    implementation "androidx.media3:media3-exoplayer:1.4.1"
-    implementation "androidx.media3:media3-common:1.4.1"
-    // FFmpegKit with libx264: mandatory Samsung-safe transcoder for live wallpaper MP4s.
+    // NO Media3 / NO ExoPlayer. Samsung OneUI rechaza MediaCodecVideoRenderer dentro del
+    // WallpaperService (ERROR_CODE_DECODER_INIT_FAILED). El servicio usa SOLO MediaPlayer.
+    // FFmpegKit con libx264: transcoder Samsung-safe obligatorio para los MP4 del wallpaper.
     implementation "com.arthenica:ffmpeg-kit-full-gpl:6.0-2.LTS"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
@@ -145,20 +144,27 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
         if (!appGradle.contains('ffmpeg-kit-full-gpl') || !transcoderText.contains('com.arthenica.ffmpegkit.FFmpegKit')) {
             throw new GradleException('Samsung wallpaper transcoder must use FFmpegKit/libx264')
         }
-        // Scan only dependency declarations (lines starting with implementation/api/etc) to avoid self-match on this check.
-        def forbiddenMedia3 = ['media3-transformer', 'media3-effect', 'media3-muxer']
+        // Scan only dependency declarations (lines starting with implementation/api/etc) to avoid self-match.
+        def forbiddenMedia3 = ['media3-transformer', 'media3-effect', 'media3-muxer', 'media3-exoplayer', 'media3-common']
         appGradle.eachLine { line ->
             def trimmed = line.trim()
             if (trimmed.startsWith('implementation') || trimmed.startsWith('api ') || trimmed.startsWith('compileOnly')) {
                 forbiddenMedia3.each { dep ->
                     if (trimmed.contains(dep)) {
-                        throw new GradleException("Media3 Transformer dependency forbidden: ${dep}")
+                        throw new GradleException("Media3 dependency forbidden (Samsung wallpaper uses MediaPlayer only): ${dep}")
                     }
                 }
             }
         }
         if (transcoderText.contains('androidx.media3.transformer')) {
             throw new GradleException('Media3 Transformer import forbidden in WallpaperTranscoder')
+        }
+        def serviceText = service.getText('UTF-8')
+        ['androidx.media3', 'ExoPlayer', 'MediaCodecVideoRenderer', 'DefaultRenderersFactory',
+         'ProgressiveMediaSource', 'PlayerView'].each { forbidden ->
+            if (serviceText.contains(forbidden)) {
+                throw new GradleException("WallpaperService must be MediaPlayer-only; forbidden symbol: ${forbidden}")
+            }
         }
     }
 }
