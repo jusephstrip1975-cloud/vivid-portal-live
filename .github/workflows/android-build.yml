@@ -84,28 +84,44 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
-            echo "Release signing secrets not found. Generating temporary internal keystore for personal testing."
-            keytool -genkeypair \
-              -v \
-              -keystore android/app/release.keystore \
-              -storepass aetherx-internal-test \
-              -keypass aetherx-internal-test \
-              -alias aetherx-test \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=AETHERX Internal Test, OU=AETHERX, O=AETHERX, L=Local, S=Local, C=ES"
-            echo "ks_password=aetherx-internal-test" >> "$GITHUB_OUTPUT"
-            echo "key_alias=aetherx-test" >> "$GITHUB_OUTPUT"
-            echo "key_password=aetherx-internal-test" >> "$GITHUB_OUTPUT"
-            echo "Temporary internal keystore generated."
-          else
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
             echo "Using provided release keystore from secrets."
             echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
             echo "ks_password=$KEYSTORE_PASSWORD" >> "$GITHUB_OUTPUT"
             echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
             echo "key_password=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
+          else
+            KS=android/app/release.keystore
+            KS_PASS=aetherx-internal-test
+            KEY_PASS=aetherx-internal-test
+            ALIAS=aetherx-test
+            if [ -f "$KS" ]; then
+              echo "Existing keystore found at $KS"
+              if keytool -list -keystore "$KS" -alias "$ALIAS" -storepass "$KS_PASS" >/dev/null 2>&1; then
+                echo "Alias '$ALIAS' already exists in keystore. Reusing as-is."
+              else
+                echo "Keystore exists but alias '$ALIAS' missing. Adding alias."
+                keytool -genkeypair -v \
+                  -keystore "$KS" \
+                  -storepass "$KS_PASS" \
+                  -keypass "$KEY_PASS" \
+                  -alias "$ALIAS" \
+                  -keyalg RSA -keysize 2048 -validity 10000 \
+                  -dname "CN=AETHERX Internal Test, OU=AETHERX, O=AETHERX, L=Local, S=Local, C=ES"
+              fi
+            else
+              echo "No keystore found. Generating new temporary internal keystore."
+              keytool -genkeypair -v \
+                -keystore "$KS" \
+                -storepass "$KS_PASS" \
+                -keypass "$KEY_PASS" \
+                -alias "$ALIAS" \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -dname "CN=AETHERX Internal Test, OU=AETHERX, O=AETHERX, L=Local, S=Local, C=ES"
+            fi
+            echo "ks_password=$KS_PASS" >> "$GITHUB_OUTPUT"
+            echo "key_alias=$ALIAS" >> "$GITHUB_OUTPUT"
+            echo "key_password=$KEY_PASS" >> "$GITHUB_OUTPUT"
           fi
           echo "Keystore size: $(stat -c%s android/app/release.keystore) bytes"
 
