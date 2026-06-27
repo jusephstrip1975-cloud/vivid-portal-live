@@ -98,10 +98,16 @@ export async function checkWallpaperCompatibility(): Promise<CompatibilityResult
 }
 
 export async function getWallpaperDiagnostic(): Promise<WallpaperDiagnostic | null> {
-  if (!(await isNative())) return null;
+  const env = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
+  const jsBuild = {
+    jsBuildId: env.VITE_AETHERX_BUILD_ID,
+    jsBuildTimestamp: env.VITE_AETHERX_BUILD_TIMESTAMP,
+    jsBuildVersion: env.VITE_AETHERX_BUILD_VERSION,
+  };
+  if (!(await isNative())) return { pluginAvailable: false, ...jsBuild };
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
-    if (Capacitor.getPlatform() !== "android") return null;
+    if (Capacitor.getPlatform() !== "android") return { pluginAvailable: false, ...jsBuild };
     const registeredWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
     const capPlugins = (Capacitor as unknown as { Plugins?: Record<string, unknown> }).Plugins ?? {};
     const pluginAvailable = Boolean(
@@ -111,7 +117,7 @@ export async function getWallpaperDiagnostic(): Promise<WallpaperDiagnostic | nu
     const LiveWallpaper =
       (capPlugins["AetherXLiveWallpaper"] as LiveWallpaperPlugin | undefined) ?? registeredWallpaper;
     const status = await LiveWallpaper.getStatus();
-    return { pluginAvailable, ...status };
+    return { pluginAvailable, ...status, ...jsBuild };
   } catch (err) {
     console.warn("getWallpaperDiagnostic failed", err);
     return {
@@ -119,6 +125,7 @@ export async function getWallpaperDiagnostic(): Promise<WallpaperDiagnostic | nu
       lastError: err instanceof Error ? err.message : String(err),
       lastExceptionStacktrace: err instanceof Error ? err.stack ?? null : null,
       openPickerCalled: false,
+      ...jsBuild,
     };
   }
 }
