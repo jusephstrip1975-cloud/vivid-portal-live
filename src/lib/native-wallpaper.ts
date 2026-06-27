@@ -83,10 +83,12 @@ export async function getWallpaperDiagnostic(): Promise<WallpaperDiagnostic | nu
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
     if (Capacitor.getPlatform() !== "android") return null;
+    const registeredWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
     const capPlugins = (Capacitor as unknown as { Plugins?: Record<string, unknown> }).Plugins ?? {};
     const pluginAvailable = Boolean(capPlugins["AetherXLiveWallpaper"]);
     console.info("[AetherX] PLUGIN_AVAILABLE=" + pluginAvailable);
-    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    const LiveWallpaper =
+      (capPlugins["AetherXLiveWallpaper"] as LiveWallpaperPlugin | undefined) ?? registeredWallpaper;
     const status = await LiveWallpaper.getStatus();
     return { pluginAvailable, ...status };
   } catch (err) {
@@ -236,7 +238,14 @@ export async function saveWallpaperToDevice(
     const platform = Capacitor.getPlatform();
 
     if (platform === "android") {
-      const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      const registeredWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      const capacitorWithPlugins = Capacitor as typeof Capacitor & {
+        Plugins?: Record<string, LiveWallpaperPlugin>;
+      };
+      const directWallpaper = capacitorWithPlugins.Plugins?.AetherXLiveWallpaper;
+      const LiveWallpaper = directWallpaper ?? registeredWallpaper;
+      console.log("PLUGIN_DIRECT_AVAILABLE", Boolean(directWallpaper));
+      console.log("PLUGIN_NAMES", Object.keys(capacitorWithPlugins.Plugins ?? {}));
       try {
         const storage = await LiveWallpaper.checkStorage();
         console.info("[AetherX] FREE_SPACE_MB", storage.freeMb, "requiredMb", storage.requiredMb, "ok", storage.ok);
@@ -248,17 +257,33 @@ export async function saveWallpaperToDevice(
         console.warn("checkStorage failed (continuing)", err);
       }
       const resolvedUrl = resolveDownloadUrl(videoUrl);
-      console.info("[AetherX] saveVideoFromUrlAndOpenPicker", { wallpaperId, fileName, resolvedUrl });
-      const saved = await LiveWallpaper.saveVideoFromUrlAndOpenPicker({
+      console.log("VIDEO_URL", resolvedUrl);
+      if (!resolvedUrl || !resolvedUrl.trim()) {
+        console.error("VIDEO_URL_INVALID", { wallpaperId, fileName, videoUrl, resolvedUrl });
+        return { ok: false, reason: "missing-url" };
+      }
+
+      console.log("CALLING_PLUGIN");
+      const saved = await LiveWallpaper.saveVideoFromUrl({
         url: resolvedUrl,
         fileName,
         wallpaperId,
       });
+      console.log("PLUGIN_RESULT", saved);
+
       if (saved.path) {
         const previewUrl = Capacitor.convertFileSrc(saved.path);
         void runInternalSpeedProbe(previewUrl, saved.path);
       }
-      if (saved.openedPicker || saved.needsConfirmation) {
+      const pickerResult =
+        target === "lock"
+          ? await LiveWallpaper.applyLock()
+          : target === "both"
+            ? await LiveWallpaper.applyBoth()
+            : await LiveWallpaper.applyHome();
+      console.log("PLUGIN_APPLY_RESULT", pickerResult);
+
+      if (pickerResult.openedPicker || pickerResult.needsConfirmation || pickerResult.applied) {
         return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
       }
       return { ok: false, reason: "CURRENT_MP4_NOT_READY" };

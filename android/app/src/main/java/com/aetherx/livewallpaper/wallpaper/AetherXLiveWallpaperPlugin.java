@@ -141,6 +141,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     @PluginMethod
     public void saveVideoFromUrl(final PluginCall call) {
+        Log.e(TAG, "SAVE_VIDEO_FROM_URL_ENTERED");
+        setCurrentAction("saveVideoFromUrl");
+        setStep("SAVE_VIDEO_FROM_URL_ENTERED");
         final String url = call.getString("url");
         final String fileName = sanitizeFileName(call.getString("fileName", "wallpaper.mp4"));
         final String wallpaperId = call.getString("wallpaperId", fileName);
@@ -194,6 +197,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     @PluginMethod
     public void saveVideoFromUrlAndOpenPicker(final PluginCall call) {
+        Log.e(TAG, "SAVE_VIDEO_FROM_URL_AND_OPEN_PICKER_ENTERED");
         setCurrentAction("saveVideoFromUrlAndOpenPicker");
         setStep("START_SAVE_VIDEO");
         final String url = call.getString("url");
