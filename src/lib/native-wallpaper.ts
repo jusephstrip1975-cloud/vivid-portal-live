@@ -48,6 +48,25 @@ export interface WallpaperDiagnostic {
   parentDir?: string | null;
   parentExists?: boolean;
   parentWritable?: boolean;
+  autoRecovered?: boolean;
+  // Build info (native side)
+  appVersion?: string;
+  versionCode?: number;
+  buildVersion?: string;
+  buildTimestamp?: string;
+  buildId?: string;
+  packageName?: string;
+  // Signature
+  apkSignatureSha256?: string;
+  signatureValid?: boolean;
+  installSource?: string;
+  // Service
+  serviceRunning?: boolean;
+  lastServiceError?: string | null;
+  // Build info (JS side, from Vite env)
+  jsBuildId?: string;
+  jsBuildTimestamp?: string;
+  jsBuildVersion?: string;
 }
 
 export interface CompatibilityResult {
