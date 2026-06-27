@@ -2,9 +2,22 @@ import java.util.TimeZone
 
 apply plugin: 'com.android.application'
 
-def aetherxVersionCode = 206
-def aetherxVersionName = "2.0.6-service-path"
+def aetherxVersionCode = 207
+def aetherxVersionName = "2.0.7-stable"
 def aetherxBuildVersion = System.getenv("AETHERX_BUILD_VERSION") ?: aetherxVersionName
+def aetherxBuildTimestamp = System.getenv("AETHERX_BUILD_TIMESTAMP")
+if (aetherxBuildTimestamp == null || aetherxBuildTimestamp.isEmpty()) {
+    def fmt = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+    fmt.setTimeZone(TimeZone.getTimeZone("UTC"))
+    aetherxBuildTimestamp = fmt.format(new Date())
+}
+def aetherxBuildId = System.getenv("AETHERX_BUILD_ID")
+if (aetherxBuildId == null || aetherxBuildId.isEmpty()) {
+    def src = (aetherxBuildVersion + "|" + aetherxBuildTimestamp).bytes
+    def md = java.security.MessageDigest.getInstance("SHA-256")
+    def hex = md.digest(src).encodeHex().toString()
+    aetherxBuildId = hex.substring(0, 12)
+}
 
 android {
     namespace = "com.aetherx.livewallpaper"
@@ -20,6 +33,8 @@ android {
         versionCode aetherxVersionCode
         versionName aetherxVersionName
         buildConfigField "String", "AETHERX_BUILD_VERSION", "\"${aetherxBuildVersion}\""
+        buildConfigField "String", "AETHERX_BUILD_TIMESTAMP", "\"${aetherxBuildTimestamp}\""
+        buildConfigField "String", "AETHERX_BUILD_ID", "\"${aetherxBuildId}\""
         buildConfigField "String", "AETHERX_BUILD_MARKER", "\"NEW_BUILD_LOADED_OK\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -49,6 +64,7 @@ android {
         debug {
             minifyEnabled false
             debuggable false
+            signingConfig signingConfigs.release
         }
     }
 
@@ -122,29 +138,19 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
     }
 }
 
-tasks.register('prepareAetherXReleaseSigning') {
+// STRICT: never auto-generate a keystore. A stable signature is the only way Play Protect stops complaining.
+tasks.register('requireAetherXKeystore') {
     doLast {
         def ksPath = System.getenv("AETHERX_KEYSTORE_PATH") ?: "release.keystore"
         def ksFile = file(ksPath)
-        if (ksFile.exists() && ksFile.length() > 0L) {
-            logger.lifecycle("AETHERX signing keystore ready: ${ksFile.absolutePath}")
-            return
+        if (!ksFile.exists() || ksFile.length() == 0L) {
+            throw new GradleException(
+                "AETHERX release keystore missing at ${ksFile.absolutePath}. " +
+                "Commit android/app/release.keystore or set AETHERX_KEYSTORE_PATH. " +
+                "NEVER regenerate it — Play Protect blocks new signatures."
+            )
         }
-        logger.lifecycle("AETHERX release keystore missing. Generating temporary internal test keystore.")
-        ksFile.parentFile?.mkdirs()
-        exec {
-            commandLine 'keytool', '-genkeypair',
-                '-v',
-                '-keystore', ksFile.absolutePath,
-                '-storepass', 'aetherx-internal-test',
-                '-keypass', 'aetherx-internal-test',
-                '-alias', 'aetherx-test',
-                '-keyalg', 'RSA',
-                '-keysize', '2048',
-                '-validity', '10000',
-                '-dname', 'CN=AETHERX Internal Test, OU=AETHERX, O=AETHERX, L=Local, S=Local, C=ES'
-        }
-        logger.lifecycle("AETHERX temporary internal keystore generated: ${ksFile.absolutePath}")
+        logger.lifecycle("AETHERX signing keystore OK: ${ksFile.absolutePath} (${ksFile.length()} bytes)")
     }
 }
 
@@ -153,7 +159,7 @@ tasks.named('preBuild') {
 }
 
 gradle.projectsEvaluated {
-    tasks.matching { it.name in ['assembleRelease', 'bundleRelease'] }.configureEach {
-        dependsOn 'prepareAetherXReleaseSigning'
+    tasks.matching { it.name in ['assembleRelease', 'bundleRelease', 'assembleDebug'] }.configureEach {
+        dependsOn 'requireAetherXKeystore'
     }
 }

@@ -170,10 +170,22 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
                 Log.i(TAG, "SERVICE_READ_KEY_VIDEO_PATH=" + path);
+
+                // AUTO-RECOVERY: if prefs say null but the canonical current.mp4 exists on disk, use it
+                // and re-persist the path with a synchronous commit so future reads succeed.
                 if (path == null || path.isEmpty()) {
-                    Log.e(TAG, "SERVICE_FILE_EXISTS=false reason=KEY_VIDEO_PATH_EMPTY");
-                    paintMessage("Archivo de wallpaper no encontrado");
-                    return;
+                    File fallback = getCurrentWallpaperFile();
+                    if (fallback.exists() && fallback.length() > MIN_VALID_VIDEO_BYTES) {
+                        String abs = fallback.getAbsolutePath();
+                        prefs.edit().putString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, abs).commit();
+                        path = abs;
+                        Log.i(TAG, "SERVICE_VIDEO_RECOVERED=true path=" + abs);
+                    } else {
+                        Log.e(TAG, "SERVICE_VIDEO_RECOVERED=false reason=disk-also-empty path=" + fallback.getAbsolutePath());
+                        prefs.edit().putString("last_service_error", "KEY_VIDEO_PATH_EMPTY_AND_NO_DISK_FILE").commit();
+                        paintMessage("Archivo de wallpaper no encontrado");
+                        return;
+                    }
                 }
                 File selectedOutput = new File(path);
                 boolean svcExists = selectedOutput.exists();
@@ -531,7 +543,20 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 + " CAN_READ=" + current.canRead()
                 + " FILE_SIZE=" + (current.exists() ? current.length() : -1)
                 + " ABSOLUTE_PATH=" + current.getAbsolutePath(), error);
-            paintMessage("Archivo de wallpaper no encontrado");
+            try {
+                if (prefs == null) {
+                    prefs = getApplicationContext()
+                        .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                }
+                prefs.edit().putString("last_service_error",
+                    reason + (error == null ? "" : ": " + error.getMessage())).commit();
+            } catch (Throwable ignored) {}
+            // Only show "not found" if the file really isn't there. Otherwise show the playback reason.
+            if (!current.exists() || current.length() <= MIN_VALID_VIDEO_BYTES) {
+                paintMessage("Archivo de wallpaper no encontrado");
+            } else {
+                paintMessage("No se pudo reproducir el vídeo");
+            }
         }
 
         private File getCurrentWallpaperFile() {

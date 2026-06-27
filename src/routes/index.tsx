@@ -178,6 +178,11 @@ function HomePage() {
             {pickToast}
           </div>
         )}
+        <p className="mt-3 text-center text-[10px] font-mono tracking-tight text-white/30">
+          BUILD_ID {String((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_AETHERX_BUILD_ID ?? "dev")}
+          {" · "}
+          {String((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_AETHERX_BUILD_TIMESTAMP ?? "")}
+        </p>
         <WallpaperDiagnosticPanel />
       </section>
 

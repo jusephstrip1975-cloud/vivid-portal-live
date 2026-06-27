@@ -1,131 +1,118 @@
-# Reconstruir Live Wallpaper Completo
+# Plan definitivo AetherX Android
 
-Reviertir la dirección "APK vacía" y devolver al proyecto Android una arquitectura real de live wallpaper que renderice vídeo en el home screen, usando el `WallpaperService` oficial de Android + ExoPlayer sobre `SurfaceHolder`, expuesto a la UI React/Capacitor mediante un plugin nativo.
+Causa raíz real (basada en los síntomas que describes):
 
-## Resultado final
+1. **`KEY_VIDEO_PATH` se vuelve null entre builds** → se usa `apply()` (asíncrono) y el proceso del WallpaperService se reinicia antes de que SharedPreferences haya hecho fsync. Además no hay revalidación al arrancar el servicio.
+2. **APK viejo "fantasma" tras instalar** → Gradle/Capacitor reutilizan `android/app/build`, `android/.gradle`, `assets/public` y el dispositivo a veces conserva data del package anterior. No hay forma visual de saber qué build está instalado.
+3. **Play Protect bloquea** → el workflow genera un keystore "fallback" cuando faltan secrets, así que la firma cambia entre ejecuciones del runner (cada vez que el repo se clona limpio). Play Protect ve una firma nueva = app desconocida = bloqueo.
+4. **Diagnóstico incompleto** → no expone versión, build id, hash de firma ni estado del servicio, así que no se puede distinguir un build viejo instalado de un bug real.
 
-- Pulsar el icono → abre la app Capacitor con la UI React (catálogo de wallpapers).
-- Elegir un wallpaper → descarga el MP4 a `filesDir`.
-- "Aplicar" → abre el selector nativo `ACTION_CHANGE_LIVE_WALLPAPER` apuntando a `AetherXLiveWallpaperService`.
-- Confirmar en el sistema → el home screen renderiza el vídeo en bucle a pantalla completa, sin sonido, sin pantalla negra.
+No son bugs separados — son consecuencias de **no tener un build reproducible y firmado de forma estable**.
 
-## Cambios en el proyecto
+---
 
-### 1. Identidad y configuración
+## Cambios
 
-- Mantener `applicationId` / `namespace` = `com.aetherx.localfinal` (no rompemos la firma instalada).
-- `capacitor.config.ts`:
-  - `webDir: "public/dist"` (build local, sin `server.url`).
-  - Reactivar Capacitor Android (quitar `allowMixedContent: false` y `captureInput: false` que rompen el WebView, dejarlos en valores por defecto).
-- `capacitor.plugins.json`: registrar el plugin local `AetherXLiveWallpaper`.
+### 1. Firma release estable (elimina Play Protect)
 
-### 2. Plugin nativo `AetherXLiveWallpaperPlugin` (Java)
+- Eliminar del workflow toda la rama "generar keystore temporal".
+- El único keystore permitido es `android/app/release.keystore` ya commiteado (alias `aetherx-test`, password `aetherx-internal-test`).
+- Si el keystore no existe o el alias no existe → **el build falla con mensaje claro**. Nunca se regenera.
+- `signingConfigs.release` en `build.gradle` lee SIEMPRE de ese keystore (sin fallback a debug).
+- `buildTypes.release` usa `signingConfig signingConfigs.release` siempre.
+- Resultado: la firma SHA-256 es idéntica en todos los builds → Play Protect deja de avisar tras la primera aceptación.
 
-Recrear en `android/app/src/main/java/com/aetherx/localfinal/wallpaper/`:
+### 2. Build reproducible y verificable
 
-- `AetherXLiveWallpaperPlugin.java` (`@CapacitorPlugin(name="AetherXLiveWallpaper")`):
-  - `saveVideoFromUrl({url, fileName})` → descarga con redirects a `filesDir/wallpapers/<fileName>` y guarda la ruta del "último vídeo" en `SharedPreferences`.
-  - `saveVideo({base64, fileName})` → variante base64.
-  - `pickVideoFromDevice()` → `ACTION_OPEN_DOCUMENT` (video/*), copia a `filesDir`.
-  - `applyHome()` / `applyLock()` / `applyBoth()` → llaman a `openPicker()`.
-  - `openPicker()` → lanza `Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)` con `EXTRA_LIVE_WALLPAPER_COMPONENT` apuntando a `AetherXLiveWallpaperService`.
-  - `checkCompatibility()` → reporta SDK, fabricante, si `WallpaperManager.isSetWallpaperAllowed()`, si hay vídeo, etc.
+- `scripts/clean-android-total.mjs` ya limpia caches; añadir `node_modules/.vite` y `android/app/src/main/assets/capacitor.plugins.json`.
+- Inyectar en `BuildConfig` tres campos: `AETHERX_BUILD_VERSION`, `AETHERX_BUILD_TIMESTAMP`, `AETHERX_BUILD_ID` (hash corto).
+- Inyectar los mismos en el bundle web vía `define` de Vite → accesibles desde JS como `import.meta.env.VITE_AETHERX_BUILD_*`.
+- Nuevo script `scripts/verify-apk.mjs` que tras `assembleRelease`:
+  - calcula SHA-256 del APK,
+  - extrae versionCode/versionName/signature con `apksigner` / `aapt`,
+  - los escribe en `android/app/build/outputs/apk/release/BUILD_INFO.json`,
+  - falla si la firma no coincide con la esperada.
+- El workflow sube `BUILD_INFO.json` como artifact.
 
-### 3. Servicio de live wallpaper
+### 3. Persistencia del path del wallpaper (elimina null fantasma)
 
-`AetherXLiveWallpaperService.java` extiende `android.service.wallpaper.WallpaperService`:
+En `AetherXLiveWallpaperPlugin.java`:
+- Tras escribir `current.mp4`: usar `editor.commit()` (síncrono) en lugar de `apply()`.
+- Guardar en el mismo commit: `KEY_VIDEO_PATH`, `KEY_VIDEO_SIZE`, `KEY_VIDEO_SAVED_AT`, `KEY_LAST_SOURCE_URL`.
+- Log obligatorio: `SAVE_VIDEO_SUCCESS`, `KEY_VIDEO_PATH_SAVED=<path>`.
 
-- `onCreateEngine()` devuelve `VideoEngine extends Engine`.
-- `VideoEngine`:
-  - Lee la ruta del último vídeo desde `SharedPreferences`.
-  - En `onSurfaceCreated(SurfaceHolder)`: crea `ExoPlayer` (Media3), `setVideoSurface(holder.getSurface())`, `setRepeatMode(REPEAT_MODE_ALL)`, volumen 0, `prepare()`, `play()`.
-  - En `onSurfaceChanged`: ajusta `setVideoScalingMode` a `VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING`.
-  - En `onVisibilityChanged(false)`: pausa. En `true`: play.
-  - En `onSurfaceDestroyed` / `onDestroy`: libera el `ExoPlayer`.
-  - Manejo de excepciones: si el vídeo no carga, pinta el canvas en negro (no crash).
+En `AetherXLiveWallpaperService.java`:
+- Al `onCreateEngine` y al `onVisibilityChanged(true)`:
+  - leer `KEY_VIDEO_PATH`,
+  - si es null pero `getExternalFilesDir(DIRECTORY_MOVIES)/AetherX/current.mp4` existe → reescribir el path en prefs con `commit()` y continuar (auto-recuperación).
+  - log: `SERVICE_VIDEO_PATH_READ=...`, `SERVICE_VIDEO_RECOVERED=true|false`, `SERVICE_PLAYBACK_STARTED`.
+- Mostrar "Archivo no encontrado" **solo** si tras la auto-recuperación el archivo realmente no existe.
 
-### 4. AndroidManifest
+### 4. Panel de diagnóstico real
 
-- Permisos:
-  - `INTERNET`
-  - `BIND_WALLPAPER` (uses-permission no es necesario; el `<service>` lo declara como `android:permission`).
-- Dentro de `<application>`:
-  - `MainActivity` queda como `BridgeActivity` de Capacitor (vuelve el WebView).
-  - **Nuevo `<service>`:**
-    ```xml
-    <service
-        android:name=".wallpaper.AetherXLiveWallpaperService"
-        android:label="AetherX Live"
-        android:permission="android.permission.BIND_WALLPAPER"
-        android:exported="true">
-        <intent-filter>
-            <action android:name="android.service.wallpaper.WallpaperService" />
-        </intent-filter>
-        <meta-data
-            android:name="android.service.wallpaper"
-            android:resource="@xml/aetherx_wallpaper" />
-    </service>
-    ```
-  - `FileProvider` para compartir el MP4 con el sistema cuando haga falta.
-- Crear `res/xml/aetherx_wallpaper.xml` con `<wallpaper android:thumbnail="@mipmap/ic_launcher" android:description="@string/app_name" />`.
-
-### 5. MainActivity
-
-Reemplazar la `Activity` nativa "pantalla negra" por la `BridgeActivity` de Capacitor, manteniendo `applicationId` y `app_name`. La UI React vuelve a renderizar.
-
-### 6. Dependencias Gradle
-
-`android/app/build.gradle`:
-- Reactivar `apply from: 'capacitor.build.gradle'` y restaurar `android/capacitor.settings.gradle` real (lo regenera `cap sync`).
-- Añadir Media3 ExoPlayer:
-  ```
-  implementation "androidx.media3:media3-exoplayer:1.4.1"
-  implementation "androidx.media3:media3-ui:1.4.1"
-  implementation "androidx.media3:media3-common:1.4.1"
-  ```
-- Eliminar el bloqueo `verifyAetherXNativeLocalFinal` que prohíbe `Capacitor`, `WebView`, `BridgeActivity`, `startActivity(`, `ACTION_VIEW`. Reemplazar por una verificación reducida que solo comprueba:
-  - applicationId/namespace siguen siendo `com.aetherx.localfinal`.
-  - El `<service>` del wallpaper está declarado.
-  - El APK final se llama `app-aetherx-localfinal-debug.apk`.
-- Mantener `copyAetherXLocalFinalDebugApk` y `verifyAetherXFinalDebugApk` (renombrado del APK).
-
-### 7. Script de "lock"
-
-`scripts/lock-android-local-final.mjs`:
-- Quitar la verificación que vacía `capacitor.plugins.json` y prohíbe `WebView`/`BridgeActivity`/`startActivity`.
-- En su lugar: verificar que existen el plugin y el servicio, que el manifest declara el `<service>` con `BIND_WALLPAPER`, y que `applicationId` no ha mutado.
-- Dejar de sobrescribir `MainActivity.java` desde `android-template/`.
-
-### 8. Capa JS
-
-`src/lib/native-wallpaper.ts` ya está preparada para esta API (saveVideoFromUrl, applyHome/Lock/Both, openPicker, pickVideoFromDevice, checkCompatibility). No hacen falta cambios funcionales; basta con que el plugin nativo vuelva a existir.
-
-### 9. GitHub Actions
-
-`.github/workflows/android-build.yml` ya espera `app-aetherx-localfinal-debug.apk`. Se mantiene.
-
-## Ficheros tocados (resumen)
-
-- **Modificar:** `capacitor.config.ts`, `android/app/build.gradle`, `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/java/com/aetherx/localfinal/MainActivity.java`, `android/app/src/main/assets/capacitor.config.json`, `android/app/src/main/assets/capacitor.plugins.json`, `scripts/lock-android-local-final.mjs`.
-- **Crear:** `android/app/src/main/java/com/aetherx/localfinal/wallpaper/AetherXLiveWallpaperPlugin.java`, `AetherXLiveWallpaperService.java`, `android/app/src/main/res/xml/aetherx_wallpaper.xml`, `android/app/src/main/res/xml/file_paths.xml` (si falta).
-- **Borrar:** `android-template/MainActivity.java` y `android-template/strings.xml` (ya no se usan como plantilla forzada).
-
-## Cómo lo probarás tú
+`WallpaperDiagnosticPanel.tsx` y `native-wallpaper.ts` exponen:
 
 ```
-bun install
-bun run build:android
-cd android
-./gradlew clean assembleDebug
+APP_VERSION             BUILD_TIMESTAMP        BUILD_ID
+APK_SIGNATURE_SHA256    PLUGIN_LOADED          SERVICE_RUNNING
+VIDEO_PATH              VIDEO_EXISTS           VIDEO_SIZE
+VIDEO_CAN_READ          LAST_NATIVE_EXCEPTION  LAST_JS_EXCEPTION
+LAST_SERVICE_ERROR      INSTALL_SOURCE         SIGNATURE_VALID
 ```
 
-APK resultante: `android/app/build/outputs/apk/debug/app-aetherx-localfinal-debug.apk`.
+Nuevo método nativo `getFullDiagnostic()` que devuelve todo en un objeto. Incluye `PackageManager.getPackageInfo(...).signingInfo` para SHA-256 real de la firma instalada. El JS también añade `BUILD_ID` y `BUILD_TIMESTAMP` desde `import.meta.env`.
 
-Instala, abre la app, elige un wallpaper, pulsa "Aplicar". Android abrirá el picker nativo de live wallpaper mostrando "AetherX Live"; al confirmar, el home reproducirá el vídeo en bucle.
+El BUILD_ID se renderiza también como texto pequeño en la home (`src/routes/index.tsx`) → así, al abrir el APK, ves al instante si es el build nuevo.
 
-## Riesgos / lo que romperá
+### 5. Validación post-build (smoke test)
 
-- El APK ya no será "pantalla negra estática". La pantalla negra que pediste antes desaparece — vuelve la UI completa.
-- Hay que volver a permitir tráfico HTTPS hacia `aetherx.org` para descargar los MP4 (o usar otra fuente). Esto contradice el bloqueo absoluto previo.
-- El primer launch puede pedir permisos (almacenamiento / wallpaper) según versión de Android.
-- Algunos fabricantes (Xiaomi/Huawei con MIUI/EMUI antiguos) restringen live wallpapers de terceros; en esos dispositivos el picker se abrirá pero el home puede ignorarlo. Lo loguearemos en `checkCompatibility()`.
+Añadir job en el workflow tras `assembleRelease`:
+- `scripts/verify-apk.mjs` (firma + versionCode + tamaño).
+- `grep` en el APK descomprimido para confirmar que `AetherXLiveWallpaperPlugin.class` y `AetherXLiveWallpaperService.class` existen.
+- Si falla cualquiera → workflow rojo, no se sube artifact.
+
+(No se puede ejecutar el plugin de verdad en CI sin emulador con Samsung — un instrumentation test daría falsos positivos. La verificación realista es: firma estable + clases presentes + assets presentes + diagnóstico visible en pantalla.)
+
+### 6. Samsung One UI
+
+- `AndroidManifest.xml`: confirmar `android:requestLegacyExternalStorage="false"` y que solo se usa `getExternalFilesDir()` (scoped storage compliant, no requiere permisos en Android 11+).
+- Servicio: añadir `android:foregroundServiceType` no aplica a `WallpaperService` — confirmar que NO está marcado como foreground service (Samsung mata foreground services no declarados).
+- En `onSurfaceCreated`: forzar `setFixedSize` al tamaño del surface antes de `prepare()` del player (workaround conocido One UI 6).
+
+### 7. Limpieza de mensajes engañosos
+
+- El plugin solo escribe `LAST_ERROR` cuando hay un `Throwable` real, no como fallback de cualquier estado vacío.
+- El servicio NUNCA loggea "archivo no encontrado" si `new File(path).exists()` es true.
+- El panel muestra `—` (no la cadena `"null"`) cuando un campo no aplica.
+
+---
+
+## Archivos a tocar
+
+```
+.github/workflows/android-build.yml      # eliminar fallback keystore, añadir verify
+android/app/build.gradle                 # BuildConfig fields, signingConfig estricto
+android/app/src/main/java/com/aetherx/livewallpaper/wallpaper/AetherXLiveWallpaperPlugin.java
+android/app/src/main/java/com/aetherx/livewallpaper/wallpaper/AetherXLiveWallpaperService.java
+android/app/src/main/java/com/aetherx/livewallpaper/MainActivity.java
+android/app/src/main/AndroidManifest.xml # revisión scoped storage
+src/lib/native-wallpaper.ts              # getFullDiagnostic
+src/components/WallpaperDiagnosticPanel.tsx
+src/routes/index.tsx                     # BUILD_ID visible
+vite.config.ts                           # define VITE_AETHERX_BUILD_*
+scripts/clean-android-total.mjs          # más rutas
+scripts/verify-apk.mjs                   # NUEVO
+```
+
+Bump `versionCode` a `207`, `versionName` a `2.0.7-stable`.
+
+---
+
+## Qué NO voy a hacer
+
+- No voy a generar otro keystore "por si acaso". Si el commiteado falla, el build falla y te lo digo.
+- No voy a añadir más capas de fallback ocultas que enmascaren bugs.
+- No voy a tocar el flujo de UI del selector (ya funciona).
+- No voy a meter instrumentation tests en CI sin emulador Samsung (darían señal falsa).
+
+¿Procedo con la implementación tal cual?

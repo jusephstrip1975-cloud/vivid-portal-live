@@ -33,13 +33,20 @@ jobs:
           node-version: "22"
 
       - name: Set unique build version
-        run: echo "AETHERX_BUILD_VERSION=$(date -u +%Y%m%d%H%M%S)-${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+        run: |
+          TS_HUMAN=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          TS_COMPACT=$(date -u +%Y%m%d%H%M%S)
+          BV="${TS_COMPACT}-${GITHUB_RUN_NUMBER}"
+          BID=$(printf "%s|%s" "$BV" "$TS_HUMAN" | sha256sum | cut -c1-12)
+          echo "AETHERX_BUILD_VERSION=$BV" >> "$GITHUB_ENV"
+          echo "AETHERX_BUILD_TIMESTAMP=$TS_HUMAN" >> "$GITHUB_ENV"
+          echo "AETHERX_BUILD_ID=$BID" >> "$GITHUB_ENV"
+          echo "VITE_AETHERX_BUILD_VERSION=$BV" >> "$GITHUB_ENV"
+          echo "VITE_AETHERX_BUILD_TIMESTAMP=$TS_HUMAN" >> "$GITHUB_ENV"
+          echo "VITE_AETHERX_BUILD_ID=$BID" >> "$GITHUB_ENV"
 
       - name: Total clean before install
-        run: |
-          rm -rf android/.gradle android/app/build android/build node_modules/.cache public/dist dist .capacitor android/app/src/main/assets/public
-          rm -rf ~/.gradle/caches ~/.gradle/daemon ~/.gradle/native ~/.gradle/wrapper/dists
-          echo "TOTAL_ANDROID_CLEAN_OK"
+        run: node scripts/clean-android-total.mjs && rm -rf ~/.gradle/caches ~/.gradle/daemon ~/.gradle/native ~/.gradle/wrapper/dists
 
       - name: Delete previous AETHERX artifacts
         env:
@@ -73,9 +80,10 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # ----- Signing setup -----
-      # If release signing secrets exist, use them. If not, generate an internal
-      # temporary keystore so the workflow still produces installable release APK/AAB.
+      # ----- Signing setup (STRICT) -----
+      # The release keystore is committed to the repo. If repo secrets override
+      # are present, use them; otherwise use the committed keystore as-is.
+      # NEVER regenerate a keystore — that would change the signature and trigger Play Protect.
       - name: Prepare release keystore
         id: keystore
         env:
@@ -84,46 +92,24 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          KS=android/app/release.keystore
           if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
-            echo "Using provided release keystore from secrets."
-            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            echo "Overriding committed keystore with secret-provided one."
+            echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
             echo "ks_password=$KEYSTORE_PASSWORD" >> "$GITHUB_OUTPUT"
             echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
             echo "key_password=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
           else
-            KS=android/app/release.keystore
-            KS_PASS=aetherx-internal-test
-            KEY_PASS=aetherx-internal-test
-            ALIAS=aetherx-test
-            if [ -f "$KS" ]; then
-              echo "Existing keystore found at $KS"
-              if keytool -list -keystore "$KS" -alias "$ALIAS" -storepass "$KS_PASS" >/dev/null 2>&1; then
-                echo "Alias '$ALIAS' already exists in keystore. Reusing as-is."
-              else
-                echo "Keystore exists but alias '$ALIAS' missing. Adding alias."
-                keytool -genkeypair -v \
-                  -keystore "$KS" \
-                  -storepass "$KS_PASS" \
-                  -keypass "$KEY_PASS" \
-                  -alias "$ALIAS" \
-                  -keyalg RSA -keysize 2048 -validity 10000 \
-                  -dname "CN=AETHERX Internal Test, OU=AETHERX, O=AETHERX, L=Local, S=Local, C=ES"
-              fi
-            else
-              echo "No keystore found. Generating new temporary internal keystore."
-              keytool -genkeypair -v \
-                -keystore "$KS" \
-                -storepass "$KS_PASS" \
-                -keypass "$KEY_PASS" \
-                -alias "$ALIAS" \
-                -keyalg RSA -keysize 2048 -validity 10000 \
-                -dname "CN=AETHERX Internal Test, OU=AETHERX, O=AETHERX, L=Local, S=Local, C=ES"
+            if [ ! -f "$KS" ] || [ ! -s "$KS" ]; then
+              echo "::error::Committed keystore $KS missing or empty. Never regenerate — Play Protect blocks new signatures."
+              exit 1
             fi
-            echo "ks_password=$KS_PASS" >> "$GITHUB_OUTPUT"
-            echo "key_alias=$ALIAS" >> "$GITHUB_OUTPUT"
-            echo "key_password=$KEY_PASS" >> "$GITHUB_OUTPUT"
+            echo "Using committed keystore $KS (stable signature)."
+            echo "ks_password=aetherx-internal-test" >> "$GITHUB_OUTPUT"
+            echo "key_alias=aetherx-test" >> "$GITHUB_OUTPUT"
+            echo "key_password=aetherx-internal-test" >> "$GITHUB_OUTPUT"
           fi
-          echo "Keystore size: $(stat -c%s android/app/release.keystore) bytes"
+          echo "Keystore size: $(stat -c%s $KS) bytes"
 
       - name: Stop Gradle and purge project outputs
         working-directory: android
@@ -141,11 +127,16 @@ jobs:
           AETHERX_KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
         run: ./gradlew assembleRelease bundleRelease --no-daemon --no-build-cache --rerun-tasks --stacktrace
 
+      - name: Verify APK (sha256 + signature + BUILD_INFO.json)
+        run: node scripts/verify-apk.mjs
+
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: AETHERX-${{ env.AETHERX_BUILD_VERSION }}-release-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/apk/release/BUILD_INFO.json
           if-no-files-found: error
 
       - name: Upload release AAB (Google Play)

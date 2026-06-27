@@ -513,13 +513,24 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public void getStatus(PluginCall call) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String path = prefs.getString(KEY_VIDEO_PATH, null);
+        File current = getCurrentWallpaperFile();
+
+        // AUTO-RECOVERY: if path is null but current.mp4 exists on disk, re-persist it now.
+        boolean recovered = false;
+        if ((path == null || path.isEmpty()) && current.exists() && current.length() > MIN_VALID_VIDEO_BYTES) {
+            String abs = current.getAbsolutePath();
+            prefs.edit().putString(KEY_VIDEO_PATH, abs).commit();
+            path = abs;
+            recovered = true;
+            Log.i(TAG, "AUTO_RECOVERED_KEY_VIDEO_PATH=" + abs);
+        }
+
         String lastDownloadUrl = prefs.getString(KEY_LAST_SOURCE_URL, null);
         long lastDownloadBytes = prefs.getLong(KEY_LAST_DOWNLOAD_BYTES, 0L);
         String lastError = prefs.getString(KEY_LAST_ERROR, null);
         boolean openPickerCalled = prefs.getBoolean(KEY_OPEN_PICKER_CALLED, false);
         long version = prefs.getLong(KEY_VIDEO_VERSION, 0L);
         long updatedAt = prefs.getLong("video_updated_at", 0L);
-        File current = getCurrentWallpaperFile();
         File persisted = path == null ? null : new File(path);
         boolean exists = persisted != null && persisted.exists();
         long size = exists ? persisted.length() : 0;
@@ -533,16 +544,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 fdErr = e.getMessage();
             }
         }
-        Log.i(TAG, "getStatus VIDEO_PATH=" + path
-            + " CURRENT_EXPECTED=" + current.getAbsolutePath()
-            + " FILE_EXISTS=" + exists
-            + " FILE_SIZE=" + size
-            + " ABSOLUTE_PATH=" + (persisted == null ? "null" : persisted.getAbsolutePath())
-            + " canRead=" + canRead
-            + " fdOk=" + fdOk
-            + " fdErr=" + fdErr
-            + " version=" + version
-            + " updatedAt=" + updatedAt);
 
         JSObject ret = new JSObject();
         ret.put("finalPath", current.getAbsolutePath());
@@ -554,12 +555,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("lastDownloadBytes", lastDownloadBytes);
         ret.put("lastError", lastError);
         ret.put("openPickerCalled", openPickerCalled);
-        ret.put("savedPath", path);
-        ret.put("expectedCurrentPath", current.getAbsolutePath());
-        ret.put("exists", exists);
-        ret.put("size", size);
-        ret.put("canRead", canRead);
-        ret.put("fdOk", fdOk);
+        ret.put("autoRecovered", recovered);
         ret.put("version", version);
         ret.put("updatedAt", updatedAt);
         ret.put("renderer", "native-wallpaper-service");
@@ -573,7 +569,73 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("parentExists", parent != null && parent.exists());
         ret.put("parentWritable", parent != null && parent.canWrite());
         if (fdErr != null) ret.put("fdError", fdErr);
+
+        // BUILD INFO
+        ret.put("appVersion", BuildConfig.VERSION_NAME);
+        ret.put("versionCode", BuildConfig.VERSION_CODE);
+        ret.put("buildVersion", BuildConfig.AETHERX_BUILD_VERSION);
+        ret.put("buildTimestamp", BuildConfig.AETHERX_BUILD_TIMESTAMP);
+        ret.put("buildId", BuildConfig.AETHERX_BUILD_ID);
+        ret.put("packageName", getContext().getPackageName());
+
+        // SIGNATURE
+        try {
+            android.content.pm.PackageManager pm = getContext().getPackageManager();
+            android.content.pm.PackageInfo pi;
+            android.content.pm.Signature[] sigs;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pi = pm.getPackageInfo(getContext().getPackageName(),
+                    android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES);
+                sigs = pi.signingInfo.hasMultipleSigners()
+                    ? pi.signingInfo.getApkContentsSigners()
+                    : pi.signingInfo.getSigningCertificateHistory();
+            } else {
+                pi = pm.getPackageInfo(getContext().getPackageName(),
+                    android.content.pm.PackageManager.GET_SIGNATURES);
+                sigs = pi.signatures;
+            }
+            if (sigs != null && sigs.length > 0) {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+                byte[] hash = md.digest(sigs[0].toByteArray());
+                StringBuilder sb = new StringBuilder(hash.length * 2);
+                for (byte b : hash) sb.append(String.format("%02x", b));
+                ret.put("apkSignatureSha256", sb.toString());
+                ret.put("signatureValid", true);
+            } else {
+                ret.put("signatureValid", false);
+            }
+            String installer;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                installer = pm.getInstallSourceInfo(getContext().getPackageName()).getInstallingPackageName();
+            } else {
+                installer = pm.getInstallerPackageName(getContext().getPackageName());
+            }
+            ret.put("installSource", installer == null ? "unknown" : installer);
+        } catch (Throwable t) {
+            ret.put("signatureValid", false);
+            ret.put("signatureError", t.getMessage());
+        }
+
+        ret.put("serviceRunning", isWallpaperServiceActive());
+        ret.put("lastServiceError", prefs.getString("last_service_error", null));
+
+        Log.i(TAG, "getStatus VIDEO_PATH=" + path
+            + " FILE_EXISTS=" + exists
+            + " FILE_SIZE=" + size
+            + " recovered=" + recovered
+            + " buildId=" + BuildConfig.AETHERX_BUILD_ID);
         call.resolve(ret);
+    }
+
+    private boolean isWallpaperServiceActive() {
+        try {
+            WallpaperManager wm = WallpaperManager.getInstance(getContext());
+            android.app.WallpaperInfo info = wm.getWallpaperInfo();
+            if (info == null) return false;
+            return AetherXLiveWallpaperService.class.getName().equals(info.getServiceName());
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     @PluginMethod
