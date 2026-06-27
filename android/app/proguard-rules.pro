@@ -17,6 +17,12 @@
 -keep class androidx.media3.** { *; }
 -dontwarn androidx.media3.**
 
+# FFmpegKit / libx264 transcoder
+-keep class com.arthenica.ffmpegkit.** { *; }
+-dontwarn com.arthenica.ffmpegkit.**
+-keep class com.arthenica.smartexception.** { *; }
+-dontwarn com.arthenica.smartexception.**
+
 # AndroidX general
 -dontwarn androidx.**
 
