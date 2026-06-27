@@ -196,11 +196,14 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     @PluginMethod
     public void saveVideoFromUrlAndOpenPicker(final PluginCall call) {
+        setCurrentAction("saveVideoFromUrlAndOpenPicker");
+        setStep("START_SAVE_VIDEO");
         final String url = call.getString("url");
         final String fileName = sanitizeFileName(call.getString("fileName", "wallpaper.mp4"));
         final String wallpaperId = call.getString("wallpaperId", fileName);
-        Log.i(TAG, "saveVideoFromUrlAndOpenPicker wallpaperId=" + wallpaperId + " url=" + url + " fileName=" + fileName);
+        Log.i(TAG, "START_SAVE_VIDEO wallpaperId=" + wallpaperId + " url=" + url + " fileName=" + fileName);
         if (url == null || url.isEmpty()) {
+            setStep("DOWNLOAD_FAILED:missing-url");
             setLastError("descarga fallida: missing-url");
             setOpenPickerCalled(false);
             call.reject("descarga fallida");
@@ -208,6 +211,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
         String storageError = guardStorageOrReject("saveVideoFromUrlAndOpenPicker");
         if (storageError != null) {
+            setStep("DOWNLOAD_FAILED:low-storage");
             setLastError(storageError);
             setOpenPickerCalled(false);
             call.reject(storageError);
@@ -220,25 +224,58 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             try {
                 prepareForNewWallpaper(wallpaperId);
                 persistLastSourceUrl(url, wallpaperId);
+                setStep("SET_KEY_VIDEO_PATH:pending");
                 clearLastError();
                 setLastDownloadBytes(0L);
                 setOpenPickerCalled(false);
 
-                Log.i(TAG, "download-start wallpaperId=" + wallpaperId + " current=" + current.getAbsolutePath());
+                // Ensure parent dir exists physically
+                File parent = current.getParentFile();
+                boolean mkdirsOk = parent != null && (parent.exists() || parent.mkdirs());
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_MKDIRS_OK, mkdirsOk).commit();
+                Log.i(TAG, "MKDIRS_RESULT ok=" + mkdirsOk
+                    + " parent=" + (parent == null ? "null" : parent.getAbsolutePath())
+                    + " parentExists=" + (parent != null && parent.exists())
+                    + " parentWritable=" + (parent != null && parent.canWrite()));
+                if (!mkdirsOk) throw new Exception("mkdirs-failed:" + (parent == null ? "null" : parent.getAbsolutePath()));
+
+                // Pre-create the destination file so we know FS permits write before we open the stream
+                boolean createOk;
+                if (current.exists()) {
+                    createOk = true;
+                } else {
+                    try { createOk = current.createNewFile(); }
+                    catch (Throwable t) { createOk = false; Log.e(TAG, "createNewFile threw", t); }
+                }
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_CREATE_FILE_OK, createOk).commit();
+                Log.i(TAG, "CREATE_NEW_FILE ok=" + createOk + " path=" + current.getAbsolutePath());
+                if (!createOk) throw new Exception("create-new-file-failed:" + current.getAbsolutePath());
+
+                setStep("DOWNLOAD_STARTED");
+                Log.i(TAG, "DOWNLOAD_STARTED wallpaperId=" + wallpaperId
+                    + " current=" + current.getAbsolutePath() + " url=" + url);
                 long bytes = downloadFollowingRedirects(url, current);
                 setLastDownloadBytes(bytes);
-                Log.i(TAG, "download-complete wallpaperId=" + wallpaperId
+                setStep("DOWNLOAD_SUCCESS:" + bytes);
+                Log.i(TAG, "DOWNLOAD_SUCCESS wallpaperId=" + wallpaperId
                     + " bytes=" + bytes
                     + " exists=" + current.exists()
                     + " size=" + current.length()
                     + " absolute=" + current.getAbsolutePath());
 
+                setStep("WRITE_SUCCESS");
                 current = commitValidatedCurrentMp4(current, wallpaperId, "download-and-open");
+                setStep("SET_KEY_VIDEO_PATH:" + current.getAbsolutePath());
+                setStep("SAVE_COMPLETE");
                 final String finalPath = current.getAbsolutePath();
                 new Handler(Looper.getMainLooper()).post(() -> openLivePickerForFinalPath(call, finalPath));
             } catch (Exception e) {
+                setStep("DOWNLOAD_FAILED:" + e.getMessage());
                 String userError = classifySaveError(e);
                 setLastError(userError + ": " + e.getMessage());
+                setLastExceptionStacktrace(e);
                 setOpenPickerCalled(false);
                 Log.e(TAG, "SAVE_AND_OPEN_FAILED wallpaperId=" + wallpaperId
                     + " error=" + userError
@@ -257,6 +294,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
         }).start();
     }
+
+
 
     @PluginMethod
     public void saveVideo(PluginCall call) {
