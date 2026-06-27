@@ -8,11 +8,13 @@ const targets = [
   "android/app/build",
   "android/build",
   "node_modules/.cache",
+  "node_modules/.vite",
   "public/dist",
   "dist",
   ".capacitor",
   "android/app/src/main/assets/public",
   "android/app/src/main/assets/capacitor.config.json",
+  "android/app/src/main/assets/capacitor.plugins.json",
 ];
 
 for (const target of targets) {
