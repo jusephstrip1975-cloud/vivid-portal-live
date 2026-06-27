@@ -14,6 +14,9 @@ import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
+
 import androidx.annotation.OptIn;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
@@ -219,38 +222,98 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         }
 
         private void startMediaPlayerFallback(Uri uri) {
+            // Full reset/release before attempting any prepare
+            releasePlayer();
+            if (uri == null) {
+                Log.w(TAG, "MediaPlayer fallback: uri is null");
+                paintMessage("Vídeo no disponible");
+                return;
+            }
+            if (currentHolder == null || currentHolder.getSurface() == null
+                    || !currentHolder.getSurface().isValid()) {
+                Log.w(TAG, "MediaPlayer fallback: surface not valid yet");
+                return;
+            }
+
+            // Resolve a File from the uri so we can try FileDescriptor first
+            File file = null;
             try {
-                releasePlayer();
-                if (uri == null) {
-                    paintMessage("Vídeo no disponible");
-                    return;
+                if ("file".equalsIgnoreCase(uri.getScheme()) && uri.getPath() != null) {
+                    file = new File(uri.getPath());
                 }
-                if (currentHolder == null || currentHolder.getSurface() == null
-                        || !currentHolder.getSurface().isValid()) {
-                    Log.w(TAG, "MediaPlayer fallback: surface not valid");
+            } catch (Throwable t) {
+                Log.e(TAG, "MediaPlayer fallback: failed to resolve file from uri " + uri, t);
+            }
+
+            Log.i(TAG, "MediaPlayer fallback start uri=" + uri
+                    + " file=" + (file == null ? "null" : file.getAbsolutePath())
+                    + " exists=" + (file != null && file.exists())
+                    + " canRead=" + (file != null && file.canRead())
+                    + " size=" + (file != null && file.exists() ? file.length() : -1));
+
+            // Attempt #1: FileDescriptor via FileInputStream.getFD()
+            if (file != null && file.exists() && file.canRead() && file.length() > 0) {
+                FileInputStream fis = null;
+                try {
+                    fallbackPlayer = newConfiguredMediaPlayer();
+                    fis = new FileInputStream(file);
+                    FileDescriptor fd = fis.getFD();
+                    fallbackPlayer.setDataSource(fd);
+                    fallbackPlayer.prepareAsync();
+                    Log.i(TAG, "MediaPlayer setDataSource(FileDescriptor) ok, prepareAsync issued");
                     return;
+                } catch (Throwable t) {
+                    Log.e(TAG, "MediaPlayer setDataSource(FileDescriptor) failed; will try Uri fallback", t);
+                    releasePlayer();
+                } finally {
+                    if (fis != null) {
+                        try { fis.close(); } catch (Throwable ignored) {}
+                    }
                 }
-                Log.i(TAG, "MediaPlayer fallback start uri=" + uri);
-                fallbackPlayer = new MediaPlayer();
-                fallbackPlayer.setSurface(currentHolder.getSurface());
-                fallbackPlayer.setLooping(true);
-                fallbackPlayer.setVolume(0f, 0f);
-                fallbackPlayer.setOnErrorListener((mp, what, extra) -> {
-                    Log.e(TAG, "MediaPlayer error what=" + what + " extra=" + extra);
-                    paintMessage("Vídeo no soportado por el dispositivo");
-                    return true;
-                });
-                fallbackPlayer.setOnPreparedListener(mp -> {
-                    Log.i(TAG, "MediaPlayer prepared, starting playback");
-                    try { mp.start(); } catch (Throwable t) { Log.e(TAG, "MediaPlayer start failed", t); }
-                });
+            }
+
+            // Attempt #2: setDataSource(Context, Uri)
+            try {
+                fallbackPlayer = newConfiguredMediaPlayer();
                 fallbackPlayer.setDataSource(getApplicationContext(), uri);
                 fallbackPlayer.prepareAsync();
+                Log.i(TAG, "MediaPlayer setDataSource(Context, Uri) ok, prepareAsync issued");
             } catch (Throwable t) {
-                Log.e(TAG, "MediaPlayer fallback failed", t);
+                Log.e(TAG, "MediaPlayer setDataSource(Context, Uri) failed: "
+                        + (t.getMessage() == null ? t.getClass().getName() : t.getMessage()), t);
+                releasePlayer();
                 paintMessage("Vídeo no soportado por el dispositivo");
             }
         }
+
+        private MediaPlayer newConfiguredMediaPlayer() {
+            MediaPlayer mp = new MediaPlayer();
+            try {
+                mp.setSurface(currentHolder.getSurface());
+            } catch (Throwable t) {
+                Log.e(TAG, "MediaPlayer setSurface failed", t);
+            }
+            mp.setLooping(true);
+            try { mp.setVolume(0f, 0f); } catch (Throwable ignored) {}
+            mp.setOnErrorListener((p, what, extra) -> {
+                Log.e(TAG, "MediaPlayer onError what=" + what + " extra=" + extra
+                        + " (see logcat above for stacktrace if any)");
+                paintMessage("Vídeo no soportado por el dispositivo");
+                return true;
+            });
+            mp.setOnPreparedListener(p -> {
+                Log.i(TAG, "MediaPlayer prepared, starting playback");
+                try {
+                    p.start();
+                } catch (Throwable t) {
+                    Log.e(TAG, "MediaPlayer start() failed", t);
+                }
+            });
+            mp.setOnVideoSizeChangedListener((p, w, h) ->
+                    Log.i(TAG, "MediaPlayer videoSize " + w + "x" + h));
+            return mp;
+        }
+
 
         private void paintLoading(String text) {
             paintMessage(text);
