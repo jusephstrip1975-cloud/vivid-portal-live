@@ -47,13 +47,48 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_LAST_DOWNLOAD_BYTES = "last_download_bytes";
     public static final String KEY_LAST_ERROR = "last_error";
     public static final String KEY_OPEN_PICKER_CALLED = "open_picker_called";
+    public static final String KEY_CURRENT_ACTION = "current_action";
+    public static final String KEY_LAST_EXCEPTION_STACKTRACE = "last_exception_stacktrace";
+    public static final String KEY_LAST_STEP = "last_step";
+    public static final String KEY_MKDIRS_OK = "mkdirs_ok";
+    public static final String KEY_CREATE_FILE_OK = "create_file_ok";
 
     private static final int MAX_REDIRECTS = 5;
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
     private static final String WALLPAPER_DIR = "AetherX";
     private static final String CURRENT_MP4 = "current.mp4";
-    private static final long MIN_FREE_SPACE_BYTES = 10L * 1024L * 1024L * 1024L; // 10 GB
+    // Reduced from 10 GB (unrealistic — blocked all devices) to 200 MB which fits a 720p ~60s MP4.
+    private static final long MIN_FREE_SPACE_BYTES = 200L * 1024L * 1024L;
     private static final String LOW_STORAGE_MESSAGE = "Espacio insuficiente para procesar wallpapers 3D";
+
+    private void setStep(String step) {
+        Log.i(TAG, "STEP=" + step);
+        try {
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_LAST_STEP, step).commit();
+        } catch (Throwable ignored) {}
+    }
+
+    private void setCurrentAction(String action) {
+        Log.i(TAG, "CURRENT_ACTION=" + action);
+        try {
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_CURRENT_ACTION, action).commit();
+        } catch (Throwable ignored) {}
+    }
+
+    private void setLastExceptionStacktrace(Throwable t) {
+        if (t == null) return;
+        try {
+            java.io.StringWriter sw = new java.io.StringWriter();
+            t.printStackTrace(new java.io.PrintWriter(sw));
+            String trace = sw.toString();
+            if (trace.length() > 4000) trace = trace.substring(0, 4000);
+            Log.e(TAG, "LAST_EXCEPTION_STACKTRACE\n" + trace);
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_LAST_EXCEPTION_STACKTRACE, trace).commit();
+        } catch (Throwable ignored) {}
+    }
 
     @Override
     public void load() {
