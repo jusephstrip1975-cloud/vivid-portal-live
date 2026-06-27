@@ -571,6 +571,16 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("updatedAt", updatedAt);
         ret.put("renderer", "native-wallpaper-service");
         ret.put("playbackSpeed", 1.0);
+        ret.put("pluginAvailable", true);
+        ret.put("currentAction", prefs.getString(KEY_CURRENT_ACTION, null));
+        ret.put("lastStep", prefs.getString(KEY_LAST_STEP, null));
+        ret.put("lastExceptionStacktrace", prefs.getString(KEY_LAST_EXCEPTION_STACKTRACE, null));
+        ret.put("mkdirsOk", prefs.getBoolean(KEY_MKDIRS_OK, false));
+        ret.put("createFileOk", prefs.getBoolean(KEY_CREATE_FILE_OK, false));
+        File parent = current.getParentFile();
+        ret.put("parentDir", parent == null ? null : parent.getAbsolutePath());
+        ret.put("parentExists", parent != null && parent.exists());
+        ret.put("parentWritable", parent != null && parent.canWrite());
         if (fdErr != null) ret.put("fdError", fdErr);
         call.resolve(ret);
     }
