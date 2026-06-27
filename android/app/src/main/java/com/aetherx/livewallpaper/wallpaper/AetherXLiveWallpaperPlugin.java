@@ -1030,15 +1030,35 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             long total = 0;
             File parent = out.getParentFile();
             if (parent != null && !parent.exists()) parent.mkdirs();
-            try (InputStream in = conn.getInputStream();
-                 FileOutputStream fos = new FileOutputStream(out, false)) {
+            Log.i(TAG, "OPEN_FILE_OUTPUTSTREAM path=" + out.getAbsolutePath()
+                + " existsBefore=" + out.exists()
+                + " canWriteBefore=" + out.canWrite()
+                + " parentExists=" + (parent != null && parent.exists())
+                + " parentCanWrite=" + (parent != null && parent.canWrite()));
+            FileOutputStream fos;
+            try {
+                fos = new FileOutputStream(out, false);
+            } catch (Throwable t) {
+                Log.e(TAG, "FILE_OUTPUTSTREAM_FAILED path=" + out.getAbsolutePath(), t);
+                setLastExceptionStacktrace(t instanceof Exception ? (Exception) t : new Exception(t));
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_CREATE_FILE_OK, false).commit();
+                conn.disconnect();
+                throw new Exception("file-output-stream-failed:" + t.getMessage());
+            }
+            Log.i(TAG, "FILE_OUTPUTSTREAM_OK path=" + out.getAbsolutePath()
+                + " existsAfterOpen=" + out.exists()
+                + " canWriteAfterOpen=" + out.canWrite());
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_CREATE_FILE_OK, true).commit();
+            try (InputStream in = conn.getInputStream(); FileOutputStream out2 = fos) {
                 byte[] buf = new byte[16384];
                 int n;
                 while ((n = in.read(buf)) > 0) {
-                    fos.write(buf, 0, n);
+                    out2.write(buf, 0, n);
                     total += n;
                 }
-                fos.getFD().sync();
+                out2.getFD().sync();
             } finally {
                 conn.disconnect();
             }
