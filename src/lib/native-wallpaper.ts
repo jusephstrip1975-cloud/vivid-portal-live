@@ -82,6 +82,11 @@ export interface WallpaperDiagnostic {
   sourceHasAudio?: boolean;
   transcoded?: boolean;
   lastTranscodeError?: string | null;
+  ffmpegCommand?: string | null;
+  ffmpegExitCode?: string | null;
+  ffprobeWidth?: number;
+  ffprobeHeight?: number;
+  ffprobeRotation?: number;
 }
 
 export interface CompatibilityResult {

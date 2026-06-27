@@ -1,168 +1,114 @@
 package com.aetherx.livewallpaper.wallpaper;
 
 import android.content.Context;
-import android.net.Uri;
-import android.os.Handler;
-import android.os.Looper;
+import android.content.SharedPreferences;
 import android.util.Log;
 
-import androidx.media3.common.MediaItem;
-import androidx.media3.common.MimeTypes;
-import androidx.media3.effect.Presentation;
-import androidx.media3.effect.ScaleAndRotateTransformation;
-import androidx.media3.transformer.Composition;
-import androidx.media3.transformer.DefaultEncoderFactory;
-import androidx.media3.transformer.EditedMediaItem;
-import androidx.media3.transformer.Effects;
-import androidx.media3.transformer.ExportException;
-import androidx.media3.transformer.ExportResult;
-import androidx.media3.transformer.Transformer;
-import androidx.media3.transformer.VideoEncoderSettings;
+import com.arthenica.ffmpegkit.FFmpegKit;
+import com.arthenica.ffmpegkit.FFmpegSession;
+import com.arthenica.ffmpegkit.FFprobeKit;
+import com.arthenica.ffmpegkit.FFprobeSession;
+import com.arthenica.ffmpegkit.ReturnCode;
 
-import com.google.common.collect.ImmutableList;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.File;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Normalises any downloaded MP4 to Samsung Live Wallpaper safe format:
- * H.264 (AVC) / 1080x1920 PORTRAIT / ~30fps / yuv420p / no audio / faststart.
+ * H.264 baseline (AVC) / 1080x1920 PORTRAIT / max 30fps / yuv420p / no audio / faststart.
  *
- * Output MUST be portrait. We ignore the source rotationDegrees metadata and
- * physically rotate the frames so the encoded file has width=1080, height=1920
- * (no rotation flag). Samsung WallpaperService rejects 1920x1080 even when the
- * rotation metadata says portrait.
+ * The previous Android transformer is intentionally not used here. Samsung OneUI
+ * kept detecting a physically landscape stream (1920x1080) despite portrait
+ * metadata. FFmpegKit + libx264 is the mandatory transcoder for Samsung wallpapers.
  */
 public final class WallpaperTranscoder {
 
     private static final String TAG = "AetherXLiveWP";
-    private static final long TIMEOUT_SECONDS = 180L;
 
     public static File transcodeToSamsungSafe(Context ctx, File input, File finalOutput) throws Exception {
         if (input == null || !input.exists()) throw new Exception("transcode-input-missing");
 
-        // Decide rotation by looking at the decoded (post-rotation) frame size from the source.
         WallpaperProbe srcProbe = WallpaperProbe.of(input);
-        final int rotationDegrees;
-        if (srcProbe.width > 0 && srcProbe.height > 0 && srcProbe.width > srcProbe.height) {
-            // Landscape decoded frames -> rotate 90 to get portrait.
-            rotationDegrees = 90;
-        } else {
-            rotationDegrees = 0;
-        }
-        Log.i(TAG, "TRANSCODE_PLAN srcSize=" + srcProbe.width + "x" + srcProbe.height
-            + " applyRotation=" + rotationDegrees
-            + " target=1080x1920@30 H264 noAudio portrait");
+        Log.i(TAG, "TRANSCODE_PLAN engine=FFmpegKit srcSize=" + srcProbe.width + "x" + srcProbe.height
+            + " target=1080x1920@30 H264-baseline yuv420p noAudio SAR=1 faststart SDR");
 
         File tmpOutput = new File(finalOutput.getParentFile(), "current_transcoded.mp4");
         if (tmpOutput.exists() && !tmpOutput.delete()) {
             Log.w(TAG, "TRANSCODE_TMP_DELETE_FAILED path=" + tmpOutput.getAbsolutePath());
         }
 
-        final CountDownLatch latch = new CountDownLatch(1);
-        final AtomicReference<Throwable> errorRef = new AtomicReference<>();
-        final Handler main = new Handler(Looper.getMainLooper());
+        String[] ffmpegArgs = new String[] {
+            "-y",
+            "-i", input.getAbsolutePath(),
+            "-vf", "transpose=1,scale=1080:1920,setsar=1",
+            "-r", "30",
+            "-an",
+            "-c:v", "libx264",
+            "-profile:v", "baseline",
+            "-level", "3.1",
+            "-pix_fmt", "yuv420p",
+            "-colorspace", "bt709",
+            "-color_primaries", "bt709",
+            "-color_trc", "bt709",
+            "-map_metadata", "-1",
+            "-metadata:s:v:0", "rotate=0",
+            "-movflags", "+faststart",
+            tmpOutput.getAbsolutePath()
+        };
+        String ffmpegCommand = joinArgsForLog(ffmpegArgs);
+        Log.i(TAG, "FFMPEG_COMMAND=" + ffmpegCommand);
+        persistString(ctx, "ffmpeg_command", ffmpegCommand);
+        persistString(ctx, "ffmpeg_exit_code", null);
 
-        main.post(() -> {
-            try {
-                VideoEncoderSettings encoderSettings = new VideoEncoderSettings.Builder()
-                    .setBitrate(6_000_000)
-                    .build();
+        FFmpegSession session = FFmpegKit.executeWithArguments(ffmpegArgs);
+        String exitCode = String.valueOf(session.getReturnCode());
+        Log.i(TAG, "FFMPEG_EXIT_CODE=" + exitCode
+            + " state=" + session.getState()
+            + " failStack=" + session.getFailStackTrace());
+        persistString(ctx, "ffmpeg_exit_code", exitCode);
 
-                DefaultEncoderFactory encoderFactory = new DefaultEncoderFactory.Builder(ctx)
-                    .setRequestedVideoEncoderSettings(encoderSettings)
-                    .setEnableFallback(true)
-                    .build();
-
-                Transformer transformer = new Transformer.Builder(ctx)
-                    .setVideoMimeType(MimeTypes.VIDEO_H264)
-                    .setEncoderFactory(encoderFactory)
-                    .addListener(new Transformer.Listener() {
-                        @Override
-                        public void onCompleted(Composition composition, ExportResult exportResult) {
-                            Log.i(TAG, "TRANSCODE_COMPLETED durationMs=" + exportResult.durationMs
-                                + " videoMime=" + exportResult.videoMimeType
-                                + " outW=" + exportResult.width
-                                + " outH=" + exportResult.height);
-                            latch.countDown();
-                        }
-
-                        @Override
-                        public void onError(Composition composition, ExportResult exportResult, ExportException exportException) {
-                            Log.e(TAG, "TRANSCODE_ERROR", exportException);
-                            errorRef.set(exportException);
-                            latch.countDown();
-                        }
-                    })
-                    .build();
-
-                ImmutableList.Builder<androidx.media3.common.Effect> videoEffects = ImmutableList.builder();
-                if (rotationDegrees != 0) {
-                    // Flatten rotation into frames (bakes orientation, no rotation metadata in output).
-                    videoEffects.add(new ScaleAndRotateTransformation.Builder()
-                        .setRotationDegrees(rotationDegrees)
-                        .build());
-                }
-                // Force exact portrait 1080x1920. Use SCALE_TO_FIT_WITH_CROP to fully fill the
-                // wallpaper frame; LAYOUT_SCALE_TO_FIT can letterbox and some Samsung decoders
-                // dislike the resulting non-standard ratio.
-                videoEffects.add(Presentation.createForWidthAndHeight(
-                    WallpaperProbe.TARGET_WIDTH,
-                    WallpaperProbe.TARGET_HEIGHT,
-                    Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP));
-
-                EditedMediaItem mediaItem = new EditedMediaItem.Builder(
-                        MediaItem.fromUri(Uri.fromFile(input)))
-                    .setRemoveAudio(true)
-                    .setEffects(new Effects(ImmutableList.of(), videoEffects.build()))
-                    .build();
-
-                transformer.start(mediaItem, tmpOutput.getAbsolutePath());
-            } catch (Throwable t) {
-                Log.e(TAG, "TRANSCODE_START_FAILED", t);
-                errorRef.set(t);
-                latch.countDown();
-            }
-        });
-
-        if (!latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-            throw new Exception("transcode-timeout");
-        }
-        Throwable err = errorRef.get();
-        if (err != null) {
-            throw new Exception("transcode-failed:" + err.getMessage());
+        if (!ReturnCode.isSuccess(session.getReturnCode())) {
+            deleteQuietly(tmpOutput, "TRANSCODE_FFMPEG_FAILED_DELETE");
+            String output = session.getOutput();
+            if (output != null && output.length() > 1200) output = output.substring(output.length() - 1200);
+            Log.e(TAG, "TRANSCODE_FFMPEG_FAILED output=" + output);
+            throw new Exception("FAIL_FFMPEG_TRANSCODE:exit=" + exitCode);
         }
         if (!tmpOutput.exists() || tmpOutput.length() < 1024L * 1024L) {
             throw new Exception("transcode-output-invalid:size=" + (tmpOutput.exists() ? tmpOutput.length() : -1));
         }
 
-        // VALIDATE output orientation BEFORE committing.
+        FFprobeResult ffprobe = probeWithFFprobe(ctx, tmpOutput);
+        validateFFprobeResultOrFail(tmpOutput, ffprobe);
+
         WallpaperProbe outProbe = WallpaperProbe.of(tmpOutput);
         Log.i(TAG, "OUTPUT_PROBE codec=" + outProbe.codec
             + " OUTPUT_WIDTH=" + outProbe.width
             + " OUTPUT_HEIGHT=" + outProbe.height
             + " OUTPUT_FPS=" + outProbe.fps
             + " OUTPUT_HAS_AUDIO=" + outProbe.hasAudio
-            + " OUTPUT_ROTATION=0 (flattened)");
+            + " OUTPUT_ROTATION=" + ffprobe.rotation
+            + " OUTPUT_COLOR_STANDARD=bt709 OUTPUT_COLOR_TRANSFER=bt709");
         if (outProbe.width <= 0 || outProbe.height <= 0) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_PROBE_DELETE");
             throw new Exception("FAIL_TRANSCODE_INVALID_PROBE");
         }
         if (outProbe.width > outProbe.height) {
-            // Landscape — Samsung will reject. Abort.
-            if (tmpOutput.exists() && !tmpOutput.delete()) {
-                Log.w(TAG, "TRANSCODE_INVALID_DELETE_FAILED path=" + tmpOutput.getAbsolutePath());
-            }
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_ORIENTATION_DELETE");
             throw new Exception("FAIL_TRANSCODE_INVALID_ORIENTATION:"
                 + outProbe.width + "x" + outProbe.height);
         }
         if (outProbe.width != WallpaperProbe.TARGET_WIDTH
             || outProbe.height != WallpaperProbe.TARGET_HEIGHT) {
-            Log.w(TAG, "OUTPUT_SIZE_MISMATCH expected="
-                + WallpaperProbe.TARGET_WIDTH + "x" + WallpaperProbe.TARGET_HEIGHT
-                + " got=" + outProbe.width + "x" + outProbe.height
-                + " (portrait-ok, continuing)");
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_OUTPUT_SIZE_DELETE");
+            throw new Exception("FAIL_TRANSCODE_INVALID_SIZE:"
+                + outProbe.width + "x" + outProbe.height);
+        }
+        if (outProbe.hasAudio) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_AUDIO_DELETE");
+            throw new Exception("FAIL_TRANSCODE_AUDIO_PRESENT");
         }
 
         // Atomically replace finalOutput with tmpOutput.
@@ -187,5 +133,196 @@ public final class WallpaperTranscoder {
             + " size=" + finalOutput.length()
             + " finalSize=" + outProbe.width + "x" + outProbe.height);
         return finalOutput;
+    }
+
+    private static FFprobeResult probeWithFFprobe(Context ctx, File file) throws Exception {
+        String[] ffprobeArgs = new String[] {
+            "-v", "error",
+            "-show_entries", "stream=codec_type,codec_name,profile,width,height,pix_fmt,r_frame_rate,avg_frame_rate,sample_aspect_ratio,color_space,color_transfer,color_primaries:stream_tags=rotate:stream_side_data=rotation",
+            "-of", "json",
+            file.getAbsolutePath()
+        };
+        FFprobeSession session = FFprobeKit.executeWithArguments(ffprobeArgs);
+        String exitCode = String.valueOf(session.getReturnCode());
+        String output = session.getOutput();
+        Log.i(TAG, "FFPROBE_EXIT_CODE=" + exitCode + " output=" + output);
+        if (!ReturnCode.isSuccess(session.getReturnCode())) {
+            throw new Exception("FAIL_FFPROBE:exit=" + exitCode);
+        }
+
+        FFprobeResult result = new FFprobeResult();
+        try {
+            JSONObject root = new JSONObject(output == null ? "{}" : output);
+            JSONArray streams = root.optJSONArray("streams");
+            if (streams != null) {
+                for (int s = 0; s < streams.length(); s++) {
+                    JSONObject stream = streams.optJSONObject(s);
+                    if (stream == null) continue;
+                    String codecType = stream.optString("codec_type", "");
+                    if ("audio".equals(codecType)) {
+                        result.hasAudio = true;
+                        continue;
+                    }
+                    if (!"video".equals(codecType) || result.width > 0) continue;
+                    result.codec = stream.optString("codec_name", "");
+                    result.profile = stream.optString("profile", "");
+                    result.width = stream.optInt("width", 0);
+                    result.height = stream.optInt("height", 0);
+                    result.pixFmt = stream.optString("pix_fmt", "");
+                    result.fps = parseFps(stream.optString("avg_frame_rate", "0/0"));
+                    if (result.fps <= 0) result.fps = parseFps(stream.optString("r_frame_rate", "0/0"));
+                    result.sampleAspectRatio = stream.optString("sample_aspect_ratio", "");
+                    result.colorSpace = stream.optString("color_space", "");
+                    result.colorTransfer = stream.optString("color_transfer", "");
+                    result.colorPrimaries = stream.optString("color_primaries", "");
+                    JSONObject tags = stream.optJSONObject("tags");
+                    if (tags != null) result.rotation = parseRotation(tags.optString("rotate", "0"));
+                    JSONArray sideData = stream.optJSONArray("side_data_list");
+                    if (sideData != null) {
+                        for (int i = 0; i < sideData.length(); i++) {
+                            JSONObject item = sideData.optJSONObject(i);
+                            if (item != null && item.has("rotation")) {
+                                result.rotation = parseRotation(item.optString("rotation", "0"));
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "FFPROBE_PARSE_FAILED", t);
+            throw new Exception("FAIL_FFPROBE_PARSE:" + t.getMessage());
+        }
+
+        Log.i(TAG, "FFPROBE_WIDTH=" + result.width);
+        Log.i(TAG, "FFPROBE_HEIGHT=" + result.height);
+        Log.i(TAG, "FFPROBE_ROTATION=" + result.rotation);
+        Log.i(TAG, "FFPROBE_CODEC=" + result.codec
+            + " profile=" + result.profile
+            + " pix_fmt=" + result.pixFmt
+            + " fps=" + result.fps
+            + " sar=" + result.sampleAspectRatio
+            + " hasAudio=" + result.hasAudio
+            + " colorSpace=" + result.colorSpace
+            + " colorTransfer=" + result.colorTransfer
+            + " colorPrimaries=" + result.colorPrimaries);
+        SharedPreferences.Editor e = ctx.getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE).edit();
+        e.putInt("ffprobe_width", result.width);
+        e.putInt("ffprobe_height", result.height);
+        e.putInt("ffprobe_rotation", result.rotation);
+        e.commit();
+        return result;
+    }
+
+    private static void validateFFprobeResultOrFail(File tmpOutput, FFprobeResult p) throws Exception {
+        if (p.width > p.height) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_LANDSCAPE_DELETE");
+            throw new Exception("FAIL_TRANSCODE_INVALID_ORIENTATION:" + p.width + "x" + p.height);
+        }
+        if (p.width != WallpaperProbe.TARGET_WIDTH || p.height != WallpaperProbe.TARGET_HEIGHT) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_SIZE_DELETE");
+            throw new Exception("FAIL_TRANSCODE_INVALID_SIZE:" + p.width + "x" + p.height);
+        }
+        if (p.rotation != 0) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_ROTATION_DELETE");
+            throw new Exception("FAIL_TRANSCODE_ROTATION_METADATA:" + p.rotation);
+        }
+        if (!"h264".equalsIgnoreCase(p.codec)) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_CODEC_DELETE");
+            throw new Exception("FAIL_TRANSCODE_INVALID_CODEC:" + p.codec);
+        }
+        if (p.profile == null || !p.profile.toLowerCase().contains("baseline")) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_PROFILE_DELETE");
+            throw new Exception("FAIL_TRANSCODE_INVALID_PROFILE:" + p.profile);
+        }
+        if (!"yuv420p".equalsIgnoreCase(p.pixFmt)) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_PIXFMT_DELETE");
+            throw new Exception("FAIL_TRANSCODE_INVALID_PIXFMT:" + p.pixFmt);
+        }
+        if (p.fps <= 0 || p.fps > 30.5) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_FPS_DELETE");
+            throw new Exception("FAIL_TRANSCODE_INVALID_FPS:" + p.fps);
+        }
+        if (!"1:1".equals(p.sampleAspectRatio)) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_SAR_DELETE");
+            throw new Exception("FAIL_TRANSCODE_INVALID_SAR:" + p.sampleAspectRatio);
+        }
+        if (p.hasAudio) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_AUDIO_STREAM_DELETE");
+            throw new Exception("FAIL_TRANSCODE_AUDIO_PRESENT");
+        }
+        String cs = lower(p.colorSpace);
+        String ct = lower(p.colorTransfer);
+        String cp = lower(p.colorPrimaries);
+        if (cs.contains("bt2020") || ct.contains("smpte2084") || ct.contains("arib-std-b67") || cp.contains("bt2020")) {
+            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_HDR_BT2020_DELETE");
+            throw new Exception("FAIL_TRANSCODE_HDR_OR_BT2020:" + cs + "/" + ct + "/" + cp);
+        }
+    }
+
+    private static int parseRotation(String raw) {
+        try { return Math.round(Float.parseFloat(raw == null ? "0" : raw.trim())); }
+        catch (Throwable ignored) { return 0; }
+    }
+
+    private static double parseFps(String raw) {
+        try {
+            if (raw == null || raw.isEmpty() || "0/0".equals(raw)) return 0;
+            if (raw.contains("/")) {
+                String[] parts = raw.split("/", 2);
+                double num = Double.parseDouble(parts[0]);
+                double den = Double.parseDouble(parts[1]);
+                return den == 0 ? 0 : num / den;
+            }
+            return Double.parseDouble(raw);
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
+    private static String lower(String s) {
+        return s == null ? "" : s.toLowerCase();
+    }
+
+    private static String joinArgsForLog(String[] args) {
+        StringBuilder sb = new StringBuilder("ffmpeg");
+        for (String arg : args) {
+            sb.append(' ');
+            if (arg == null) {
+                sb.append("null");
+            } else if (arg.indexOf(' ') >= 0 || arg.indexOf('"') >= 0) {
+                sb.append('"').append(arg.replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
+            } else {
+                sb.append(arg);
+            }
+        }
+        return sb.toString();
+    }
+
+    private static void persistString(Context ctx, String key, String value) {
+        SharedPreferences.Editor e = ctx.getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE).edit();
+        if (value == null) e.remove(key); else e.putString(key, value);
+        e.commit();
+    }
+
+    private static void deleteQuietly(File file, String label) {
+        if (file == null) return;
+        boolean existed = file.exists();
+        boolean deleted = !existed || file.delete();
+        Log.i(TAG, label + " path=" + file.getAbsolutePath() + " existed=" + existed + " deleted=" + deleted);
+    }
+
+    private static final class FFprobeResult {
+        String codec = "";
+        String profile = "";
+        String pixFmt = "";
+        String sampleAspectRatio = "";
+        String colorSpace = "";
+        String colorTransfer = "";
+        String colorPrimaries = "";
+        int width = 0;
+        int height = 0;
+        int rotation = 0;
+        double fps = 0;
+        boolean hasAudio = false;
     }
 }

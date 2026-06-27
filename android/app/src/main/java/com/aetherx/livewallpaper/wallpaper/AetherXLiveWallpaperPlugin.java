@@ -634,6 +634,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("sourceHasAudio", prefs.getBoolean("source_has_audio", false));
         ret.put("transcoded", prefs.getBoolean("transcoded", false));
         ret.put("lastTranscodeError", prefs.getString("last_transcode_error", null));
+        ret.put("ffmpegCommand", prefs.getString("ffmpeg_command", null));
+        ret.put("ffmpegExitCode", prefs.getString("ffmpeg_exit_code", null));
+        ret.put("ffprobeWidth", prefs.getInt("ffprobe_width", 0));
+        ret.put("ffprobeHeight", prefs.getInt("ffprobe_height", 0));
+        ret.put("ffprobeRotation", prefs.getInt("ffprobe_rotation", 0));
 
         Log.i(TAG, "getStatus VIDEO_PATH=" + path
             + " FILE_EXISTS=" + exists
@@ -706,6 +711,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         prefs.edit()
             .remove(KEY_VIDEO_PATH)
             .remove("last_transcode_error")
+            .remove("ffmpeg_command")
+            .remove("ffmpeg_exit_code")
+            .remove("ffprobe_width")
+            .remove("ffprobe_height")
+            .remove("ffprobe_rotation")
             .putLong("video_updated_at", System.currentTimeMillis())
             .putLong(KEY_VIDEO_VERSION, version)
             .commit();
@@ -726,28 +736,25 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         persistProbe(originalProbe, false, "original");
 
         boolean transcoded = false;
-        if (!originalProbe.isSamsungSafe()) {
-            Log.i(TAG, "TRANSCODE_REQUIRED reason=non-samsung-safe"
-                + " codec=" + originalProbe.codec
-                + " size=" + originalProbe.width + "x" + originalProbe.height
-                + " fps=" + originalProbe.fps
-                + " hasAudio=" + originalProbe.hasAudio);
-            setStep("TRANSCODE_STARTED");
-            try {
-                current = WallpaperTranscoder.transcodeToSamsungSafe(getContext(), current, current);
-                transcoded = true;
-                WallpaperProbe finalProbe = WallpaperProbe.of(current);
-                persistProbe(finalProbe, true, "transcoded");
-                setStep("TRANSCODE_SUCCESS");
-            } catch (Exception te) {
-                setStep("TRANSCODE_FAILED:" + te.getMessage());
-                Log.e(TAG, "TRANSCODE_FAILED wallpaperId=" + wallpaperId, te);
-                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit().putString("last_transcode_error", te.getMessage()).commit();
-                throw te;
-            }
-        } else {
-            Log.i(TAG, "TRANSCODE_SKIPPED reason=samsung-safe-already");
+        Log.i(TAG, "TRANSCODE_REQUIRED reason=ffmpegkit-mandatory-for-samsung"
+            + " sourceSafe=" + originalProbe.isSamsungSafe()
+            + " codec=" + originalProbe.codec
+            + " size=" + originalProbe.width + "x" + originalProbe.height
+            + " fps=" + originalProbe.fps
+            + " hasAudio=" + originalProbe.hasAudio);
+        setStep("TRANSCODE_STARTED");
+        try {
+            current = WallpaperTranscoder.transcodeToSamsungSafe(getContext(), current, current);
+            transcoded = true;
+            WallpaperProbe finalProbe = WallpaperProbe.of(current);
+            persistProbe(finalProbe, true, "transcoded");
+            setStep("TRANSCODE_SUCCESS");
+        } catch (Exception te) {
+            setStep("TRANSCODE_FAILED:" + te.getMessage());
+            Log.e(TAG, "TRANSCODE_FAILED wallpaperId=" + wallpaperId, te);
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString("last_transcode_error", te.getMessage()).commit();
+            throw te;
         }
 
         ValidationResult currentValidation = validatePhysicalFileForPlayback(current, "current-before-persist", wallpaperId);
