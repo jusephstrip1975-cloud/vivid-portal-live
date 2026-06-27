@@ -19,17 +19,15 @@ import com.aetherx.livewallpaper.BuildConfig;
 import java.io.File;
 
 /**
- * AetherX Live Wallpaper Service — MEDIAPLAYER-ONLY engine.
+ * AetherX Live Wallpaper Service — MediaPlayer-only engine.
  *
  * Versión 2.1.2-mediaplayer-only.
  *
- * Samsung OneUI rechaza MediaCodecVideoRenderer (ExoPlayer/Media3) dentro del
- * WallpaperService con ERROR_CODE_DECODER_INIT_FAILED aunque el MP4 sea válido.
- * Por eso este servicio NO usa ExoPlayer, Media3, MediaCodecVideoRenderer,
- * DefaultRenderersFactory, ProgressiveMediaSource ni PlayerView.
- *
- * Solo android.media.MediaPlayer.
+ * Samsung OneUI rechaza otros decoders dentro del WallpaperService
+ * (DECODER_INIT_FAILED) aunque el MP4 sea válido. Por eso este servicio
+ * usa exclusivamente android.media.MediaPlayer y ningún otro motor.
  */
+
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
