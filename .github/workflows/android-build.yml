@@ -127,11 +127,16 @@ jobs:
           AETHERX_KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
         run: ./gradlew assembleRelease bundleRelease --no-daemon --no-build-cache --rerun-tasks --stacktrace
 
+      - name: Verify APK (sha256 + signature + BUILD_INFO.json)
+        run: node scripts/verify-apk.mjs
+
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: AETHERX-${{ env.AETHERX_BUILD_VERSION }}-release-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/apk/release/BUILD_INFO.json
           if-no-files-found: error
 
       - name: Upload release AAB (Google Play)
