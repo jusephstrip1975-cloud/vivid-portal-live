@@ -543,7 +543,20 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 + " CAN_READ=" + current.canRead()
                 + " FILE_SIZE=" + (current.exists() ? current.length() : -1)
                 + " ABSOLUTE_PATH=" + current.getAbsolutePath(), error);
-            paintMessage("Archivo de wallpaper no encontrado");
+            try {
+                if (prefs == null) {
+                    prefs = getApplicationContext()
+                        .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                }
+                prefs.edit().putString("last_service_error",
+                    reason + (error == null ? "" : ": " + error.getMessage())).commit();
+            } catch (Throwable ignored) {}
+            // Only show "not found" if the file really isn't there. Otherwise show the playback reason.
+            if (!current.exists() || current.length() <= MIN_VALID_VIDEO_BYTES) {
+                paintMessage("Archivo de wallpaper no encontrado");
+            } else {
+                paintMessage("No se pudo reproducir el vídeo");
+            }
         }
 
         private File getCurrentWallpaperFile() {
