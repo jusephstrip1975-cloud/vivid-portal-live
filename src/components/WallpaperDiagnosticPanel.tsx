@@ -69,6 +69,10 @@ export function WallpaperDiagnosticPanel() {
     ["FFPROBE_WIDTH", value(diagnostic?.ffprobeWidth)],
     ["FFPROBE_HEIGHT", value(diagnostic?.ffprobeHeight)],
     ["FFPROBE_ROTATION", value(diagnostic?.ffprobeRotation)],
+    // Player engine (2.1.2-mediaplayer-only)
+    ["PLAYER_ENGINE", value(diagnostic?.playerEngine)],
+    ["EXOPLAYER_ENABLED", value(diagnostic?.exoplayerEnabled)],
+    ["MEDIAPLAYER_STARTED", value(diagnostic?.mediaplayerStarted)],
     // Errors
     ["LAST_NATIVE_EXCEPTION", value(diagnostic?.lastExceptionStacktrace)],
     ["LAST_JS_EXCEPTION", value(diagnostic?.lastError)],

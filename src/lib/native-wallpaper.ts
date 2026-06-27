@@ -87,6 +87,9 @@ export interface WallpaperDiagnostic {
   ffprobeWidth?: number;
   ffprobeHeight?: number;
   ffprobeRotation?: number;
+  playerEngine?: string | null;
+  exoplayerEnabled?: boolean;
+  mediaplayerStarted?: boolean;
 }
 
 export interface CompatibilityResult {
