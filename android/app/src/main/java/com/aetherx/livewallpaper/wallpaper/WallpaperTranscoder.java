@@ -9,6 +9,7 @@ import android.util.Log;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.effect.Presentation;
+import androidx.media3.effect.ScaleAndRotateTransformation;
 import androidx.media3.transformer.Composition;
 import androidx.media3.transformer.DefaultEncoderFactory;
 import androidx.media3.transformer.EditedMediaItem;
@@ -27,19 +28,34 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Normalises any downloaded MP4 to Samsung Live Wallpaper safe format:
- * H.264 (AVC) / 1080x1920 / ~30fps / yuv420p / no audio / faststart.
+ * H.264 (AVC) / 1080x1920 PORTRAIT / ~30fps / yuv420p / no audio / faststart.
+ *
+ * Output MUST be portrait. We ignore the source rotationDegrees metadata and
+ * physically rotate the frames so the encoded file has width=1080, height=1920
+ * (no rotation flag). Samsung WallpaperService rejects 1920x1080 even when the
+ * rotation metadata says portrait.
  */
 public final class WallpaperTranscoder {
 
     private static final String TAG = "AetherXLiveWP";
     private static final long TIMEOUT_SECONDS = 180L;
 
-    /**
-     * @return file with normalised wallpaper (overwrites {@code finalOutput}).
-     * @throws Exception if transcoding fails or times out.
-     */
     public static File transcodeToSamsungSafe(Context ctx, File input, File finalOutput) throws Exception {
         if (input == null || !input.exists()) throw new Exception("transcode-input-missing");
+
+        // Decide rotation by looking at the decoded (post-rotation) frame size from the source.
+        WallpaperProbe srcProbe = WallpaperProbe.of(input);
+        final int rotationDegrees;
+        if (srcProbe.width > 0 && srcProbe.height > 0 && srcProbe.width > srcProbe.height) {
+            // Landscape decoded frames -> rotate 90 to get portrait.
+            rotationDegrees = 90;
+        } else {
+            rotationDegrees = 0;
+        }
+        Log.i(TAG, "TRANSCODE_PLAN srcSize=" + srcProbe.width + "x" + srcProbe.height
+            + " applyRotation=" + rotationDegrees
+            + " target=1080x1920@30 H264 noAudio portrait");
+
         File tmpOutput = new File(finalOutput.getParentFile(), "current_transcoded.mp4");
         if (tmpOutput.exists() && !tmpOutput.delete()) {
             Log.w(TAG, "TRANSCODE_TMP_DELETE_FAILED path=" + tmpOutput.getAbsolutePath());
@@ -48,10 +64,6 @@ public final class WallpaperTranscoder {
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicReference<Throwable> errorRef = new AtomicReference<>();
         final Handler main = new Handler(Looper.getMainLooper());
-
-        Log.i(TAG, "TRANSCODE_START input=" + input.getAbsolutePath()
-            + " tmp=" + tmpOutput.getAbsolutePath()
-            + " target=1080x1920@30 H264 noAudio");
 
         main.post(() -> {
             try {
@@ -71,7 +83,9 @@ public final class WallpaperTranscoder {
                         @Override
                         public void onCompleted(Composition composition, ExportResult exportResult) {
                             Log.i(TAG, "TRANSCODE_COMPLETED durationMs=" + exportResult.durationMs
-                                + " videoMime=" + exportResult.videoMimeType);
+                                + " videoMime=" + exportResult.videoMimeType
+                                + " outW=" + exportResult.width
+                                + " outH=" + exportResult.height);
                             latch.countDown();
                         }
 
@@ -84,15 +98,25 @@ public final class WallpaperTranscoder {
                     })
                     .build();
 
+                ImmutableList.Builder<androidx.media3.common.Effect> videoEffects = ImmutableList.builder();
+                if (rotationDegrees != 0) {
+                    // Flatten rotation into frames (bakes orientation, no rotation metadata in output).
+                    videoEffects.add(new ScaleAndRotateTransformation.Builder()
+                        .setRotationDegrees(rotationDegrees)
+                        .build());
+                }
+                // Force exact portrait 1080x1920. Use SCALE_TO_FIT_WITH_CROP to fully fill the
+                // wallpaper frame; LAYOUT_SCALE_TO_FIT can letterbox and some Samsung decoders
+                // dislike the resulting non-standard ratio.
+                videoEffects.add(Presentation.createForWidthAndHeight(
+                    WallpaperProbe.TARGET_WIDTH,
+                    WallpaperProbe.TARGET_HEIGHT,
+                    Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP));
+
                 EditedMediaItem mediaItem = new EditedMediaItem.Builder(
                         MediaItem.fromUri(Uri.fromFile(input)))
                     .setRemoveAudio(true)
-                    .setEffects(new Effects(
-                        ImmutableList.of(),
-                        ImmutableList.of(Presentation.createForWidthAndHeight(
-                            WallpaperProbe.TARGET_WIDTH,
-                            WallpaperProbe.TARGET_HEIGHT,
-                            Presentation.LAYOUT_SCALE_TO_FIT))))
+                    .setEffects(new Effects(ImmutableList.of(), videoEffects.build()))
                     .build();
 
                 transformer.start(mediaItem, tmpOutput.getAbsolutePath());
@@ -114,12 +138,38 @@ public final class WallpaperTranscoder {
             throw new Exception("transcode-output-invalid:size=" + (tmpOutput.exists() ? tmpOutput.length() : -1));
         }
 
+        // VALIDATE output orientation BEFORE committing.
+        WallpaperProbe outProbe = WallpaperProbe.of(tmpOutput);
+        Log.i(TAG, "OUTPUT_PROBE codec=" + outProbe.codec
+            + " OUTPUT_WIDTH=" + outProbe.width
+            + " OUTPUT_HEIGHT=" + outProbe.height
+            + " OUTPUT_FPS=" + outProbe.fps
+            + " OUTPUT_HAS_AUDIO=" + outProbe.hasAudio
+            + " OUTPUT_ROTATION=0 (flattened)");
+        if (outProbe.width <= 0 || outProbe.height <= 0) {
+            throw new Exception("FAIL_TRANSCODE_INVALID_PROBE");
+        }
+        if (outProbe.width > outProbe.height) {
+            // Landscape — Samsung will reject. Abort.
+            if (tmpOutput.exists() && !tmpOutput.delete()) {
+                Log.w(TAG, "TRANSCODE_INVALID_DELETE_FAILED path=" + tmpOutput.getAbsolutePath());
+            }
+            throw new Exception("FAIL_TRANSCODE_INVALID_ORIENTATION:"
+                + outProbe.width + "x" + outProbe.height);
+        }
+        if (outProbe.width != WallpaperProbe.TARGET_WIDTH
+            || outProbe.height != WallpaperProbe.TARGET_HEIGHT) {
+            Log.w(TAG, "OUTPUT_SIZE_MISMATCH expected="
+                + WallpaperProbe.TARGET_WIDTH + "x" + WallpaperProbe.TARGET_HEIGHT
+                + " got=" + outProbe.width + "x" + outProbe.height
+                + " (portrait-ok, continuing)");
+        }
+
         // Atomically replace finalOutput with tmpOutput.
         if (finalOutput.exists() && !finalOutput.delete()) {
             Log.w(TAG, "TRANSCODE_FINAL_DELETE_FAILED path=" + finalOutput.getAbsolutePath());
         }
         if (!tmpOutput.renameTo(finalOutput)) {
-            // Fallback: copy + delete
             java.io.FileInputStream fis = new java.io.FileInputStream(tmpOutput);
             java.io.FileOutputStream fos = new java.io.FileOutputStream(finalOutput, false);
             try {
@@ -134,7 +184,8 @@ public final class WallpaperTranscoder {
             if (!tmpOutput.delete()) Log.w(TAG, "TRANSCODE_TMP_CLEANUP_FAILED");
         }
         Log.i(TAG, "TRANSCODE_REPLACED_CURRENT path=" + finalOutput.getAbsolutePath()
-            + " size=" + finalOutput.length());
+            + " size=" + finalOutput.length()
+            + " finalSize=" + outProbe.width + "x" + outProbe.height);
         return finalOutput;
     }
 }
