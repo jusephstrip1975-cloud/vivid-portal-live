@@ -21,13 +21,13 @@ import java.io.File;
 /**
  * AetherX Live Wallpaper Service — MediaPlayer-only engine.
  *
- * Versión 2.1.2-mediaplayer-only.
+ * Versión 2.1.3-surface-gated.
  *
- * Samsung OneUI rechaza otros decoders dentro del WallpaperService
- * (DECODER_INIT_FAILED) aunque el MP4 sea válido. Por eso este servicio
- * usa exclusivamente android.media.MediaPlayer y ningún otro motor.
+ * Samsung OneUI fix for mediaplayer-error:-38:
+ *  - setSurface() BEFORE prepareAsync()
+ *  - start() ONLY when both surfaceReady && playerReady
+ *  - 300ms delay before start() (Samsung surface settle)
  */
-
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
@@ -47,8 +47,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
         private MediaPlayer mediaPlayer;
         private String currentPath;
-        private long currentVersion = -1L;
         private SurfaceHolder currentHolder;
+        private boolean surfaceReady = false;
+        private boolean playerReady = false;
         private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
         private SharedPreferences prefs;
@@ -69,7 +70,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     Log.i(TAG, "Prefs changed key=" + key + " -> reloading wallpaper engine");
                     main.post(() -> {
                         releasePlayer();
-                        startPlayer();
+                        preparePlayer();
                     });
                 }
             };
@@ -80,26 +81,32 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         public void onSurfaceCreated(SurfaceHolder holder) {
             super.onSurfaceCreated(holder);
             currentHolder = holder;
+            surfaceReady = true;
             Surface s = holder.getSurface();
-            Log.i(TAG, "onSurfaceCreated surfaceValid=" + (s != null && s.isValid()));
+            Log.i(TAG, "onSurfaceCreated SURFACE_READY=true surfaceValid=" + (s != null && s.isValid()));
             paintMessage("Cargando vídeo...");
-            main.post(this::startPlayer);
+            main.post(() -> {
+                if (mediaPlayer == null) {
+                    preparePlayer();
+                } else {
+                    try { mediaPlayer.setSurface(holder.getSurface()); } catch (Throwable ignored) {}
+                    tryStartPlayback();
+                }
+            });
         }
 
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
             currentHolder = holder;
-            Log.i(TAG, "onSurfaceChanged " + width + "x" + height);
+            surfaceReady = true;
+            Log.i(TAG, "onSurfaceChanged " + width + "x" + height + " SURFACE_READY=true");
             main.post(() -> {
                 if (mediaPlayer == null) {
-                    startPlayer();
+                    preparePlayer();
                 } else {
-                    try {
-                        mediaPlayer.setSurface(holder.getSurface());
-                    } catch (Throwable t) {
-                        Log.e(TAG, "setSurface on change failed", t);
-                    }
+                    try { mediaPlayer.setSurface(holder.getSurface()); } catch (Throwable ignored) {}
+                    tryStartPlayback();
                 }
             });
         }
@@ -111,12 +118,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             Log.i(TAG, "onVisibilityChanged visible=" + v + " hasPlayer=" + (mediaPlayer != null));
             main.post(() -> {
                 if (mediaPlayer == null) {
-                    if (v) startPlayer();
+                    if (v) preparePlayer();
                     return;
                 }
                 try {
                     if (v) {
-                        if (!mediaPlayer.isPlaying()) mediaPlayer.start();
+                        tryStartPlayback();
                     } else {
                         if (mediaPlayer.isPlaying()) mediaPlayer.pause();
                     }
@@ -127,6 +134,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
             Log.i(TAG, "onSurfaceDestroyed");
+            surfaceReady = false;
             main.post(this::releasePlayer);
             super.onSurfaceDestroyed(holder);
         }
@@ -143,12 +151,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             super.onDestroy();
         }
 
-        private void startPlayer() {
+        private void preparePlayer() {
             try {
                 releasePlayer();
-                if (currentHolder == null || currentHolder.getSurface() == null
+                if (!surfaceReady || currentHolder == null || currentHolder.getSurface() == null
                         || !currentHolder.getSurface().isValid()) {
-                    Log.w(TAG, "startPlayer: surface not valid yet");
+                    Log.w(TAG, "preparePlayer: surface not ready");
                     return;
                 }
 
@@ -157,10 +165,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
                 }
                 String path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
-                long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
                 Log.i(TAG, "SERVICE_READ_KEY_VIDEO_PATH=" + path);
 
-                // AUTO-RECOVERY: if prefs say null but the canonical current.mp4 exists, use it.
                 if (path == null || path.isEmpty()) {
                     File fallback = getCurrentWallpaperFile();
                     if (fallback.exists() && fallback.length() > MIN_VALID_VIDEO_BYTES) {
@@ -183,63 +189,77 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.i(TAG, "SERVICE_FILE PATH=" + path + " EXISTS=" + exists
                     + " CAN_READ=" + canRead + " SIZE=" + size);
                 if (!exists || !canRead || size <= MIN_VALID_VIDEO_BYTES) {
-                    String reason = !exists ? "file-missing"
-                        : !canRead ? "no-read"
-                        : "file-too-small";
-                    Log.e(TAG, "CURRENT_MP4_INVALID reason=" + reason + " path=" + path + " size=" + size);
+                    String reason = !exists ? "file-missing" : !canRead ? "no-read" : "file-too-small";
                     prefs.edit().putString("last_service_error", "CURRENT_MP4_INVALID:" + reason).commit();
                     paintMessage("Archivo de wallpaper no encontrado");
                     return;
                 }
 
                 currentPath = path;
-                currentVersion = version;
-                startMediaPlayer(file);
-            } catch (Throwable t) {
-                Log.e(TAG, "startPlayer failed", t);
-                fatalPlaybackFailure("startPlayer-exception", t);
-            }
-        }
+                playerReady = false;
 
-        private void startMediaPlayer(File file) {
-            try {
-                Log.i(TAG, "SERVICE_ENGINE=" + SERVICE_ENGINE + " starting MediaPlayer path=" + file.getAbsolutePath());
+                Log.i(TAG, "SERVICE_ENGINE=" + SERVICE_ENGINE + " preparing MediaPlayer path=" + file.getAbsolutePath());
                 persistEngineFlags(false);
+
                 mediaPlayer = new MediaPlayer();
+                // CRITICAL ORDER for Samsung: setSurface BEFORE setDataSource + prepareAsync.
                 mediaPlayer.setSurface(currentHolder.getSurface());
-                mediaPlayer.setLooping(true);
                 mediaPlayer.setVolume(0f, 0f);
+                mediaPlayer.setLooping(true);
+
                 mediaPlayer.setOnErrorListener((mp, what, extra) -> {
                     Log.e(TAG, "MEDIAPLAYER_ERROR_CODE=" + what + " MEDIAPLAYER_ERROR_EXTRA=" + extra
                         + " path=" + currentPath);
                     try {
                         prefs.edit()
-                            .putString("last_service_error",
-                                "MEDIAPLAYER_ERROR what=" + what + " extra=" + extra)
+                            .putString("last_service_error", "mediaplayer-error:" + what + "/" + extra)
                             .putBoolean("mediaplayer_started", false)
                             .commit();
                     } catch (Throwable ignored) {}
                     main.post(() -> fatalPlaybackFailure("mediaplayer-error:" + what + "/" + extra, null));
                     return true;
                 });
+
                 mediaPlayer.setOnPreparedListener(mp -> {
-                    Log.i(TAG, "MEDIAPLAYER_ON_PREPARED durationMs=" + safeDuration(mp));
-                    try {
-                        mp.start();
-                        Log.i(TAG, "MEDIAPLAYER_STARTED path=" + currentPath);
-                        persistEngineFlags(true);
-                    } catch (Throwable t) {
-                        Log.e(TAG, "MEDIAPLAYER_START_FAILED", t);
-                        fatalPlaybackFailure("mediaplayer-start-failed", t);
-                    }
+                    playerReady = true;
+                    Log.i(TAG, "MEDIAPLAYER_ON_PREPARED PLAYER_READY=true durationMs=" + safeDuration(mp));
+                    // Samsung surface-settle delay before start.
+                    main.postDelayed(this::tryStartPlayback, 300L);
                 });
+
                 mediaPlayer.setDataSource(file.getAbsolutePath());
                 Log.i(TAG, "MEDIAPLAYER_SET_DATASOURCE_OK path=" + file.getAbsolutePath());
                 mediaPlayer.prepareAsync();
                 Log.i(TAG, "MEDIAPLAYER_PREPARE_ASYNC");
             } catch (Throwable t) {
-                Log.e(TAG, "MEDIAPLAYER_SETUP_FAILED path=" + (file == null ? "null" : file.getAbsolutePath()), t);
-                fatalPlaybackFailure("mediaplayer-setup-failed", t);
+                Log.e(TAG, "preparePlayer failed", t);
+                fatalPlaybackFailure("preparePlayer-exception", t);
+            }
+        }
+
+        private void tryStartPlayback() {
+            Log.i(TAG, "TRY_START_PLAYBACK surfaceReady=" + surfaceReady
+                + " playerReady=" + playerReady + " hasPlayer=" + (mediaPlayer != null));
+            if (mediaPlayer == null || !surfaceReady || !playerReady) return;
+            try {
+                if (currentHolder != null && currentHolder.getSurface() != null
+                        && currentHolder.getSurface().isValid()) {
+                    try { mediaPlayer.setSurface(currentHolder.getSurface()); } catch (Throwable ignored) {}
+                }
+                mediaPlayer.setLooping(true);
+                if (!mediaPlayer.isPlaying()) {
+                    Log.i(TAG, "MEDIA_PLAYER_START_CALLED");
+                    mediaPlayer.start();
+                    boolean playing = false;
+                    try { playing = mediaPlayer.isPlaying(); } catch (Throwable ignored) {}
+                    Log.i(TAG, "MEDIA_PLAYER_IS_PLAYING=" + playing);
+                    persistEngineFlags(true);
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "tryStartPlayback failed", t);
+                try {
+                    prefs.edit().putString("last_service_error", "start-failed:" + t).commit();
+                } catch (Throwable ignored) {}
             }
         }
 
@@ -287,9 +307,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
         private File getWallpaperDir() {
             File moviesDir = getApplicationContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES);
-            if (moviesDir == null) {
-                throw new IllegalStateException("external-movies-dir-unavailable");
-            }
+            if (moviesDir == null) throw new IllegalStateException("external-movies-dir-unavailable");
             File dir = new File(moviesDir, "AetherX");
             if (!dir.exists() && !dir.mkdirs()) {
                 Log.w(TAG, "wallpaper-dir-mkdirs-failed path=" + dir.getAbsolutePath());
@@ -309,16 +327,14 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 p.setTextSize(36f);
                 c.drawText(text == null ? "" : text, 40f, c.getHeight() / 2f, p);
                 currentHolder.unlockCanvasAndPost(c);
-            } catch (Throwable ignored) {
-            }
+            } catch (Throwable ignored) {}
         }
 
         private void releasePlayer() {
+            playerReady = false;
             if (mediaPlayer != null) {
                 Log.i(TAG, "releasePlayer MediaPlayer release");
-                try {
-                    if (mediaPlayer.isPlaying()) mediaPlayer.stop();
-                } catch (Throwable ignored) {}
+                try { if (mediaPlayer.isPlaying()) mediaPlayer.stop(); } catch (Throwable ignored) {}
                 try { mediaPlayer.release(); } catch (Throwable ignored) {}
                 mediaPlayer = null;
                 persistEngineFlags(false);

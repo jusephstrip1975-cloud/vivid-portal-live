@@ -2,8 +2,8 @@ import java.util.TimeZone
 
 apply plugin: 'com.android.application'
 
-def aetherxVersionCode = 212
-def aetherxVersionName = "2.1.2-mediaplayer-only"
+def aetherxVersionCode = 213
+def aetherxVersionName = "2.1.3-surface-gated"
 def aetherxBuildVersion = System.getenv("AETHERX_BUILD_VERSION") ?: aetherxVersionName
 def aetherxBuildTimestamp = System.getenv("AETHERX_BUILD_TIMESTAMP")
 if (aetherxBuildTimestamp == null || aetherxBuildTimestamp.isEmpty()) {
