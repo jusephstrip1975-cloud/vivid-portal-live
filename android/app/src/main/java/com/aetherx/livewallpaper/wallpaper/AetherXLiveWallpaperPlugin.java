@@ -619,6 +619,22 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("serviceRunning", isWallpaperServiceActive());
         ret.put("lastServiceError", prefs.getString("last_service_error", null));
 
+        // PROBE / TRANSCODE diagnostics (real codec, fps, resolution, bitrate, audio).
+        ret.put("realCodec", prefs.getString("real_codec", null));
+        ret.put("realWidth", prefs.getInt("real_width", 0));
+        ret.put("realHeight", prefs.getInt("real_height", 0));
+        ret.put("realFps", prefs.getFloat("real_fps", 0f));
+        ret.put("realBitrate", prefs.getLong("real_bitrate", 0L));
+        ret.put("realHasAudio", prefs.getBoolean("real_has_audio", false));
+        ret.put("sourceCodec", prefs.getString("source_codec", null));
+        ret.put("sourceWidth", prefs.getInt("source_width", 0));
+        ret.put("sourceHeight", prefs.getInt("source_height", 0));
+        ret.put("sourceFps", prefs.getFloat("source_fps", 0f));
+        ret.put("sourceBitrate", prefs.getLong("source_bitrate", 0L));
+        ret.put("sourceHasAudio", prefs.getBoolean("source_has_audio", false));
+        ret.put("transcoded", prefs.getBoolean("transcoded", false));
+        ret.put("lastTranscodeError", prefs.getString("last_transcode_error", null));
+
         Log.i(TAG, "getStatus VIDEO_PATH=" + path
             + " FILE_EXISTS=" + exists
             + " FILE_SIZE=" + size
@@ -705,6 +721,35 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             + " canRead=" + current.canRead()
             + " size=" + (current.exists() ? current.length() : -1));
 
+        // PROBE original file to capture real codec/fps/resolution/bitrate/audio for diagnostics.
+        WallpaperProbe originalProbe = WallpaperProbe.of(current);
+        persistProbe(originalProbe, false, "original");
+
+        boolean transcoded = false;
+        if (!originalProbe.isSamsungSafe()) {
+            Log.i(TAG, "TRANSCODE_REQUIRED reason=non-samsung-safe"
+                + " codec=" + originalProbe.codec
+                + " size=" + originalProbe.width + "x" + originalProbe.height
+                + " fps=" + originalProbe.fps
+                + " hasAudio=" + originalProbe.hasAudio);
+            setStep("TRANSCODE_STARTED");
+            try {
+                current = WallpaperTranscoder.transcodeToSamsungSafe(getContext(), current, current);
+                transcoded = true;
+                WallpaperProbe finalProbe = WallpaperProbe.of(current);
+                persistProbe(finalProbe, true, "transcoded");
+                setStep("TRANSCODE_SUCCESS");
+            } catch (Exception te) {
+                setStep("TRANSCODE_FAILED:" + te.getMessage());
+                Log.e(TAG, "TRANSCODE_FAILED wallpaperId=" + wallpaperId, te);
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putString("last_transcode_error", te.getMessage()).commit();
+                throw te;
+            }
+        } else {
+            Log.i(TAG, "TRANSCODE_SKIPPED reason=samsung-safe-already");
+        }
+
         ValidationResult currentValidation = validatePhysicalFileForPlayback(current, "current-before-persist", wallpaperId);
         if (!currentValidation.ok) {
             Log.e(TAG, "CURRENT_MP4_MISSING reason=" + currentValidation.reason
@@ -722,22 +767,45 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
 
         persistCurrentPath(current, wallpaperId);
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean("transcoded", transcoded).commit();
         Log.i(TAG, "CURRENT_MP4_SAVE_OK wallpaperId=" + wallpaperId
+            + " transcoded=" + transcoded
             + " PATH=" + current.getAbsolutePath()
-            + " EXISTS=" + current.exists()
-            + " CAN_READ=" + current.canRead()
-            + " SIZE=" + current.length()
-            + " ABSOLUTE_PATH=" + current.getAbsolutePath());
-        Log.i(TAG, "CURRENT_MP4_EXISTS=" + current.exists() + " PATH=" + current.getAbsolutePath());
-        Log.i(TAG, "CURRENT_MP4_CAN_READ=" + current.canRead() + " PATH=" + current.getAbsolutePath());
-        Log.i(TAG, "SAVE_SUCCESS wallpaperId=" + wallpaperId
-            + " KEY_VIDEO_PATH=" + current.getAbsolutePath()
-            + " FILE_EXISTS=" + current.exists()
-            + " CAN_READ=" + current.canRead()
-            + " FILE_SIZE=" + current.length()
-            + " ABSOLUTE_PATH=" + current.getAbsolutePath());
+            + " SIZE=" + current.length());
         return current;
     }
+
+    private void persistProbe(WallpaperProbe p, boolean transcoded, String label) {
+        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences.Editor e = prefs.edit();
+        if (transcoded) {
+            e.putString("real_codec", p.codec);
+            e.putInt("real_width", p.width);
+            e.putInt("real_height", p.height);
+            e.putFloat("real_fps", (float) p.fps);
+            e.putLong("real_bitrate", p.bitrate);
+            e.putBoolean("real_has_audio", p.hasAudio);
+        } else {
+            e.putString("source_codec", p.codec);
+            e.putInt("source_width", p.width);
+            e.putInt("source_height", p.height);
+            e.putFloat("source_fps", (float) p.fps);
+            e.putLong("source_bitrate", p.bitrate);
+            e.putBoolean("source_has_audio", p.hasAudio);
+            // initialise real_* with source values in case no transcode happens
+            e.putString("real_codec", p.codec);
+            e.putInt("real_width", p.width);
+            e.putInt("real_height", p.height);
+            e.putFloat("real_fps", (float) p.fps);
+            e.putLong("real_bitrate", p.bitrate);
+            e.putBoolean("real_has_audio", p.hasAudio);
+        }
+        e.commit();
+        Log.i(TAG, "PROBE_PERSISTED label=" + label + " codec=" + p.codec
+            + " " + p.width + "x" + p.height + "@" + p.fps + " hasAudio=" + p.hasAudio);
+    }
+
 
     private void waitForClosedFile(File current, String wallpaperId, String sourceLabel) throws Exception {
         if (current == null) throw new Exception("archivo no guardado");
