@@ -619,6 +619,22 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("serviceRunning", isWallpaperServiceActive());
         ret.put("lastServiceError", prefs.getString("last_service_error", null));
 
+        // PROBE / TRANSCODE diagnostics (real codec, fps, resolution, bitrate, audio).
+        ret.put("realCodec", prefs.getString("real_codec", null));
+        ret.put("realWidth", prefs.getInt("real_width", 0));
+        ret.put("realHeight", prefs.getInt("real_height", 0));
+        ret.put("realFps", prefs.getFloat("real_fps", 0f));
+        ret.put("realBitrate", prefs.getLong("real_bitrate", 0L));
+        ret.put("realHasAudio", prefs.getBoolean("real_has_audio", false));
+        ret.put("sourceCodec", prefs.getString("source_codec", null));
+        ret.put("sourceWidth", prefs.getInt("source_width", 0));
+        ret.put("sourceHeight", prefs.getInt("source_height", 0));
+        ret.put("sourceFps", prefs.getFloat("source_fps", 0f));
+        ret.put("sourceBitrate", prefs.getLong("source_bitrate", 0L));
+        ret.put("sourceHasAudio", prefs.getBoolean("source_has_audio", false));
+        ret.put("transcoded", prefs.getBoolean("transcoded", false));
+        ret.put("lastTranscodeError", prefs.getString("last_transcode_error", null));
+
         Log.i(TAG, "getStatus VIDEO_PATH=" + path
             + " FILE_EXISTS=" + exists
             + " FILE_SIZE=" + size
