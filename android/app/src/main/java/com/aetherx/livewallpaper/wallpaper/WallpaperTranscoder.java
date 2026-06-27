@@ -19,9 +19,9 @@ import java.io.File;
  * Normalises any downloaded MP4 to Samsung Live Wallpaper safe format:
  * H.264 baseline (AVC) / 1080x1920 PORTRAIT / max 30fps / yuv420p / no audio / faststart.
  *
- * Media3 Transformer is intentionally not used here. Samsung OneUI kept detecting a
- * physically landscape stream (1920x1080) despite portrait metadata. FFmpegKit +
- * libx264 is the mandatory transcoder for Samsung wallpapers.
+ * The previous Android transformer is intentionally not used here. Samsung OneUI
+ * kept detecting a physically landscape stream (1920x1080) despite portrait
+ * metadata. FFmpegKit + libx264 is the mandatory transcoder for Samsung wallpapers.
  */
 public final class WallpaperTranscoder {
 
