@@ -136,8 +136,18 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
         }
         def service = file("$projectDir/src/main/java/com/aetherx/livewallpaper/wallpaper/AetherXLiveWallpaperService.java")
         def plugin = file("$projectDir/src/main/java/com/aetherx/livewallpaper/wallpaper/AetherXLiveWallpaperPlugin.java")
+        def transcoder = file("$projectDir/src/main/java/com/aetherx/livewallpaper/wallpaper/WallpaperTranscoder.java")
         if (!service.exists()) throw new GradleException('Missing AetherXLiveWallpaperService.java')
         if (!plugin.exists()) throw new GradleException('Missing AetherXLiveWallpaperPlugin.java')
+        if (!transcoder.exists()) throw new GradleException('Missing WallpaperTranscoder.java')
+        def appGradle = file("$projectDir/build.gradle").getText('UTF-8')
+        def transcoderText = transcoder.getText('UTF-8')
+        if (!appGradle.contains('ffmpeg-kit-full-gpl') || !transcoderText.contains('com.arthenica.ffmpegkit.FFmpegKit')) {
+            throw new GradleException('Samsung wallpaper transcoder must use FFmpegKit/libx264')
+        }
+        if (appGradle.contains('media3-transformer') || transcoderText.contains('androidx.media3.transformer')) {
+            throw new GradleException('Media3 Transformer is forbidden for Samsung wallpaper transcoding')
+        }
     }
 }
 
