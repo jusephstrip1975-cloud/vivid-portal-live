@@ -18,7 +18,15 @@ export function WallpaperDiagnosticPanel() {
   }
 
   const rows: Array<[string, string]> = [
+    ["PLUGIN_AVAILABLE", value(diagnostic?.pluginAvailable)],
+    ["CURRENT_ACTION", value(diagnostic?.currentAction)],
+    ["LAST_STEP", value(diagnostic?.lastStep)],
     ["finalPath", value(diagnostic?.finalPath)],
+    ["parentDir", value(diagnostic?.parentDir)],
+    ["parentExists", value(diagnostic?.parentExists)],
+    ["parentWritable", value(diagnostic?.parentWritable)],
+    ["MKDIRS_OK", value(diagnostic?.mkdirsOk)],
+    ["CREATE_FILE_OK", value(diagnostic?.createFileOk)],
     ["fileExists", value(diagnostic?.fileExists)],
     ["fileSize", value(diagnostic?.fileSize)],
     ["canRead", value(diagnostic?.canRead)],
@@ -27,6 +35,7 @@ export function WallpaperDiagnosticPanel() {
     ["lastDownloadBytes", value(diagnostic?.lastDownloadBytes)],
     ["lastError", value(diagnostic?.lastError)],
     ["openPickerCalled", value(diagnostic?.openPickerCalled)],
+    ["LAST_EXCEPTION_STACKTRACE", value(diagnostic?.lastExceptionStacktrace)],
   ];
 
   return (

@@ -41,6 +41,15 @@ export interface WallpaperDiagnostic {
   lastDownloadBytes?: number;
   lastError?: string | null;
   openPickerCalled?: boolean;
+  pluginAvailable?: boolean;
+  currentAction?: string | null;
+  lastStep?: string | null;
+  lastExceptionStacktrace?: string | null;
+  mkdirsOk?: boolean;
+  createFileOk?: boolean;
+  parentDir?: string | null;
+  parentExists?: boolean;
+  parentWritable?: boolean;
 }
 
 export interface CompatibilityResult {
@@ -76,12 +85,18 @@ export async function getWallpaperDiagnostic(): Promise<WallpaperDiagnostic | nu
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
     if (Capacitor.getPlatform() !== "android") return null;
+    const capPlugins = (Capacitor as unknown as { Plugins?: Record<string, unknown> }).Plugins ?? {};
+    const pluginAvailable = Boolean(capPlugins["AetherXLiveWallpaper"]);
+    console.info("[AetherX] PLUGIN_AVAILABLE=" + pluginAvailable);
     const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-    return await LiveWallpaper.getStatus();
+    const status = await LiveWallpaper.getStatus();
+    return { pluginAvailable, ...status };
   } catch (err) {
     console.warn("getWallpaperDiagnostic failed", err);
     return {
+      pluginAvailable: false,
       lastError: err instanceof Error ? err.message : String(err),
+      lastExceptionStacktrace: err instanceof Error ? err.stack ?? null : null,
       openPickerCalled: false,
     };
   }

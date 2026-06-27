@@ -47,13 +47,48 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_LAST_DOWNLOAD_BYTES = "last_download_bytes";
     public static final String KEY_LAST_ERROR = "last_error";
     public static final String KEY_OPEN_PICKER_CALLED = "open_picker_called";
+    public static final String KEY_CURRENT_ACTION = "current_action";
+    public static final String KEY_LAST_EXCEPTION_STACKTRACE = "last_exception_stacktrace";
+    public static final String KEY_LAST_STEP = "last_step";
+    public static final String KEY_MKDIRS_OK = "mkdirs_ok";
+    public static final String KEY_CREATE_FILE_OK = "create_file_ok";
 
     private static final int MAX_REDIRECTS = 5;
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
     private static final String WALLPAPER_DIR = "AetherX";
     private static final String CURRENT_MP4 = "current.mp4";
-    private static final long MIN_FREE_SPACE_BYTES = 10L * 1024L * 1024L * 1024L; // 10 GB
+    // Reduced from 10 GB (unrealistic — blocked all devices) to 200 MB which fits a 720p ~60s MP4.
+    private static final long MIN_FREE_SPACE_BYTES = 200L * 1024L * 1024L;
     private static final String LOW_STORAGE_MESSAGE = "Espacio insuficiente para procesar wallpapers 3D";
+
+    private void setStep(String step) {
+        Log.i(TAG, "STEP=" + step);
+        try {
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_LAST_STEP, step).commit();
+        } catch (Throwable ignored) {}
+    }
+
+    private void setCurrentAction(String action) {
+        Log.i(TAG, "CURRENT_ACTION=" + action);
+        try {
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_CURRENT_ACTION, action).commit();
+        } catch (Throwable ignored) {}
+    }
+
+    private void setLastExceptionStacktrace(Throwable t) {
+        if (t == null) return;
+        try {
+            java.io.StringWriter sw = new java.io.StringWriter();
+            t.printStackTrace(new java.io.PrintWriter(sw));
+            String trace = sw.toString();
+            if (trace.length() > 4000) trace = trace.substring(0, 4000);
+            Log.e(TAG, "LAST_EXCEPTION_STACKTRACE\n" + trace);
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_LAST_EXCEPTION_STACKTRACE, trace).commit();
+        } catch (Throwable ignored) {}
+    }
 
     @Override
     public void load() {
@@ -161,11 +196,14 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     @PluginMethod
     public void saveVideoFromUrlAndOpenPicker(final PluginCall call) {
+        setCurrentAction("saveVideoFromUrlAndOpenPicker");
+        setStep("START_SAVE_VIDEO");
         final String url = call.getString("url");
         final String fileName = sanitizeFileName(call.getString("fileName", "wallpaper.mp4"));
         final String wallpaperId = call.getString("wallpaperId", fileName);
-        Log.i(TAG, "saveVideoFromUrlAndOpenPicker wallpaperId=" + wallpaperId + " url=" + url + " fileName=" + fileName);
+        Log.i(TAG, "START_SAVE_VIDEO wallpaperId=" + wallpaperId + " url=" + url + " fileName=" + fileName);
         if (url == null || url.isEmpty()) {
+            setStep("DOWNLOAD_FAILED:missing-url");
             setLastError("descarga fallida: missing-url");
             setOpenPickerCalled(false);
             call.reject("descarga fallida");
@@ -173,6 +211,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
         String storageError = guardStorageOrReject("saveVideoFromUrlAndOpenPicker");
         if (storageError != null) {
+            setStep("DOWNLOAD_FAILED:low-storage");
             setLastError(storageError);
             setOpenPickerCalled(false);
             call.reject(storageError);
@@ -185,25 +224,58 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             try {
                 prepareForNewWallpaper(wallpaperId);
                 persistLastSourceUrl(url, wallpaperId);
+                setStep("SET_KEY_VIDEO_PATH:pending");
                 clearLastError();
                 setLastDownloadBytes(0L);
                 setOpenPickerCalled(false);
 
-                Log.i(TAG, "download-start wallpaperId=" + wallpaperId + " current=" + current.getAbsolutePath());
+                // Ensure parent dir exists physically
+                File parent = current.getParentFile();
+                boolean mkdirsOk = parent != null && (parent.exists() || parent.mkdirs());
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_MKDIRS_OK, mkdirsOk).commit();
+                Log.i(TAG, "MKDIRS_RESULT ok=" + mkdirsOk
+                    + " parent=" + (parent == null ? "null" : parent.getAbsolutePath())
+                    + " parentExists=" + (parent != null && parent.exists())
+                    + " parentWritable=" + (parent != null && parent.canWrite()));
+                if (!mkdirsOk) throw new Exception("mkdirs-failed:" + (parent == null ? "null" : parent.getAbsolutePath()));
+
+                // Pre-create the destination file so we know FS permits write before we open the stream
+                boolean createOk;
+                if (current.exists()) {
+                    createOk = true;
+                } else {
+                    try { createOk = current.createNewFile(); }
+                    catch (Throwable t) { createOk = false; Log.e(TAG, "createNewFile threw", t); }
+                }
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_CREATE_FILE_OK, createOk).commit();
+                Log.i(TAG, "CREATE_NEW_FILE ok=" + createOk + " path=" + current.getAbsolutePath());
+                if (!createOk) throw new Exception("create-new-file-failed:" + current.getAbsolutePath());
+
+                setStep("DOWNLOAD_STARTED");
+                Log.i(TAG, "DOWNLOAD_STARTED wallpaperId=" + wallpaperId
+                    + " current=" + current.getAbsolutePath() + " url=" + url);
                 long bytes = downloadFollowingRedirects(url, current);
                 setLastDownloadBytes(bytes);
-                Log.i(TAG, "download-complete wallpaperId=" + wallpaperId
+                setStep("DOWNLOAD_SUCCESS:" + bytes);
+                Log.i(TAG, "DOWNLOAD_SUCCESS wallpaperId=" + wallpaperId
                     + " bytes=" + bytes
                     + " exists=" + current.exists()
                     + " size=" + current.length()
                     + " absolute=" + current.getAbsolutePath());
 
+                setStep("WRITE_SUCCESS");
                 current = commitValidatedCurrentMp4(current, wallpaperId, "download-and-open");
+                setStep("SET_KEY_VIDEO_PATH:" + current.getAbsolutePath());
+                setStep("SAVE_COMPLETE");
                 final String finalPath = current.getAbsolutePath();
                 new Handler(Looper.getMainLooper()).post(() -> openLivePickerForFinalPath(call, finalPath));
             } catch (Exception e) {
+                setStep("DOWNLOAD_FAILED:" + e.getMessage());
                 String userError = classifySaveError(e);
                 setLastError(userError + ": " + e.getMessage());
+                setLastExceptionStacktrace(e);
                 setOpenPickerCalled(false);
                 Log.e(TAG, "SAVE_AND_OPEN_FAILED wallpaperId=" + wallpaperId
                     + " error=" + userError
@@ -222,6 +294,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
         }).start();
     }
+
+
 
     @PluginMethod
     public void saveVideo(PluginCall call) {
@@ -497,6 +571,16 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("updatedAt", updatedAt);
         ret.put("renderer", "native-wallpaper-service");
         ret.put("playbackSpeed", 1.0);
+        ret.put("pluginAvailable", true);
+        ret.put("currentAction", prefs.getString(KEY_CURRENT_ACTION, null));
+        ret.put("lastStep", prefs.getString(KEY_LAST_STEP, null));
+        ret.put("lastExceptionStacktrace", prefs.getString(KEY_LAST_EXCEPTION_STACKTRACE, null));
+        ret.put("mkdirsOk", prefs.getBoolean(KEY_MKDIRS_OK, false));
+        ret.put("createFileOk", prefs.getBoolean(KEY_CREATE_FILE_OK, false));
+        File parent = current.getParentFile();
+        ret.put("parentDir", parent == null ? null : parent.getAbsolutePath());
+        ret.put("parentExists", parent != null && parent.exists());
+        ret.put("parentWritable", parent != null && parent.canWrite());
         if (fdErr != null) ret.put("fdError", fdErr);
         call.resolve(ret);
     }
