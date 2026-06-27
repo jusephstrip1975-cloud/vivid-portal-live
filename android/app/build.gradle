@@ -2,8 +2,8 @@ import java.util.TimeZone
 
 apply plugin: 'com.android.application'
 
-def aetherxVersionCode = 207
-def aetherxVersionName = "2.0.7-stable"
+def aetherxVersionCode = 208
+def aetherxVersionName = "2.0.8-transcode"
 def aetherxBuildVersion = System.getenv("AETHERX_BUILD_VERSION") ?: aetherxVersionName
 def aetherxBuildTimestamp = System.getenv("AETHERX_BUILD_TIMESTAMP")
 if (aetherxBuildTimestamp == null || aetherxBuildTimestamp.isEmpty()) {
@@ -102,6 +102,10 @@ dependencies {
     // Media3 ExoPlayer for live wallpaper video rendering (fallback after MediaPlayer)
     implementation "androidx.media3:media3-exoplayer:1.4.1"
     implementation "androidx.media3:media3-common:1.4.1"
+    // Media3 Transformer: normalises downloaded MP4s to Samsung-safe H.264 1080x1920 30fps no-audio.
+    implementation "androidx.media3:media3-transformer:1.4.1"
+    implementation "androidx.media3:media3-effect:1.4.1"
+    implementation "androidx.media3:media3-muxer:1.4.1"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
