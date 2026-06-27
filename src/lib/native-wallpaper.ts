@@ -41,6 +41,15 @@ export interface WallpaperDiagnostic {
   lastDownloadBytes?: number;
   lastError?: string | null;
   openPickerCalled?: boolean;
+  pluginAvailable?: boolean;
+  currentAction?: string | null;
+  lastStep?: string | null;
+  lastExceptionStacktrace?: string | null;
+  mkdirsOk?: boolean;
+  createFileOk?: boolean;
+  parentDir?: string | null;
+  parentExists?: boolean;
+  parentWritable?: boolean;
 }
 
 export interface CompatibilityResult {
