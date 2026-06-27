@@ -2,8 +2,8 @@ import java.util.TimeZone
 
 apply plugin: 'com.android.application'
 
-def aetherxVersionCode = 210
-def aetherxVersionName = "2.1.0-ffmpegkit"
+def aetherxVersionCode = 211
+def aetherxVersionName = "2.1.1-validator-fix"
 def aetherxBuildVersion = System.getenv("AETHERX_BUILD_VERSION") ?: aetherxVersionName
 def aetherxBuildTimestamp = System.getenv("AETHERX_BUILD_TIMESTAMP")
 if (aetherxBuildTimestamp == null || aetherxBuildTimestamp.isEmpty()) {
