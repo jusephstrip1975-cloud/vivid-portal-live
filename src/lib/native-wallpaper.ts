@@ -85,7 +85,9 @@ export async function getWallpaperDiagnostic(): Promise<WallpaperDiagnostic | nu
     if (Capacitor.getPlatform() !== "android") return null;
     const registeredWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
     const capPlugins = (Capacitor as unknown as { Plugins?: Record<string, unknown> }).Plugins ?? {};
-    const pluginAvailable = Boolean(capPlugins["AetherXLiveWallpaper"]);
+    const pluginAvailable = Boolean(
+      (capPlugins["AetherXLiveWallpaper"] as Partial<LiveWallpaperPlugin> | undefined)?.saveVideoFromUrl,
+    );
     console.info("[AetherX] PLUGIN_AVAILABLE=" + pluginAvailable);
     const LiveWallpaper =
       (capPlugins["AetherXLiveWallpaper"] as LiveWallpaperPlugin | undefined) ?? registeredWallpaper;
@@ -238,14 +240,23 @@ export async function saveWallpaperToDevice(
     const platform = Capacitor.getPlatform();
 
     if (platform === "android") {
-      const registeredWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
       const capacitorWithPlugins = Capacitor as typeof Capacitor & {
         Plugins?: Record<string, LiveWallpaperPlugin>;
       };
-      const directWallpaper = capacitorWithPlugins.Plugins?.AetherXLiveWallpaper;
-      const LiveWallpaper = directWallpaper ?? registeredWallpaper;
-      console.log("PLUGIN_DIRECT_AVAILABLE", Boolean(directWallpaper));
+      const plugins = capacitorWithPlugins.Plugins;
+      const LiveWallpaper = plugins?.AetherXLiveWallpaper;
+      const hasNativeSaveMethod = typeof LiveWallpaper?.saveVideoFromUrl === "function";
+      console.log("PLUGIN_DIRECT_AVAILABLE", Boolean(LiveWallpaper));
+      console.log("PLUGIN_SAVE_METHOD_AVAILABLE", hasNativeSaveMethod);
       console.log("PLUGIN_NAMES", Object.keys(capacitorWithPlugins.Plugins ?? {}));
+      if (!LiveWallpaper || !hasNativeSaveMethod) {
+        console.error("PLUGIN_BRIDGE_MISSING", {
+          hasPluginsObject: Boolean(plugins),
+          pluginNames: Object.keys(plugins ?? {}),
+        });
+        return { ok: false, reason: "PLUGIN_BRIDGE_MISSING" };
+      }
       try {
         const storage = await LiveWallpaper.checkStorage();
         console.info("[AetherX] FREE_SPACE_MB", storage.freeMb, "requiredMb", storage.requiredMb, "ok", storage.ok);
