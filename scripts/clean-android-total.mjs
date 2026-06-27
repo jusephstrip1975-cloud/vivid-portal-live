@@ -12,6 +12,7 @@ const targets = [
   "dist",
   ".capacitor",
   "android/app/src/main/assets/public",
+  "android/app/src/main/assets/capacitor.config.json",
 ];
 
 for (const target of targets) {

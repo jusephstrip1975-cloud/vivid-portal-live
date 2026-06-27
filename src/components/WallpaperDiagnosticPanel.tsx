@@ -25,8 +25,6 @@ export function WallpaperDiagnosticPanel() {
     ["parentDir", value(diagnostic?.parentDir)],
     ["parentExists", value(diagnostic?.parentExists)],
     ["parentWritable", value(diagnostic?.parentWritable)],
-    ["MKDIRS_OK", value(diagnostic?.mkdirsOk)],
-    ["CREATE_FILE_OK", value(diagnostic?.createFileOk)],
     ["fileExists", value(diagnostic?.fileExists)],
     ["fileSize", value(diagnostic?.fileSize)],
     ["canRead", value(diagnostic?.canRead)],

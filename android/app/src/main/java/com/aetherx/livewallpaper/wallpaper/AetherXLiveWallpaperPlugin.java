@@ -50,8 +50,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_CURRENT_ACTION = "current_action";
     public static final String KEY_LAST_EXCEPTION_STACKTRACE = "last_exception_stacktrace";
     public static final String KEY_LAST_STEP = "last_step";
-    public static final String KEY_MKDIRS_OK = "mkdirs_ok";
-    public static final String KEY_CREATE_FILE_OK = "create_file_ok";
 
     private static final int MAX_REDIRECTS = 5;
     private static final long MIN_VALID_VIDEO_BYTES = 1024L * 1024L;
@@ -229,19 +227,16 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 setLastDownloadBytes(0L);
                 setOpenPickerCalled(false);
 
-                // Ensure parent dir exists physically
                 File parent = current.getParentFile();
-                boolean mkdirsOk = parent != null && (parent.exists() || parent.mkdirs());
-                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit().putBoolean(KEY_MKDIRS_OK, mkdirsOk).commit();
-                Log.i(TAG, "MKDIRS_RESULT ok=" + mkdirsOk
+                if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                    throw new Exception("parent-dir-unavailable:" + parent.getAbsolutePath());
+                }
+                Log.i(TAG, "PARENT_DIR_READY"
                     + " parent=" + (parent == null ? "null" : parent.getAbsolutePath())
                     + " parentExists=" + (parent != null && parent.exists())
                     + " parentWritable=" + (parent != null && parent.canWrite()));
-                if (!mkdirsOk) throw new Exception("mkdirs-failed:" + (parent == null ? "null" : parent.getAbsolutePath()));
 
-                // NOTE: createNewFile() preflight removed — Samsung OneUI rejects it even on
-                // writable external app dirs. FileOutputStream(file,false) creates the file itself.
+                // Samsung OneUI rejects manual file preflight on some devices; the stream creates the file.
                 Log.i(TAG, "PRE_STREAM path=" + current.getAbsolutePath()
                     + " exists=" + current.exists()
                     + " canWrite=" + current.canWrite()
@@ -569,8 +564,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("currentAction", prefs.getString(KEY_CURRENT_ACTION, null));
         ret.put("lastStep", prefs.getString(KEY_LAST_STEP, null));
         ret.put("lastExceptionStacktrace", prefs.getString(KEY_LAST_EXCEPTION_STACKTRACE, null));
-        ret.put("mkdirsOk", prefs.getBoolean(KEY_MKDIRS_OK, false));
-        ret.put("createFileOk", prefs.getBoolean(KEY_CREATE_FILE_OK, false));
         File parent = current.getParentFile();
         ret.put("parentDir", parent == null ? null : parent.getAbsolutePath());
         ret.put("parentExists", parent != null && parent.exists());
@@ -1041,16 +1034,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             } catch (Throwable t) {
                 Log.e(TAG, "FILE_OUTPUTSTREAM_FAILED path=" + out.getAbsolutePath(), t);
                 setLastExceptionStacktrace(t instanceof Exception ? (Exception) t : new Exception(t));
-                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit().putBoolean(KEY_CREATE_FILE_OK, false).commit();
                 conn.disconnect();
                 throw new Exception("file-output-stream-failed:" + t.getMessage());
             }
             Log.i(TAG, "FILE_OUTPUTSTREAM_OK path=" + out.getAbsolutePath()
                 + " existsAfterOpen=" + out.exists()
                 + " canWriteAfterOpen=" + out.canWrite());
-            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putBoolean(KEY_CREATE_FILE_OK, true).commit();
             try (InputStream in = conn.getInputStream(); FileOutputStream out2 = fos) {
                 byte[] buf = new byte[16384];
                 int n;
