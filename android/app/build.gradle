@@ -2,8 +2,8 @@ import java.util.TimeZone
 
 apply plugin: 'com.android.application'
 
-def aetherxVersionCode = 205
-def aetherxVersionName = "2.0.5-bridge"
+def aetherxVersionCode = 206
+def aetherxVersionName = "2.0.6-service-path"
 def aetherxBuildVersion = System.getenv("AETHERX_BUILD_VERSION") ?: aetherxVersionName
 
 android {

@@ -169,41 +169,23 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 }
                 String path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
                 long version = prefs.getLong(AetherXLiveWallpaperPlugin.KEY_VIDEO_VERSION, 0L);
-                File expectedCurrent = getCurrentWallpaperFile();
-                logServicePath("startPlayer-initial", path, expectedCurrent);
-                Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
-                    + " new=" + path + " newVersion=" + version
-                    + " expectedCurrent=" + expectedCurrent.getAbsolutePath());
-                if (!isCurrentPathUsable(path, expectedCurrent, "startPlayer-initial")) {
-                    Log.e(TAG, "CURRENT_MP4_MISSING service-blocked-no-fallback path=" + path);
-                    paintMessage("Archivo de wallpaper no encontrado");
-                    return;
-                }
-                currentPath = path;
-                currentVersion = version;
-
-                if (path == null) {
-                    Log.e(TAG, "CURRENT_MP4_MISSING reason=KEY_VIDEO_PATH_EMPTY ABSOLUTE_PATH=" + expectedCurrent.getAbsolutePath());
+                Log.i(TAG, "SERVICE_READ_KEY_VIDEO_PATH=" + path);
+                if (path == null || path.isEmpty()) {
+                    Log.e(TAG, "SERVICE_FILE_EXISTS=false reason=KEY_VIDEO_PATH_EMPTY");
                     paintMessage("Archivo de wallpaper no encontrado");
                     return;
                 }
                 File selectedOutput = new File(path);
-                try {
-                    String selectedCanonical = selectedOutput.getCanonicalPath();
-                    String expectedCanonical = expectedCurrent.getCanonicalPath();
-                    if (!selectedCanonical.equals(expectedCanonical)) {
-                        Log.e(TAG, "CURRENT_MP4_MISSING reason=KEY_VIDEO_PATH_NOT_CURRENT"
-                            + " VIDEO_PATH=" + path
-                            + " expected=" + expectedCanonical
-                            + " ABSOLUTE_PATH=" + expectedCurrent.getAbsolutePath());
-                        paintMessage("Archivo de wallpaper no encontrado");
-                        return;
-                    }
-                } catch (Throwable t) {
-                    Log.e(TAG, "CURRENT_MP4_MISSING reason=canonical-path-failed VIDEO_PATH=" + path, t);
-                    paintMessage("Archivo de wallpaper no encontrado");
-                    return;
-                }
+                boolean svcExists = selectedOutput.exists();
+                long svcSize = svcExists ? selectedOutput.length() : -1L;
+                boolean svcCanRead = svcExists && selectedOutput.canRead();
+                Log.i(TAG, "SERVICE_FILE_EXISTS=" + svcExists);
+                Log.i(TAG, "SERVICE_FILE_SIZE=" + svcSize);
+                Log.i(TAG, "SERVICE_CAN_READ=" + svcCanRead);
+                Log.i(TAG, "startPlayer prev=" + currentPath + " prevVersion=" + currentVersion
+                    + " new=" + path + " newVersion=" + version);
+                currentPath = path;
+                currentVersion = version;
                 boolean selectedExists = selectedOutput.exists();
                 long selectedSize = selectedExists ? selectedOutput.length() : -1L;
                 boolean selectedCanRead = selectedExists && selectedOutput.canRead();
