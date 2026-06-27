@@ -145,8 +145,20 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
         if (!appGradle.contains('ffmpeg-kit-full-gpl') || !transcoderText.contains('com.arthenica.ffmpegkit.FFmpegKit')) {
             throw new GradleException('Samsung wallpaper transcoder must use FFmpegKit/libx264')
         }
-        if (appGradle.contains('media3-transformer') || transcoderText.contains('androidx.media3.transformer')) {
-            throw new GradleException('Media3 Transformer is forbidden for Samsung wallpaper transcoding')
+        // Scan only dependency declarations (lines starting with implementation/api/etc) to avoid self-match on this check.
+        def forbiddenMedia3 = ['media3-transformer', 'media3-effect', 'media3-muxer']
+        appGradle.eachLine { line ->
+            def trimmed = line.trim()
+            if (trimmed.startsWith('implementation') || trimmed.startsWith('api ') || trimmed.startsWith('compileOnly')) {
+                forbiddenMedia3.each { dep ->
+                    if (trimmed.contains(dep)) {
+                        throw new GradleException("Media3 Transformer dependency forbidden: ${dep}")
+                    }
+                }
+            }
+        }
+        if (transcoderText.contains('androidx.media3.transformer')) {
+            throw new GradleException('Media3 Transformer import forbidden in WallpaperTranscoder')
         }
     }
 }
