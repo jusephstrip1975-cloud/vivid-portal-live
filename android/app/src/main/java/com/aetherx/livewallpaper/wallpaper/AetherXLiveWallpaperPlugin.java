@@ -634,6 +634,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("sourceHasAudio", prefs.getBoolean("source_has_audio", false));
         ret.put("transcoded", prefs.getBoolean("transcoded", false));
         ret.put("lastTranscodeError", prefs.getString("last_transcode_error", null));
+        ret.put("ffmpegCommand", prefs.getString("ffmpeg_command", null));
+        ret.put("ffmpegExitCode", prefs.getString("ffmpeg_exit_code", null));
+        ret.put("ffprobeWidth", prefs.getInt("ffprobe_width", 0));
+        ret.put("ffprobeHeight", prefs.getInt("ffprobe_height", 0));
+        ret.put("ffprobeRotation", prefs.getInt("ffprobe_rotation", 0));
 
         Log.i(TAG, "getStatus VIDEO_PATH=" + path
             + " FILE_EXISTS=" + exists
@@ -706,6 +711,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         prefs.edit()
             .remove(KEY_VIDEO_PATH)
             .remove("last_transcode_error")
+            .remove("ffmpeg_command")
+            .remove("ffmpeg_exit_code")
+            .remove("ffprobe_width")
+            .remove("ffprobe_height")
+            .remove("ffprobe_rotation")
             .putLong("video_updated_at", System.currentTimeMillis())
             .putLong(KEY_VIDEO_VERSION, version)
             .commit();

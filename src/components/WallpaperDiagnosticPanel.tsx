@@ -64,6 +64,11 @@ export function WallpaperDiagnosticPanel() {
     ["REAL_HAS_AUDIO", value(diagnostic?.realHasAudio)],
     ["TRANSCODED", value(diagnostic?.transcoded)],
     ["LAST_TRANSCODE_ERROR", value(diagnostic?.lastTranscodeError)],
+    ["FFMPEG_COMMAND", value(diagnostic?.ffmpegCommand)],
+    ["FFMPEG_EXIT_CODE", value(diagnostic?.ffmpegExitCode)],
+    ["FFPROBE_WIDTH", value(diagnostic?.ffprobeWidth)],
+    ["FFPROBE_HEIGHT", value(diagnostic?.ffprobeHeight)],
+    ["FFPROBE_ROTATION", value(diagnostic?.ffprobeRotation)],
     // Errors
     ["LAST_NATIVE_EXCEPTION", value(diagnostic?.lastExceptionStacktrace)],
     ["LAST_JS_EXCEPTION", value(diagnostic?.lastError)],
