@@ -144,20 +144,27 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
         if (!appGradle.contains('ffmpeg-kit-full-gpl') || !transcoderText.contains('com.arthenica.ffmpegkit.FFmpegKit')) {
             throw new GradleException('Samsung wallpaper transcoder must use FFmpegKit/libx264')
         }
-        // Scan only dependency declarations (lines starting with implementation/api/etc) to avoid self-match on this check.
-        def forbiddenMedia3 = ['media3-transformer', 'media3-effect', 'media3-muxer']
+        // Scan only dependency declarations (lines starting with implementation/api/etc) to avoid self-match.
+        def forbiddenMedia3 = ['media3-transformer', 'media3-effect', 'media3-muxer', 'media3-exoplayer', 'media3-common']
         appGradle.eachLine { line ->
             def trimmed = line.trim()
             if (trimmed.startsWith('implementation') || trimmed.startsWith('api ') || trimmed.startsWith('compileOnly')) {
                 forbiddenMedia3.each { dep ->
                     if (trimmed.contains(dep)) {
-                        throw new GradleException("Media3 Transformer dependency forbidden: ${dep}")
+                        throw new GradleException("Media3 dependency forbidden (Samsung wallpaper uses MediaPlayer only): ${dep}")
                     }
                 }
             }
         }
         if (transcoderText.contains('androidx.media3.transformer')) {
             throw new GradleException('Media3 Transformer import forbidden in WallpaperTranscoder')
+        }
+        def serviceText = service.getText('UTF-8')
+        ['androidx.media3', 'ExoPlayer', 'MediaCodecVideoRenderer', 'DefaultRenderersFactory',
+         'ProgressiveMediaSource', 'PlayerView'].each { forbidden ->
+            if (serviceText.contains(forbidden)) {
+                throw new GradleException("WallpaperService must be MediaPlayer-only; forbidden symbol: ${forbidden}")
+            }
         }
     }
 }

@@ -640,6 +640,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("ffprobeHeight", prefs.getInt("ffprobe_height", 0));
         ret.put("ffprobeRotation", prefs.getInt("ffprobe_rotation", 0));
 
+        // Player engine flags (2.1.2-mediaplayer-only)
+        ret.put("playerEngine", prefs.getString("player_engine", "MediaPlayer"));
+        ret.put("exoplayerEnabled", prefs.getBoolean("exoplayer_enabled", false));
+        ret.put("mediaplayerStarted", prefs.getBoolean("mediaplayer_started", false));
+
         Log.i(TAG, "getStatus VIDEO_PATH=" + path
             + " FILE_EXISTS=" + exists
             + " FILE_SIZE=" + size
