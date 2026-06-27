@@ -70,6 +70,7 @@ function WallpaperDetail() {
 
   async function handleApply(target: WallpaperTarget) {
     const fileName = `aetherx-${wp.id}.mp4`;
+    console.log("ESTABLECER_FONDO_CLICK", { wallpaperId: wp.id, target, video: wp.video });
     try {
       setActiveTarget(target);
       setDownloadState("downloading");
@@ -87,7 +88,9 @@ function WallpaperDetail() {
             return;
           }
         }
+        console.log("CALL_SAVE_WALLPAPER_TO_DEVICE", { wallpaperId: wp.id, fileName, target, video: wp.video });
         const result = await saveWallpaperToDevice(wp.video, fileName, target, wp.id);
+        console.log("SAVE_WALLPAPER_TO_DEVICE_RESULT", result);
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
         const successMsg =
           target === "lock"
