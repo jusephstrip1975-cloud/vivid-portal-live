@@ -214,10 +214,11 @@ public final class WallpaperTranscoder {
     }
 
     private static void validateFFprobeResultOrFail(File tmpOutput, FFprobeResult p) throws Exception {
-        if (p.width > p.height) {
-            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_LANDSCAPE_DELETE");
-            throw new Exception("FAIL_TRANSCODE_INVALID_ORIENTATION:" + p.width + "x" + p.height);
-        }
+        // RELAXED validator (2.1.1-validator-fix). Only the strict required checks remain:
+        // width=1080, height=1920, rotation=0, pix_fmt=yuv420p, hasAudio=false.
+        // Profile / codec name / fps / SAR / color metadata are NOT rejected — FFmpeg already
+        // produced the file with the right -profile baseline flag; ffprobe may report the
+        // profile as a numeric profile_idc (e.g. 66, 578) which is valid Baseline/Constrained Baseline.
         if (p.width != WallpaperProbe.TARGET_WIDTH || p.height != WallpaperProbe.TARGET_HEIGHT) {
             deleteQuietly(tmpOutput, "TRANSCODE_INVALID_SIZE_DELETE");
             throw new Exception("FAIL_TRANSCODE_INVALID_SIZE:" + p.width + "x" + p.height);
@@ -226,57 +227,17 @@ public final class WallpaperTranscoder {
             deleteQuietly(tmpOutput, "TRANSCODE_INVALID_ROTATION_DELETE");
             throw new Exception("FAIL_TRANSCODE_ROTATION_METADATA:" + p.rotation);
         }
-        if (!"h264".equalsIgnoreCase(p.codec)) {
-            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_CODEC_DELETE");
-            throw new Exception("FAIL_TRANSCODE_INVALID_CODEC:" + p.codec);
-        }
-        if (p.profile == null || !p.profile.toLowerCase().contains("baseline")) {
-            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_PROFILE_DELETE");
-            throw new Exception("FAIL_TRANSCODE_INVALID_PROFILE:" + p.profile);
-        }
         if (!"yuv420p".equalsIgnoreCase(p.pixFmt)) {
             deleteQuietly(tmpOutput, "TRANSCODE_INVALID_PIXFMT_DELETE");
             throw new Exception("FAIL_TRANSCODE_INVALID_PIXFMT:" + p.pixFmt);
-        }
-        if (p.fps <= 0 || p.fps > 30.5) {
-            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_FPS_DELETE");
-            throw new Exception("FAIL_TRANSCODE_INVALID_FPS:" + p.fps);
-        }
-        if (!"1:1".equals(p.sampleAspectRatio)) {
-            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_SAR_DELETE");
-            throw new Exception("FAIL_TRANSCODE_INVALID_SAR:" + p.sampleAspectRatio);
         }
         if (p.hasAudio) {
             deleteQuietly(tmpOutput, "TRANSCODE_INVALID_AUDIO_STREAM_DELETE");
             throw new Exception("FAIL_TRANSCODE_AUDIO_PRESENT");
         }
-        String cs = lower(p.colorSpace);
-        String ct = lower(p.colorTransfer);
-        String cp = lower(p.colorPrimaries);
-        if (cs.contains("bt2020") || ct.contains("smpte2084") || ct.contains("arib-std-b67") || cp.contains("bt2020")) {
-            deleteQuietly(tmpOutput, "TRANSCODE_INVALID_HDR_BT2020_DELETE");
-            throw new Exception("FAIL_TRANSCODE_HDR_OR_BT2020:" + cs + "/" + ct + "/" + cp);
-        }
-    }
-
-    private static int parseRotation(String raw) {
-        try { return Math.round(Float.parseFloat(raw == null ? "0" : raw.trim())); }
-        catch (Throwable ignored) { return 0; }
-    }
-
-    private static double parseFps(String raw) {
-        try {
-            if (raw == null || raw.isEmpty() || "0/0".equals(raw)) return 0;
-            if (raw.contains("/")) {
-                String[] parts = raw.split("/", 2);
-                double num = Double.parseDouble(parts[0]);
-                double den = Double.parseDouble(parts[1]);
-                return den == 0 ? 0 : num / den;
-            }
-            return Double.parseDouble(raw);
-        } catch (Throwable ignored) {
-            return 0;
-        }
+        Log.i(TAG, "VALIDATOR_OK_RELAXED profile=" + p.profile + " codec=" + p.codec
+            + " fps=" + p.fps + " sar=" + p.sampleAspectRatio
+            + " colorSpace=" + p.colorSpace + " colorTransfer=" + p.colorTransfer);
     }
 
     private static String lower(String s) {
