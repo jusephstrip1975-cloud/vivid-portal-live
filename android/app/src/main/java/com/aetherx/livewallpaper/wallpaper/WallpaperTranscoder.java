@@ -286,4 +286,28 @@ public final class WallpaperTranscoder {
         double fps = 0;
         boolean hasAudio = false;
     }
+    private static float parseFps(String fps) {
+        try {
+            if (fps == null || fps.isEmpty() || fps.equals("0/0")) return 0f;
+            if (fps.contains("/")) {
+                String[] parts = fps.split("/");
+                float num = Float.parseFloat(parts[0]);
+                float den = Float.parseFloat(parts[1]);
+                if (den == 0f) return 0f;
+                return num / den;
+            }
+            return Float.parseFloat(fps);
+        } catch (Exception e) {
+            return 0f;
+        }
+    }
+
+    private static int parseRotation(String rotation) {
+        try {
+            if (rotation == null || rotation.isEmpty()) return 0;
+            return Integer.parseInt(rotation.trim());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
 }
