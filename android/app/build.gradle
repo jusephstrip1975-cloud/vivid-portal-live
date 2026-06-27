@@ -1,88 +1,25 @@
-import java.util.TimeZone
-
 apply plugin: 'com.android.application'
 
-def aetherxVersionCode = 213
-def aetherxVersionName = "2.1.3-surface-gated"
-def aetherxBuildVersion = System.getenv("AETHERX_BUILD_VERSION") ?: aetherxVersionName
-def aetherxBuildTimestamp = System.getenv("AETHERX_BUILD_TIMESTAMP")
-if (aetherxBuildTimestamp == null || aetherxBuildTimestamp.isEmpty()) {
-    def fmt = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
-    fmt.setTimeZone(TimeZone.getTimeZone("UTC"))
-    aetherxBuildTimestamp = fmt.format(new Date())
-}
-def aetherxBuildId = System.getenv("AETHERX_BUILD_ID")
-if (aetherxBuildId == null || aetherxBuildId.isEmpty()) {
-    def src = (aetherxBuildVersion + "|" + aetherxBuildTimestamp).bytes
-    def md = java.security.MessageDigest.getInstance("SHA-256")
-    def hex = md.digest(src).encodeHex().toString()
-    aetherxBuildId = hex.substring(0, 12)
-}
-
 android {
-    namespace = "com.aetherx.livewallpaper"
+    namespace = "com.aetherx.localfinal"
     compileSdk = rootProject.ext.compileSdkVersion
-    buildFeatures {
-        buildConfig true
-    }
     defaultConfig {
-        applicationId "com.aetherx.livewallpaper"
-        setProperty("archivesBaseName", "AETHERX")
+        applicationId "com.aetherx.localfinal"
+        setProperty("archivesBaseName", "app-aetherx-localfinal")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode aetherxVersionCode
-        versionName aetherxVersionName
-        buildConfigField "String", "AETHERX_BUILD_VERSION", "\"${aetherxBuildVersion}\""
-        buildConfigField "String", "AETHERX_BUILD_TIMESTAMP", "\"${aetherxBuildTimestamp}\""
-        buildConfigField "String", "AETHERX_BUILD_ID", "\"${aetherxBuildId}\""
-        buildConfigField "String", "AETHERX_BUILD_MARKER", "\"NEW_BUILD_LOADED_OK\""
+        versionCode 101
+        versionName "1.1-live-wallpaper"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-
-    signingConfigs {
-        release {
-            def ksPath = System.getenv("AETHERX_KEYSTORE_PATH") ?: "release.keystore"
-            storeFile file(ksPath)
-            storePassword System.getenv("AETHERX_KEYSTORE_PASSWORD") ?: "aetherx-internal-test"
-            keyAlias System.getenv("AETHERX_KEY_ALIAS") ?: "aetherx-test"
-            keyPassword System.getenv("AETHERX_KEY_PASSWORD") ?: "aetherx-internal-test"
-        }
-    }
-
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
-            debuggable false
-            zipAlignEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
-        }
-        debug {
             minifyEnabled false
-            debuggable false
-            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    packagingOptions {
-        jniLibs {
-            useLegacyPackaging = false
-        }
-    }
-
-    bundle {
-        language { enableSplit = true }
-        density  { enableSplit = true }
-        abi      { enableSplit = true }
     }
 }
 
@@ -90,7 +27,22 @@ repositories {
     flatDir {
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
     }
-    maven { url 'https://artifactory.appodeal.com/appodeal-public' }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType('debug')) { variant ->
+        variant.outputs.each { output ->
+            output.outputFileName.set('app-aetherx-localfinal-debug.apk')
+        }
+    }
+}
+
+android.applicationVariants.all { variant ->
+    if (variant.buildType.name == 'debug') {
+        variant.outputs.all { output ->
+            outputFileName = 'app-aetherx-localfinal-debug.apk'
+        }
+    }
 }
 
 dependencies {
@@ -100,10 +52,15 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
 
-    // NO Media3 / NO ExoPlayer. Samsung OneUI rechaza MediaCodecVideoRenderer dentro del
-    // WallpaperService (ERROR_CODE_DECODER_INIT_FAILED). El servicio usa SOLO MediaPlayer.
-    // FFmpegKit con libx264: transcoder Samsung-safe obligatorio para los MP4 del wallpaper.
-    implementation "com.arthenica:ffmpeg-kit-full-gpl:6.0-2.LTS"
+    // Media3 ExoPlayer for live wallpaper video rendering
+    implementation "androidx.media3:media3-exoplayer:1.4.1"
+    implementation "androidx.media3:media3-common:1.4.1"
+    // Media3 Transformer for transcoding to Samsung-compatible H.264/AAC (no FFmpeg)
+    implementation "androidx.media3:media3-transformer:1.4.1"
+    implementation "androidx.media3:media3-effect:1.4.1"
+    implementation "androidx.media3:media3-muxer:1.4.1"
+
+
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
@@ -124,7 +81,7 @@ try {
 tasks.register('verifyAetherXLiveWallpaperSetup') {
     doLast {
         def manifest = file("$projectDir/src/main/AndroidManifest.xml").getText('UTF-8')
-        if (!manifest.contains('com.aetherx.livewallpaper.wallpaper.AetherXLiveWallpaperService')) {
+        if (!manifest.contains('com.aetherx.localfinal.wallpaper.AetherXLiveWallpaperService')) {
             throw new GradleException('AetherXLiveWallpaperService must be declared in AndroidManifest.xml')
         }
         if (!manifest.contains('android.permission.BIND_WALLPAPER')) {
@@ -133,55 +90,42 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
         if (!manifest.contains('android.service.wallpaper.WallpaperService')) {
             throw new GradleException('Live wallpaper service must declare WallpaperService intent-filter')
         }
-        def service = file("$projectDir/src/main/java/com/aetherx/livewallpaper/wallpaper/AetherXLiveWallpaperService.java")
-        def plugin = file("$projectDir/src/main/java/com/aetherx/livewallpaper/wallpaper/AetherXLiveWallpaperPlugin.java")
-        def transcoder = file("$projectDir/src/main/java/com/aetherx/livewallpaper/wallpaper/WallpaperTranscoder.java")
+        def service = file("$projectDir/src/main/java/com/aetherx/localfinal/wallpaper/AetherXLiveWallpaperService.java")
+        def plugin = file("$projectDir/src/main/java/com/aetherx/localfinal/wallpaper/AetherXLiveWallpaperPlugin.java")
         if (!service.exists()) throw new GradleException('Missing AetherXLiveWallpaperService.java')
         if (!plugin.exists()) throw new GradleException('Missing AetherXLiveWallpaperPlugin.java')
-        if (!transcoder.exists()) throw new GradleException('Missing WallpaperTranscoder.java')
-        def appGradle = file("$projectDir/build.gradle").getText('UTF-8')
-        def transcoderText = transcoder.getText('UTF-8')
-        if (!appGradle.contains('ffmpeg-kit-full-gpl') || !transcoderText.contains('com.arthenica.ffmpegkit.FFmpegKit')) {
-            throw new GradleException('Samsung wallpaper transcoder must use FFmpegKit/libx264')
-        }
-        // Scan only dependency declarations (lines starting with implementation/api/etc) to avoid self-match.
-        def forbiddenMedia3 = ['media3-transformer', 'media3-effect', 'media3-muxer', 'media3-exoplayer', 'media3-common']
-        appGradle.eachLine { line ->
-            def trimmed = line.trim()
-            if (trimmed.startsWith('implementation') || trimmed.startsWith('api ') || trimmed.startsWith('compileOnly')) {
-                forbiddenMedia3.each { dep ->
-                    if (trimmed.contains(dep)) {
-                        throw new GradleException("Media3 dependency forbidden (Samsung wallpaper uses MediaPlayer only): ${dep}")
-                    }
-                }
-            }
-        }
-        if (transcoderText.contains('androidx.media3.transformer')) {
-            throw new GradleException('Media3 Transformer import forbidden in WallpaperTranscoder')
-        }
-        def serviceText = service.getText('UTF-8')
-        ['androidx.media3', 'ExoPlayer', 'MediaCodecVideoRenderer', 'DefaultRenderersFactory',
-         'ProgressiveMediaSource', 'PlayerView'].each { forbidden ->
-            if (serviceText.contains(forbidden)) {
-                throw new GradleException("WallpaperService must be MediaPlayer-only; forbidden symbol: ${forbidden}")
-            }
-        }
     }
 }
 
-// STRICT: never auto-generate a keystore. A stable signature is the only way Play Protect stops complaining.
-tasks.register('requireAetherXKeystore') {
+tasks.register('copyAetherXLocalFinalDebugApk') {
     doLast {
-        def ksPath = System.getenv("AETHERX_KEYSTORE_PATH") ?: "release.keystore"
-        def ksFile = file(ksPath)
-        if (!ksFile.exists() || ksFile.length() == 0L) {
-            throw new GradleException(
-                "AETHERX release keystore missing at ${ksFile.absolutePath}. " +
-                "Commit android/app/release.keystore or set AETHERX_KEYSTORE_PATH. " +
-                "NEVER regenerate it — Play Protect blocks new signatures."
-            )
+        def outputDir = file("$buildDir/outputs/apk/debug")
+        def expected = file("${outputDir}/app-aetherx-localfinal-debug.apk")
+        def defaultApk = file("${outputDir}/app-debug.apk")
+
+        if (expected.exists()) {
+            logger.lifecycle("AetherX Local Final debug APK already exists: ${expected}")
+            return
         }
-        logger.lifecycle("AETHERX signing keystore OK: ${ksFile.absolutePath} (${ksFile.length()} bytes)")
+        if (!defaultApk.exists()) {
+            throw new GradleException("Neither ${expected.name} nor ${defaultApk.name} exists in ${outputDir}")
+        }
+        outputDir.mkdirs()
+        expected.bytes = defaultApk.bytes
+        if (!expected.exists()) {
+            throw new GradleException("Failed to create final debug APK: ${expected}")
+        }
+        logger.lifecycle("Copied ${defaultApk.name} to ${expected.name}")
+    }
+}
+
+tasks.register('verifyAetherXFinalDebugApk') {
+    doLast {
+        def expected = file("$buildDir/outputs/apk/debug/app-aetherx-localfinal-debug.apk")
+        if (!expected.exists()) {
+            throw new GradleException("Expected debug APK was not generated: ${expected}")
+        }
+        logger.lifecycle("AetherX Local Final debug APK generated: ${expected}")
     }
 }
 
@@ -189,8 +133,14 @@ tasks.named('preBuild') {
     dependsOn 'verifyAetherXLiveWallpaperSetup'
 }
 
-gradle.projectsEvaluated {
-    tasks.matching { it.name in ['assembleRelease', 'bundleRelease', 'assembleDebug'] }.configureEach {
-        dependsOn 'requireAetherXKeystore'
+afterEvaluate {
+    tasks.matching { task -> task.name == 'assembleDebug' }.configureEach {
+        finalizedBy tasks.named('copyAetherXLocalFinalDebugApk')
+    }
+    tasks.named('verifyAetherXFinalDebugApk') {
+        mustRunAfter tasks.named('copyAetherXLocalFinalDebugApk')
+    }
+    tasks.named('copyAetherXLocalFinalDebugApk') {
+        finalizedBy tasks.named('verifyAetherXFinalDebugApk')
     }
 }

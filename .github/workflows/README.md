@@ -6,15 +6,15 @@ Cada push a `main` (o ejecución manual desde la pestaña **Actions** → **Buil
 
 1. Ve a tu repo en GitHub → pestaña **Actions**.
 2. Abre la última ejecución de **Build Android APK**.
-3. Al final de la página, sección **Artifacts**, descarga `AETHERX-release-apk`.
-4. Descomprime el ZIP → tendrás el APK release firmado.
+3. Al final de la página, sección **Artifacts**, descarga `AetherX-Local-Final-debug-apk`.
+4. Descomprime el ZIP → tendrás `app-aetherx-localfinal-debug.apk`.
 5. Pásalo al móvil e instálalo (permite "orígenes desconocidos").
 
-El APK **release** requiere tu keystore real en GitHub Secrets. No se genera keystore de prueba para evitar señales de build interna.
+El APK **debug** está firmado automáticamente con la clave de debug de Android — sirve para instalarlo en cualquier teléfono y probarlo. **No** sirve para Play Store.
 
 ## (Opcional) APK firmado para producción
 
-Para generar un APK/AAB firmado con tu propia clave:
+Si en el futuro quieres un APK **release** firmado con tu propia clave (necesario para Play Store o distribución pública):
 
 1. Genera un keystore en tu PC:
    ```

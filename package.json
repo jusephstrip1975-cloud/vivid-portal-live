@@ -5,9 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && node scripts/prepare-android-local.mjs --prepare",
-    "build:capacitor": "node scripts/prepare-android-local.mjs --prepare",
-    "clean:android:total": "node scripts/clean-android-total.mjs",
+    "build": "vite build",
+    "build:capacitor": "vite build --config vite.capacitor.config.ts",
     "build:android": "bash scripts/build-android.sh",
     "capacitor:sync:after": "node scripts/lock-android-local-final.mjs",
     "build:dev": "vite build --mode development",

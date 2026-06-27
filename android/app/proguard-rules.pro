@@ -1,33 +1,14 @@
-# AetherX release ProGuard rules
+# Add project specific ProGuard rules here.
+# You can control the set of applied configuration files using the
+# proguardFiles setting in build.gradle.
+#
+# For more details, see
+#   http://developer.android.com/guide/developing/tools/proguard.html
 
--keepattributes *Annotation*,InnerClasses,Signature,Exceptions
+# Uncomment this to preserve the line number information for
+# debugging stack traces.
+#-keepattributes SourceFile,LineNumberTable
 
-# Capacitor
--keep class com.getcapacitor.** { *; }
--keep @com.getcapacitor.annotation.CapacitorPlugin class * { *; }
--keep class * extends com.getcapacitor.Plugin { *; }
--keepclassmembers class * extends com.getcapacitor.Plugin {
-    @com.getcapacitor.PluginMethod <methods>;
-}
-
-# AetherX native wallpaper layer
--keep class com.aetherx.livewallpaper.** { *; }
-
-# Media3 / ExoPlayer
--keep class androidx.media3.** { *; }
--dontwarn androidx.media3.**
-
-# FFmpegKit / libx264 transcoder
--keep class com.arthenica.ffmpegkit.** { *; }
--dontwarn com.arthenica.ffmpegkit.**
--keep class com.arthenica.smartexception.** { *; }
--dontwarn com.arthenica.smartexception.**
-
-# AndroidX general
--dontwarn androidx.**
-
-# Keep info/error logs because AETHERX release APK must expose build and wallpaper diagnostics.
--assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-}
+# If you keep the line number information, uncomment this to
+# hide the original source file name.
+#-renamesourcefileattribute SourceFile

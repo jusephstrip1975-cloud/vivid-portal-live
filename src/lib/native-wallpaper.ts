@@ -10,13 +10,7 @@ interface LiveWallpaperPlugin {
   saveVideoFromUrl(options: {
     url: string;
     fileName?: string;
-    wallpaperId?: string;
   }): Promise<{ path: string; bytes: number; galleryUri?: string }>;
-  saveVideoFromUrlAndOpenPicker(options: {
-    url: string;
-    fileName?: string;
-    wallpaperId?: string;
-  }): Promise<{ path: string; bytes: number; openedPicker?: boolean; needsConfirmation?: boolean }>;
   saveVideo(options: {
     base64: string;
     fileName?: string;
@@ -27,69 +21,6 @@ interface LiveWallpaperPlugin {
   openPicker(): Promise<{ opened: boolean }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
   checkCompatibility(): Promise<CompatibilityResult>;
-  checkStorage(): Promise<{ ok: boolean; freeMb: number; requiredMb: number; message: string }>;
-  getStatus(): Promise<WallpaperDiagnostic>;
-}
-
-export interface WallpaperDiagnostic {
-  finalPath?: string;
-  fileExists?: boolean;
-  fileSize?: number;
-  canRead?: boolean;
-  KEY_VIDEO_PATH?: string | null;
-  lastDownloadUrl?: string | null;
-  lastDownloadBytes?: number;
-  lastError?: string | null;
-  openPickerCalled?: boolean;
-  pluginAvailable?: boolean;
-  currentAction?: string | null;
-  lastStep?: string | null;
-  lastExceptionStacktrace?: string | null;
-  parentDir?: string | null;
-  parentExists?: boolean;
-  parentWritable?: boolean;
-  autoRecovered?: boolean;
-  // Build info (native side)
-  appVersion?: string;
-  versionCode?: number;
-  buildVersion?: string;
-  buildTimestamp?: string;
-  buildId?: string;
-  packageName?: string;
-  // Signature
-  apkSignatureSha256?: string;
-  signatureValid?: boolean;
-  installSource?: string;
-  // Service
-  serviceRunning?: boolean;
-  lastServiceError?: string | null;
-  // Build info (JS side, from Vite env)
-  jsBuildId?: string;
-  jsBuildTimestamp?: string;
-  jsBuildVersion?: string;
-  // Real probe / transcode metadata
-  realCodec?: string | null;
-  realWidth?: number;
-  realHeight?: number;
-  realFps?: number;
-  realBitrate?: number;
-  realHasAudio?: boolean;
-  sourceCodec?: string | null;
-  sourceWidth?: number;
-  sourceHeight?: number;
-  sourceFps?: number;
-  sourceBitrate?: number;
-  sourceHasAudio?: boolean;
-  transcoded?: boolean;
-  lastTranscodeError?: string | null;
-  ffmpegCommand?: string | null;
-  ffmpegExitCode?: string | null;
-  ffprobeWidth?: number;
-  ffprobeHeight?: number;
-  ffprobeRotation?: number;
-  playerEngine?: string | null;
-  exoplayerEnabled?: boolean;
-  mediaplayerStarted?: boolean;
 }
 
 export interface CompatibilityResult {
@@ -120,39 +51,6 @@ export async function checkWallpaperCompatibility(): Promise<CompatibilityResult
   }
 }
 
-export async function getWallpaperDiagnostic(): Promise<WallpaperDiagnostic | null> {
-  const env = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
-  const jsBuild = {
-    jsBuildId: env.VITE_AETHERX_BUILD_ID,
-    jsBuildTimestamp: env.VITE_AETHERX_BUILD_TIMESTAMP,
-    jsBuildVersion: env.VITE_AETHERX_BUILD_VERSION,
-  };
-  if (!(await isNative())) return { pluginAvailable: false, ...jsBuild };
-  try {
-    const { Capacitor, registerPlugin } = await import("@capacitor/core");
-    if (Capacitor.getPlatform() !== "android") return { pluginAvailable: false, ...jsBuild };
-    const registeredWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-    const capPlugins = (Capacitor as unknown as { Plugins?: Record<string, unknown> }).Plugins ?? {};
-    const pluginAvailable = Boolean(
-      (capPlugins["AetherXLiveWallpaper"] as Partial<LiveWallpaperPlugin> | undefined)?.saveVideoFromUrl,
-    );
-    console.info("[AetherX] PLUGIN_AVAILABLE=" + pluginAvailable);
-    const LiveWallpaper =
-      (capPlugins["AetherXLiveWallpaper"] as LiveWallpaperPlugin | undefined) ?? registeredWallpaper;
-    const status = await LiveWallpaper.getStatus();
-    return { pluginAvailable, ...status, ...jsBuild };
-  } catch (err) {
-    console.warn("getWallpaperDiagnostic failed", err);
-    return {
-      pluginAvailable: false,
-      lastError: err instanceof Error ? err.message : String(err),
-      lastExceptionStacktrace: err instanceof Error ? err.stack ?? null : null,
-      openPickerCalled: false,
-      ...jsBuild,
-    };
-  }
-}
-
 export type WallpaperTarget = "home" | "lock" | "both";
 
 export interface PickedDeviceVideo {
@@ -175,16 +73,6 @@ export async function pickDeviceVideo(): Promise<
       return { ok: false, reason: "unsupported-platform" };
     }
     const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-    try {
-      const storage = await LiveWallpaper.checkStorage();
-      console.info("[AetherX] FREE_SPACE_MB", storage.freeMb, "stage=pickDeviceVideo ok=", storage.ok);
-      if (!storage.ok) {
-        console.warn("[AetherX] DOWNLOAD_ABORTED_LOW_STORAGE pickDeviceVideo", storage);
-        return { ok: false, reason: storage.message || "Espacio insuficiente para procesar wallpapers 3D" };
-      }
-    } catch (err) {
-      console.warn("checkStorage failed (continuing)", err);
-    }
     const picked = await LiveWallpaper.pickVideoFromDevice();
     const previewUrl = Capacitor.convertFileSrc(picked.path);
     return { ok: true, video: { ...picked, previewUrl } };
@@ -196,7 +84,7 @@ export async function pickDeviceVideo(): Promise<
   }
 }
 
-/** Aplica el último vídeo guardado en almacenamiento externo privado persistente al destino indicado. */
+/** Aplica el último vídeo guardado en filesDir al destino indicado. */
 export async function applyPickedVideo(
   target: WallpaperTarget = "home",
 ): Promise<SaveResult> {
@@ -215,8 +103,9 @@ export async function applyPickedVideo(
         }
       } catch (err) {
         console.warn("applyLock failed", err);
-        return { ok: false, reason: String(err) };
       }
+      await LiveWallpaper.openPicker();
+      return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
     }
 
     if (target === "both") {
@@ -229,9 +118,10 @@ export async function applyPickedVideo(
           return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
         }
       } catch (err) {
-        console.warn("applyBoth failed", err);
-        return { ok: false, reason: String(err) };
+        console.warn("applyBoth failed; opening picker", err);
       }
+      await LiveWallpaper.openPicker();
+      return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
     }
 
     try {
@@ -243,10 +133,10 @@ export async function applyPickedVideo(
         return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
       }
     } catch (err) {
-      console.warn("applyHome failed", err);
-      return { ok: false, reason: String(err) };
+      console.warn("applyHome failed; opening picker", err);
     }
-    return { ok: false, reason: "CURRENT_MP4_NOT_READY" };
+    await LiveWallpaper.openPicker();
+    return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
   } catch (err) {
     console.error("applyPickedVideo failed", err);
     return { ok: false, reason: String(err) };
@@ -278,7 +168,6 @@ export async function saveWallpaperToDevice(
   videoUrl: string,
   fileName: string,
   target: WallpaperTarget = "home",
-  wallpaperId?: string,
 ): Promise<SaveResult> {
   if (!(await isNative())) {
     return { ok: false, reason: "web" };
@@ -289,64 +178,9 @@ export async function saveWallpaperToDevice(
     const platform = Capacitor.getPlatform();
 
     if (platform === "android") {
-      registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
-      const capacitorWithPlugins = Capacitor as typeof Capacitor & {
-        Plugins?: Record<string, LiveWallpaperPlugin>;
-      };
-      const plugins = capacitorWithPlugins.Plugins;
-      const LiveWallpaper = plugins?.AetherXLiveWallpaper;
-      const hasNativeSaveMethod = typeof LiveWallpaper?.saveVideoFromUrl === "function";
-      console.log("PLUGIN_DIRECT_AVAILABLE", Boolean(LiveWallpaper));
-      console.log("PLUGIN_SAVE_METHOD_AVAILABLE", hasNativeSaveMethod);
-      console.log("PLUGIN_NAMES", Object.keys(capacitorWithPlugins.Plugins ?? {}));
-      if (!LiveWallpaper || !hasNativeSaveMethod) {
-        console.error("PLUGIN_BRIDGE_MISSING", {
-          hasPluginsObject: Boolean(plugins),
-          pluginNames: Object.keys(plugins ?? {}),
-        });
-        return { ok: false, reason: "PLUGIN_BRIDGE_MISSING" };
-      }
-      try {
-        const storage = await LiveWallpaper.checkStorage();
-        console.info("[AetherX] FREE_SPACE_MB", storage.freeMb, "requiredMb", storage.requiredMb, "ok", storage.ok);
-        if (!storage.ok) {
-          console.warn("[AetherX] DOWNLOAD_ABORTED_LOW_STORAGE", storage);
-          return { ok: false, reason: storage.message || "Espacio insuficiente para procesar wallpapers 3D" };
-        }
-      } catch (err) {
-        console.warn("checkStorage failed (continuing)", err);
-      }
-      const resolvedUrl = resolveDownloadUrl(videoUrl);
-      console.log("VIDEO_URL", resolvedUrl);
-      if (!resolvedUrl || !resolvedUrl.trim()) {
-        console.error("VIDEO_URL_INVALID", { wallpaperId, fileName, videoUrl, resolvedUrl });
-        return { ok: false, reason: "missing-url" };
-      }
-
-      console.log("CALLING_PLUGIN");
-      const saved = await LiveWallpaper.saveVideoFromUrl({
-        url: resolvedUrl,
-        fileName,
-        wallpaperId,
-      });
-      console.log("PLUGIN_RESULT", saved);
-
-      if (saved.path) {
-        const previewUrl = Capacitor.convertFileSrc(saved.path);
-        void runInternalSpeedProbe(previewUrl, saved.path);
-      }
-      const pickerResult =
-        target === "lock"
-          ? await LiveWallpaper.applyLock()
-          : target === "both"
-            ? await LiveWallpaper.applyBoth()
-            : await LiveWallpaper.applyHome();
-      console.log("PLUGIN_APPLY_RESULT", pickerResult);
-
-      if (pickerResult.openedPicker || pickerResult.needsConfirmation || pickerResult.applied) {
-        return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
-      }
-      return { ok: false, reason: "CURRENT_MP4_NOT_READY" };
+      const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      await LiveWallpaper.saveVideoFromUrl({ url: resolveDownloadUrl(videoUrl), fileName });
+      return applyPickedVideo(target);
     }
 
     if (platform === "ios") {
@@ -357,7 +191,7 @@ export async function saveWallpaperToDevice(
       await Filesystem.writeFile({
         path: fileName,
         data: base64,
-        directory: Directory.Documents,
+        directory: Directory.Cache,
       });
       return { ok: true, reason: "ios-saved" };
     }
@@ -365,16 +199,8 @@ export async function saveWallpaperToDevice(
     return { ok: false, reason: "unsupported-platform" };
   } catch (err) {
     console.error("saveWallpaperToDevice failed", err);
-    return { ok: false, reason: normalizeWallpaperError(err) };
+    return { ok: false, reason: String(err) };
   }
-}
-
-function normalizeWallpaperError(err: unknown): string {
-  const message = String(err ?? "");
-  if (message.includes("descarga fallida")) return "descarga fallida";
-  if (message.includes("archivo no guardado")) return "archivo no guardado";
-  if (message.includes("CURRENT_MP4_NOT_READY")) return "CURRENT_MP4_NOT_READY";
-  return message;
 }
 
 export function resolveDownloadUrl(url: string): string {
@@ -415,42 +241,4 @@ function blobToBase64(blob: Blob): Promise<string> {
     r.onerror = reject;
     r.readAsDataURL(blob);
   });
-}
-
-async function runInternalSpeedProbe(previewUrl: string, savedPath: string) {
-  if (typeof document === "undefined") return;
-  const video = document.createElement("video");
-  video.src = previewUrl;
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = "auto";
-  video.loop = true;
-  video.playbackRate = 1;
-  video.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px";
-  document.body.appendChild(video);
-  try {
-    await new Promise<void>((resolve) => {
-      const done = () => resolve();
-      video.addEventListener("loadedmetadata", done, { once: true });
-      window.setTimeout(done, 1500);
-    });
-    await video.play().catch(() => undefined);
-    const start = video.currentTime;
-    await new Promise((resolve) => window.setTimeout(resolve, 1000));
-    const delta = video.currentTime - start;
-    console.info("AETHERX_SPEED_TEST_CONVERTED_APP", {
-      savedPath,
-      duration: Number.isFinite(video.duration) ? video.duration : null,
-      playbackRate: video.playbackRate,
-      elapsedVideoSeconds: delta,
-      expectedElapsedSeconds: 1,
-    });
-  } catch (err) {
-    console.warn("AETHERX_SPEED_TEST_CONVERTED_APP failed", err);
-  } finally {
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
-    video.remove();
-  }
 }

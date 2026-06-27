@@ -43,11 +43,9 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
     if (!v) return;
 
     const tryPlay = () => {
-      v.playbackRate = 1;
       v.play().catch(() => {
         // Autoplay bloqueado: reintenta tras primera interacción del usuario.
         const retry = () => {
-          v.playbackRate = 1;
           v.play().catch(() => {});
           window.removeEventListener("touchstart", retry);
           window.removeEventListener("click", retry);
@@ -101,20 +99,8 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
           preload={isCoarsePointer ? "none" : "auto"}
           disablePictureInPicture
           controls={false}
-          onCanPlay={(event) => {
-            const v = event.currentTarget;
-            v.playbackRate = 1;
-            console.info("AETHERX_SPEED_TEST_APP_PREVIEW", {
-              duration: v.duration,
-              playbackRate: v.playbackRate,
-              src: resolveDownloadUrl(src),
-            });
-            setReady(true);
-          }}
-          onPlaying={(event) => {
-            event.currentTarget.playbackRate = 1;
-            setReady(true);
-          }}
+          onCanPlay={() => setReady(true)}
+          onPlaying={() => setReady(true)}
           className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${
             ready ? "opacity-100" : "opacity-0"
           }`}

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
-import { WallpaperDiagnosticPanel } from "@/components/WallpaperDiagnosticPanel";
 import {
   checkWallpaperCompatibility,
   isNative,
@@ -70,7 +69,6 @@ function WallpaperDetail() {
 
   async function handleApply(target: WallpaperTarget) {
     const fileName = `aetherx-${wp.id}.mp4`;
-    console.log("ESTABLECER_FONDO_CLICK", { wallpaperId: wp.id, target, video: wp.video });
     try {
       setActiveTarget(target);
       setDownloadState("downloading");
@@ -88,9 +86,7 @@ function WallpaperDetail() {
             return;
           }
         }
-        console.log("CALL_SAVE_WALLPAPER_TO_DEVICE", { wallpaperId: wp.id, fileName, target, video: wp.video });
-        const result = await saveWallpaperToDevice(wp.video, fileName, target, wp.id);
-        console.log("SAVE_WALLPAPER_TO_DEVICE_RESULT", result);
+        const result = await saveWallpaperToDevice(wp.video, fileName, target);
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
         const successMsg =
           target === "lock"
@@ -150,11 +146,11 @@ function WallpaperDetail() {
         setActiveTarget(null);
       }, 1800);
     } catch (err) {
-      console.error("[AetherX] apply failed", { wallpaperId: wp.id, video: wp.video, err });
+      console.error(err);
       setDownloadState("idle");
       setActiveTarget(null);
-      setToast(humanizeWallpaperError(err));
-      setTimeout(() => setToast(null), 4200);
+      setToast("No se pudo aplicar. Inténtalo de nuevo.");
+      setTimeout(() => setToast(null), 2600);
     }
   }
 
@@ -171,7 +167,7 @@ function WallpaperDetail() {
         <div className="absolute inset-0 bg-gradient-to-b from-space-black/40 via-transparent to-space-black" />
 
         {/* Top bar */}
-        <div className="absolute inset-x-4 flex items-center justify-between" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }}>
+        <div className="absolute inset-x-4 top-4 flex items-center justify-between">
           <button
             type="button"
             onClick={() => router.history.back()}
@@ -202,7 +198,7 @@ function WallpaperDetail() {
         </div>
 
         {/* Live badge */}
-        <div className="absolute left-6 flex items-center gap-1.5 rounded-full bg-space-black/60 px-3 py-1 backdrop-blur-md" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 7rem)' }}>
+        <div className="absolute left-6 top-20 flex items-center gap-1.5 rounded-full bg-space-black/60 px-3 py-1 backdrop-blur-md">
           <span className="size-1.5 rounded-full bg-electric-blue animate-shimmer" />
           <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-electric-blue">
             Vista previa en vivo
@@ -292,8 +288,6 @@ function WallpaperDetail() {
           </ol>
         </div>
 
-        <WallpaperDiagnosticPanel />
-
         {toast && (
           <div className="glass-nav fixed left-1/2 top-6 z-50 -translate-x-1/2 rounded-full px-5 py-3 text-xs font-bold uppercase tracking-[0.2em] text-electric-blue shadow-2xl">
             {toast}
@@ -311,34 +305,4 @@ function Stat({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 text-sm font-semibold text-ice-white text-display">{value}</dd>
     </div>
   );
-}
-
-function humanizeWallpaperError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err ?? "");
-  const r = raw.toLowerCase();
-  if (r.includes("missing-url")) return "URL del vídeo vacía. Reporta este fondo.";
-  if (r.includes("too-many-redirects")) return "Demasiadas redirecciones al descargar el vídeo.";
-  if (r.includes("http-404")) return "Vídeo no encontrado en el servidor (404).";
-  if (r.includes("http-403")) return "Acceso al vídeo denegado por el servidor (403).";
-  if (r.match(/http-5\d\d/)) return "Servidor caído al descargar el vídeo. Reintenta.";
-  if (r.includes("download-failed") || r.includes("timeout") || r.includes("timed out"))
-    return "Descarga fallida o tiempo de espera agotado. Revisa tu conexión.";
-  if (r.includes("empty-download") || r.includes("file-too-small"))
-    return "Descarga incompleta: el vídeo llegó vacío.";
-  if (r.includes("video-corrupt") || r.includes("mediaplayer-prepare-failed"))
-    return "Vídeo corrupto o no preparable en este dispositivo.";
-  if (r.includes("codec-not-h264") || r.includes("decoder") || r.includes("unsupported"))
-    return "Samsung rechazó el decoder de este vídeo.";
-  if (r.includes("transcode-failed"))
-    return "El conversor falló, pero la app intentará usar el vídeo original.";
-  if (r.includes("permission") || r.includes("denied"))
-    return "Permiso denegado por Android para aplicar el fondo.";
-  if (r.includes("path") && (r.includes("empty") || r.includes("missing") || r.includes("null")))
-    return "Ruta del vídeo vacía tras la descarga.";
-  if (r.includes("save-failed")) return "No se pudo guardar el vídeo en el almacenamiento.";
-  if (r.includes("current_mp4_not_ready")) return "Archivo no guardado: no se abre el selector.";
-  if (r.includes("open-picker-failed")) return "Android no abrió el selector de fondos.";
-  if (r.includes("pick-video-cancelled") || r === "cancelled") return "Selección cancelada.";
-  if (r.includes("unsupported-platform")) return "Esta plataforma no soporta live wallpapers.";
-  return raw ? `No se pudo aplicar: ${raw}` : "No se pudo aplicar. Inténtalo de nuevo.";
 }

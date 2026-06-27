@@ -9,9 +9,9 @@ import { join } from "node:path";
 const root = process.env.CAPACITOR_ROOT_DIR || process.cwd();
 const appRoot = join(root, "android", "app");
 const manifestPath = join(appRoot, "src", "main", "AndroidManifest.xml");
-const mainActivityPath = join(appRoot, "src", "main", "java", "com", "aetherx", "livewallpaper", "MainActivity.java");
-const pluginPath = join(appRoot, "src", "main", "java", "com", "aetherx", "livewallpaper", "wallpaper", "AetherXLiveWallpaperPlugin.java");
-const servicePath = join(appRoot, "src", "main", "java", "com", "aetherx", "livewallpaper", "wallpaper", "AetherXLiveWallpaperService.java");
+const mainActivityPath = join(appRoot, "src", "main", "java", "com", "aetherx", "localfinal", "MainActivity.java");
+const pluginPath = join(appRoot, "src", "main", "java", "com", "aetherx", "localfinal", "wallpaper", "AetherXLiveWallpaperPlugin.java");
+const servicePath = join(appRoot, "src", "main", "java", "com", "aetherx", "localfinal", "wallpaper", "AetherXLiveWallpaperService.java");
 const wallpaperXml = join(appRoot, "src", "main", "res", "xml", "aetherx_wallpaper.xml");
 
 function fail(msg) { throw new Error(`[AetherX Lock] ${msg}`); }
@@ -26,10 +26,10 @@ read(pluginPath);
 read(servicePath);
 read(wallpaperXml);
 
-if (!manifest.includes("com.aetherx.livewallpaper.MainActivity")) {
-  fail("AndroidManifest.xml must declare com.aetherx.livewallpaper.MainActivity");
+if (!manifest.includes("com.aetherx.localfinal.MainActivity")) {
+  fail("AndroidManifest.xml must declare com.aetherx.localfinal.MainActivity");
 }
-if (!manifest.includes("com.aetherx.livewallpaper.wallpaper.AetherXLiveWallpaperService")) {
+if (!manifest.includes("com.aetherx.localfinal.wallpaper.AetherXLiveWallpaperService")) {
   fail("AndroidManifest.xml must declare AetherXLiveWallpaperService");
 }
 if (!manifest.includes("android.permission.BIND_WALLPAPER")) {

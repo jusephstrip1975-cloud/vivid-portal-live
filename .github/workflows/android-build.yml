@@ -1,18 +1,14 @@
-name: Build AETHERX Release
+name: Build Android APK
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  actions: write
-
 jobs:
-  build-release:
+  build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -27,121 +23,61 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "22"
-
-      - name: Set unique build version
-        run: |
-          TS_HUMAN=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          TS_COMPACT=$(date -u +%Y%m%d%H%M%S)
-          BV="${TS_COMPACT}-${GITHUB_RUN_NUMBER}"
-          BID=$(printf "%s|%s" "$BV" "$TS_HUMAN" | sha256sum | cut -c1-12)
-          echo "AETHERX_BUILD_VERSION=$BV" >> "$GITHUB_ENV"
-          echo "AETHERX_BUILD_TIMESTAMP=$TS_HUMAN" >> "$GITHUB_ENV"
-          echo "AETHERX_BUILD_ID=$BID" >> "$GITHUB_ENV"
-          echo "VITE_AETHERX_BUILD_VERSION=$BV" >> "$GITHUB_ENV"
-          echo "VITE_AETHERX_BUILD_TIMESTAMP=$TS_HUMAN" >> "$GITHUB_ENV"
-          echo "VITE_AETHERX_BUILD_ID=$BID" >> "$GITHUB_ENV"
-
-      - name: Total clean before install
-        run: node scripts/clean-android-total.mjs && rm -rf ~/.gradle/caches ~/.gradle/daemon ~/.gradle/native ~/.gradle/wrapper/dists
-
-      - name: Delete previous AETHERX artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --paginate repos/${{ github.repository }}/actions/artifacts --jq '.artifacts[] | select(.name | startswith("AETHERX")) | .id' \
-            | while read -r artifact_id; do
-                if [ -n "$artifact_id" ]; then
-                  gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/$artifact_id
-                  echo "Deleted previous AETHERX artifact id=$artifact_id"
-                fi
-              done
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm install
+        run: bun install
 
-      - name: Build web app
-        run: npm run build
-
-      - name: Regenerate Capacitor local assets
-        run: npm run build:capacitor
-
-      - name: Sync Capacitor Android
-        run: npx cap sync android
-
-      - name: Verify Android wiring and fresh assets
-        run: |
-          node scripts/lock-android-local-final.mjs
-          node scripts/verify-capacitor-assets.mjs
+      - name: Build local Capacitor Android project
+        run: bun run build:android
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      # ----- Signing setup (STRICT) -----
-      # The release keystore is committed to the repo. If repo secrets override
-      # are present, use them; otherwise use the committed keystore as-is.
-      # NEVER regenerate a keystore — that would change the signature and trigger Play Protect.
-      - name: Prepare release keystore
-        id: keystore
+      # ----- DEBUG APK (always built — installable on any device) -----
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AetherX-Local-Final-debug-apk
+          path: android/app/build/outputs/apk/debug/app-aetherx-localfinal-debug.apk
+          if-no-files-found: error
+
+      # ----- RELEASE APK (only if signing secrets are configured) -----
+      - name: Decode keystore
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+
+      - name: Build release APK (signed)
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        working-directory: android
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          KS=android/app/release.keystore
-          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
-            echo "Overriding committed keystore with secret-provided one."
-            echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
-            echo "ks_password=$KEYSTORE_PASSWORD" >> "$GITHUB_OUTPUT"
-            echo "key_alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
-            echo "key_password=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
-          else
-            if [ ! -f "$KS" ] || [ ! -s "$KS" ]; then
-              echo "::error::Committed keystore $KS missing or empty. Never regenerate — Play Protect blocks new signatures."
-              exit 1
-            fi
-            echo "Using committed keystore $KS (stable signature)."
-            echo "ks_password=aetherx-internal-test" >> "$GITHUB_OUTPUT"
-            echo "key_alias=aetherx-test" >> "$GITHUB_OUTPUT"
-            echo "key_password=aetherx-internal-test" >> "$GITHUB_OUTPUT"
-          fi
-          echo "Keystore size: $(stat -c%s $KS) bytes"
-
-      - name: Stop Gradle and purge project outputs
-        working-directory: android
-        run: |
-          ./gradlew --stop || true
-          ./gradlew clean cleanBuildCache --no-daemon --no-build-cache --rerun-tasks --stacktrace
-
-      # ----- RELEASE APK + AAB (signed, minified, shrunk, no cache) -----
-      - name: Build release APK and AAB
-        working-directory: android
-        env:
-          AETHERX_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
-          AETHERX_KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.ks_password }}
-          AETHERX_KEY_ALIAS: ${{ steps.keystore.outputs.key_alias }}
-          AETHERX_KEY_PASSWORD: ${{ steps.keystore.outputs.key_password }}
-        run: ./gradlew assembleRelease bundleRelease --no-daemon --no-build-cache --rerun-tasks --stacktrace
-
-      - name: Verify APK (sha256 + signature + BUILD_INFO.json)
-        run: node scripts/verify-apk.mjs
+          ./gradlew assembleRelease --no-daemon --stacktrace \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
 
       - name: Upload release APK
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         uses: actions/upload-artifact@v4
         with:
-          name: AETHERX-${{ env.AETHERX_BUILD_VERSION }}-release-apk
-          path: |
-            android/app/build/outputs/apk/release/*.apk
-            android/app/build/outputs/apk/release/BUILD_INFO.json
-          if-no-files-found: error
-
-      - name: Upload release AAB (Google Play)
-        uses: actions/upload-artifact@v4
-        with:
-          name: AETHERX-${{ env.AETHERX_BUILD_VERSION }}-release-aab
-          path: android/app/build/outputs/bundle/release/*.aab
+          name: AetherX-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

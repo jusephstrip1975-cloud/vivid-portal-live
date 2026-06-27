@@ -3,7 +3,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
@@ -13,19 +12,16 @@
 
     <application
         android:allowBackup="false"
-        android:fullBackupContent="false"
-        android:dataExtractionRules="@xml/data_extraction_rules"
         android:hardwareAccelerated="true"
-        android:extractNativeLibs="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="false"
+        android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
 
         <activity
-            android:name="com.aetherx.livewallpaper.MainActivity"
+            android:name="com.aetherx.localfinal.MainActivity"
             android:label="@string/title_activity_main"
             android:launchMode="singleTask"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
@@ -40,7 +36,7 @@
         </activity>
 
         <service
-            android:name="com.aetherx.livewallpaper.wallpaper.AetherXLiveWallpaperService"
+            android:name="com.aetherx.localfinal.wallpaper.AetherXLiveWallpaperService"
             android:label="@string/wallpaper_label"
             android:description="@string/wallpaper_description"
             android:icon="@mipmap/ic_launcher"

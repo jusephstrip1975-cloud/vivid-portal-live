@@ -5,8 +5,6 @@ import { RouterProvider } from "@tanstack/react-router";
 import "./styles.css";
 import { getRouter } from "./router";
 
-declare const __AETHERX_BUILD_VERSION__: string;
-
 const bootLog = (...args: unknown[]) => console.info("[AetherX Android SPA]", ...args);
 
 declare global {
@@ -51,7 +49,6 @@ if (window.location.pathname.endsWith("/index.html")) {
 
 const localRouteLabel = () => window.location.pathname + window.location.search + window.location.hash;
 
-bootLog(`APP_BUILD_VERSION=${__AETHERX_BUILD_VERSION__}`, "NEW_BUILD_LOADED_OK");
 bootLog("mounting local hash router", localRouteLabel());
 
 try {
