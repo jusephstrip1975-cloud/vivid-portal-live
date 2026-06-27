@@ -45,8 +45,6 @@ export interface WallpaperDiagnostic {
   currentAction?: string | null;
   lastStep?: string | null;
   lastExceptionStacktrace?: string | null;
-  mkdirsOk?: boolean;
-  createFileOk?: boolean;
   parentDir?: string | null;
   parentExists?: boolean;
   parentWritable?: boolean;
