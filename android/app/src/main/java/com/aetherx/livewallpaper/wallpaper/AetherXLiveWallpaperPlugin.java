@@ -240,18 +240,12 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                     + " parentWritable=" + (parent != null && parent.canWrite()));
                 if (!mkdirsOk) throw new Exception("mkdirs-failed:" + (parent == null ? "null" : parent.getAbsolutePath()));
 
-                // Pre-create the destination file so we know FS permits write before we open the stream
-                boolean createOk;
-                if (current.exists()) {
-                    createOk = true;
-                } else {
-                    try { createOk = current.createNewFile(); }
-                    catch (Throwable t) { createOk = false; Log.e(TAG, "createNewFile threw", t); }
-                }
-                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit().putBoolean(KEY_CREATE_FILE_OK, createOk).commit();
-                Log.i(TAG, "CREATE_NEW_FILE ok=" + createOk + " path=" + current.getAbsolutePath());
-                if (!createOk) throw new Exception("create-new-file-failed:" + current.getAbsolutePath());
+                // NOTE: createNewFile() preflight removed — Samsung OneUI rejects it even on
+                // writable external app dirs. FileOutputStream(file,false) creates the file itself.
+                Log.i(TAG, "PRE_STREAM path=" + current.getAbsolutePath()
+                    + " exists=" + current.exists()
+                    + " canWrite=" + current.canWrite()
+                    + " parentCanWrite=" + (parent != null && parent.canWrite()));
 
                 setStep("DOWNLOAD_STARTED");
                 Log.i(TAG, "DOWNLOAD_STARTED wallpaperId=" + wallpaperId
