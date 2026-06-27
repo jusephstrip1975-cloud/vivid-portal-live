@@ -14,6 +14,9 @@ import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
+
 import androidx.annotation.OptIn;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
