@@ -91,3 +91,8 @@ lint/tmp/
 
 # Cordova plugins for Capacitor
 capacitor-cordova-android-plugins
+
+# Allow vendored FFmpegKit AAR (Maven retired)
+!app/libs/
+!app/libs/*.aar
+!app/libs/*.jar
