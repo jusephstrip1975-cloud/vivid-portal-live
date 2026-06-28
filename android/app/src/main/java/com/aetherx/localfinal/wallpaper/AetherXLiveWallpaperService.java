@@ -1,5 +1,7 @@
 package com.aetherx.localfinal.wallpaper;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -15,15 +17,31 @@ import android.view.SurfaceHolder;
 import com.aetherx.localfinal.R;
 
 /**
- * Samsung-hardened lifecycle build.
- * - Single MediaPlayer tied to Surface lifecycle.
- * - setFixedSize(720,1280) to satisfy Samsung wallpaper engine.
- * - Player only starts when Surface is valid AND prepared.
- * - Release ONLY on onSurfaceDestroyed/onDestroy, never on visibility=false.
+ * Samsung-hardened lifecycle build with diagnostics recording.
  */
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
+
+    private void recordStep(String step) {
+        Log.i(TAG, "STEP " + step);
+        try {
+            SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            p.edit().putString(AetherXLiveWallpaperPlugin.KEY_LAST_WALLPAPER_STEP,
+                System.currentTimeMillis() + " " + step).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private void recordError(String key, Throwable t) {
+        if (t == null) return;
+        Log.e(TAG, key, t);
+        try {
+            SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            String msg = t.getClass().getSimpleName() + ": " + t.getMessage();
+            p.edit().putString(key, System.currentTimeMillis() + " " + msg).apply();
+        } catch (Throwable ignored) {}
+    }
+
 
     @Override
     public Engine onCreateEngine() {
