@@ -78,6 +78,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             Surface s = holder.getSurface();
             boolean valid = s != null && s.isValid();
             Log.i(TAG, "SURFACE_CREATED valid=" + valid);
+            recordStep("SURFACE_CREATED valid=" + valid);
             paintMessage("Cargando wallpaper...");
             if (valid) main.post(this::startRawPlayer);
         }
