@@ -37,6 +37,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Fetch vendored FFmpegKit AAR (retired from Maven)
+        run: bash scripts/fetch-ffmpegkit.sh
+
       # ----- DEBUG APK (always built — installable on any device) -----
       - name: Build debug APK
         working-directory: android
