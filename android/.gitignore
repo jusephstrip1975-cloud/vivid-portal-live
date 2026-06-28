@@ -91,3 +91,9 @@ lint/tmp/
 
 # Cordova plugins for Capacitor
 capacitor-cordova-android-plugins
+
+# FFmpegKit AAR is downloaded at build time by scripts/fetch-ffmpegkit.sh
+# (too large for the repo). The smart-exception jar is small and committed.
+!app/libs/
+!app/libs/*.jar
+app/libs/*.aar
