@@ -10,8 +10,8 @@ android {
         setProperty("archivesBaseName", "app-aetherx-livewallpaper")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 250
-        versionName "2.5-installable"
+        versionCode 260
+        versionName "2.6-rawtest"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Force a single universal APK that contains every native ABI.
         ndk {
