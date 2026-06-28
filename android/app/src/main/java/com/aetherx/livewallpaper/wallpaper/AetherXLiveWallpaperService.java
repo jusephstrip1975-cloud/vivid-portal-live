@@ -1,4 +1,4 @@
-package com.aetherx.localfinal.wallpaper;
+package com.aetherx.livewallpaper.wallpaper;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -17,7 +17,8 @@ import android.view.SurfaceHolder;
 import com.aetherx.localfinal.R;
 
 /**
- * Samsung-hardened lifecycle build with diagnostics recording.
+ * Samsung One UI hardened WallpaperService.
+ * Records every lifecycle step into SharedPreferences for diagnostics.
  */
 public class AetherXLiveWallpaperService extends WallpaperService {
 
@@ -42,11 +43,17 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         } catch (Throwable ignored) {}
     }
 
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Log.i(TAG, "SERVICE_ONCREATE");
+        recordStep("SERVICE_ONCREATE");
+    }
 
     @Override
     public Engine onCreateEngine() {
-        Log.i(TAG, "ENGINE_CREATED");
-        recordStep("ENGINE_CREATED");
+        Log.i(TAG, "ON_CREATE_ENGINE");
+        recordStep("ON_CREATE_ENGINE");
         return new RawVideoEngine();
     }
 
@@ -63,12 +70,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             setOffsetNotificationsEnabled(false);
             setTouchEventsEnabled(false);
             try {
-                // Samsung wallpaper engine prefers a fixed surface size.
                 surfaceHolder.setFixedSize(720, 1280);
             } catch (Throwable t) {
                 Log.w(TAG, "setFixedSize failed", t);
             }
-            Log.i(TAG, "ENGINE_ONCREATE");
+            Log.i(TAG, "ENGINE_CREATED");
+            recordStep("ENGINE_CREATED");
         }
 
         @Override
@@ -77,8 +84,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             currentHolder = holder;
             Surface s = holder.getSurface();
             boolean valid = s != null && s.isValid();
-            Log.i(TAG, "SURFACE_CREATED valid=" + valid);
-            recordStep("SURFACE_CREATED valid=" + valid);
+            Log.i(TAG, "ON_SURFACE_CREATED valid=" + valid);
+            recordStep("ON_SURFACE_CREATED valid=" + valid);
             paintMessage("Cargando wallpaper...");
             if (valid) main.post(this::startRawPlayer);
         }
@@ -96,7 +103,6 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         player.setSurface(holder.getSurface());
                         if (prepared && visible && !player.isPlaying()) {
                             player.start();
-                            Log.i(TAG, "IS_PLAYING_TRUE=" + player.isPlaying());
                         }
                     } catch (Throwable t) {
                         Log.e(TAG, "setSurface failed", t);
@@ -113,12 +119,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             main.post(() -> {
                 if (player == null || !prepared) return;
                 try {
-                    if (v && !player.isPlaying()) {
-                        player.start();
-                        Log.i(TAG, "IS_PLAYING_TRUE=" + player.isPlaying());
-                    } else if (!v && player.isPlaying()) {
-                        player.pause();
-                    }
+                    if (v && !player.isPlaying()) player.start();
+                    else if (!v && player.isPlaying()) player.pause();
                 } catch (Throwable t) {
                     Log.e(TAG, "visibility toggle failed", t);
                 }
@@ -142,23 +144,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private void startRawPlayer() {
             try {
                 release();
-                if (currentHolder == null) {
-                    Log.w(TAG, "startRawPlayer: no holder");
-                    return;
-                }
+                if (currentHolder == null) return;
                 Surface surface = currentHolder.getSurface();
-                if (surface == null || !surface.isValid()) {
-                    Log.w(TAG, "startRawPlayer: surface invalid, skipping");
-                    return;
-                }
+                if (surface == null || !surface.isValid()) return;
 
                 AssetFileDescriptor afd = getResources().openRawResourceFd(R.raw.testwallpaper);
                 if (afd == null) {
-                    Log.e(TAG, "openRawResourceFd null");
                     paintMessage("RAW no encontrado");
                     return;
                 }
-                Log.i(TAG, "RAW afd length=" + afd.getLength());
 
                 player = new MediaPlayer();
                 player.setSurface(surface);
@@ -167,18 +161,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
-                    Log.i(TAG, "MEDIAPLAYER_PREPARED");
                     recordStep("MEDIAPLAYER_PREPARED");
                     try {
                         Surface cur = currentHolder != null ? currentHolder.getSurface() : null;
-                        if (cur == null || !cur.isValid()) {
-                            Log.w(TAG, "Prepared but surface invalid, deferring");
-                            return;
-                        }
+                        if (cur == null || !cur.isValid()) return;
                         mp.start();
-                        Log.i(TAG, "MEDIAPLAYER_STARTED");
-                        Log.i(TAG, "IS_PLAYING_TRUE=" + mp.isPlaying());
-                        recordStep("MEDIAPLAYER_STARTED isPlaying=" + mp.isPlaying());
+                        recordStep("MEDIAPLAYER_STARTED");
                     } catch (Throwable t) {
                         recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
                     }
@@ -194,13 +182,10 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     paintMessage("Error " + what + "/" + extra);
                     return true;
                 });
-                player.setOnVideoSizeChangedListener((mp, w, h) ->
-                        Log.i(TAG, "VIDEO_SIZE " + w + "x" + h));
 
                 player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
                 afd.close();
                 player.prepareAsync();
-                Log.i(TAG, "prepareAsync issued");
             } catch (Throwable t) {
                 recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
                 paintMessage("Fallo: " + t.getClass().getSimpleName());

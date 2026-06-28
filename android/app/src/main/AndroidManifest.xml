@@ -36,10 +36,9 @@
         </activity>
 
         <service
-            android:name="com.aetherx.localfinal.wallpaper.AetherXLiveWallpaperService"
+            android:name="com.aetherx.livewallpaper.wallpaper.AetherXLiveWallpaperService"
             android:label="@string/wallpaper_label"
             android:permission="android.permission.BIND_WALLPAPER"
-            android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.service.wallpaper.WallpaperService" />
