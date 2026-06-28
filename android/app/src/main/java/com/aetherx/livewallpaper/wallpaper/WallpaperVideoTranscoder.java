@@ -1,4 +1,4 @@
-package com.aetherx.localfinal.wallpaper;
+package com.aetherx.livewallpaper.wallpaper;
 
 import android.content.Context;
 import android.util.Log;

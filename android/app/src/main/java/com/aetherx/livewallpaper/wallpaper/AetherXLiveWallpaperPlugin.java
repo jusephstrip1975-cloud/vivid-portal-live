@@ -1,8 +1,7 @@
-package com.aetherx.localfinal.wallpaper;
+package com.aetherx.livewallpaper.wallpaper;
 
 import android.app.Activity;
 import android.app.WallpaperManager;
-import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -46,19 +45,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public void saveVideoFromUrl(final PluginCall call) {
         final String url = call.getString("url");
         final String fileName = sanitizeFileName(call.getString("fileName", "wallpaper.mp4"));
-        Log.i(TAG, "saveVideoFromUrl url=" + url + " fileName=" + fileName);
-        if (url == null || url.isEmpty()) {
-            call.reject("missing-url");
-            return;
-        }
+        if (url == null || url.isEmpty()) { call.reject("missing-url"); return; }
         new Thread(() -> {
             try {
                 File outFile = ensureWallpaperFile(fileName);
-                Log.i(TAG, "saveVideoFromUrl downloading to=" + outFile.getAbsolutePath());
-                long bytes = downloadFollowingRedirects(url, outFile);
-                Log.i(TAG, "saveVideoFromUrl downloaded bytes=" + bytes
-                    + " exists=" + outFile.exists() + " size=" + outFile.length()
-                    + " canRead=" + outFile.canRead());
+                downloadFollowingRedirects(url, outFile);
                 transcodeAndResolve(outFile, call);
             } catch (Exception e) {
                 Log.e(TAG, "saveVideoFromUrl failed", e);
@@ -71,28 +62,19 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public void saveVideo(PluginCall call) {
         String base64 = call.getString("base64");
         String fileName = sanitizeFileName(call.getString("fileName", "wallpaper.mp4"));
-        Log.i(TAG, "saveVideo base64Len=" + (base64 == null ? 0 : base64.length()) + " fileName=" + fileName);
-        if (base64 == null || base64.isEmpty()) {
-            call.reject("missing-base64");
-            return;
-        }
+        if (base64 == null || base64.isEmpty()) { call.reject("missing-base64"); return; }
         try {
             byte[] data = Base64.decode(base64, Base64.DEFAULT);
             File outFile = ensureWallpaperFile(fileName);
-            try (FileOutputStream fos = new FileOutputStream(outFile)) {
-                fos.write(data);
-            }
-            Log.i(TAG, "saveVideo wrote bytes=" + outFile.length() + " path=" + outFile.getAbsolutePath());
+            try (FileOutputStream fos = new FileOutputStream(outFile)) { fos.write(data); }
             transcodeAndResolve(outFile, call);
         } catch (Exception e) {
-            Log.e(TAG, "saveVideo failed", e);
             call.reject("save-failed: " + e.getMessage(), e);
         }
     }
 
     @PluginMethod
     public void pickVideoFromDevice(PluginCall call) {
-        Log.i(TAG, "pickVideoFromDevice opening ACTION_OPEN_DOCUMENT");
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("video/*");
@@ -105,115 +87,45 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private void onPickVideoResult(PluginCall call, ActivityResult result) {
         if (call == null) return;
         if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null) {
-            Log.w(TAG, "onPickVideoResult cancelled or no data");
-            call.reject("pick-video-cancelled");
-            return;
+            call.reject("pick-video-cancelled"); return;
         }
         Uri uri = result.getData().getData();
-        Log.i(TAG, "onPickVideoResult selectedVideoUri=" + uri);
-        if (uri == null) {
-            call.reject("pick-video-no-uri");
-            return;
-        }
-        // Persist URI permission so the WallpaperService can read it later
+        if (uri == null) { call.reject("pick-video-no-uri"); return; }
         try {
             final int take = result.getData().getFlags()
                 & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             getContext().getContentResolver().takePersistableUriPermission(uri, take);
-            Log.i(TAG, "takePersistableUriPermission OK for " + uri);
-        } catch (Exception e) {
-            Log.w(TAG, "takePersistableUriPermission failed (will still copy to filesDir): " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
         try {
             String fileName = "picked-" + System.currentTimeMillis() + ".mp4";
             File outFile = ensureWallpaperFile(fileName);
             ContentResolver resolver = getContext().getContentResolver();
-            long total = 0;
             try (InputStream in = resolver.openInputStream(uri);
                  OutputStream out = new FileOutputStream(outFile)) {
                 byte[] buf = new byte[8192];
                 int n;
-                while (in != null && (n = in.read(buf)) > 0) {
-                    out.write(buf, 0, n);
-                    total += n;
-                }
+                while (in != null && (n = in.read(buf)) > 0) out.write(buf, 0, n);
             }
-            Log.i(TAG, "Copied picked video bytes=" + total + " to=" + outFile.getAbsolutePath()
-                + " exists=" + outFile.exists() + " canRead=" + outFile.canRead());
             persistVideoUri(uri.toString());
             transcodeAndResolve(outFile, call, uri.toString());
         } catch (Exception e) {
-            Log.e(TAG, "pick-video-failed", e);
             call.reject("pick-video-failed: " + e.getMessage(), e);
         }
     }
 
-    @PluginMethod
-    public void applyHome(PluginCall call) {
-        openLivePicker(call);
-    }
+    @PluginMethod public void applyHome(PluginCall call)  { openLivePicker(call); }
+    @PluginMethod public void applyLock(PluginCall call)  { openLivePicker(call); }
+    @PluginMethod public void applyBoth(PluginCall call)  { openLivePicker(call); }
+    @PluginMethod public void openPicker(PluginCall call) { openLivePicker(call); }
 
-    @PluginMethod
-    public void applyLock(PluginCall call) {
-        openLivePicker(call);
-    }
-
-    @PluginMethod
-    public void applyBoth(PluginCall call) {
-        openLivePicker(call);
-    }
-
-    @PluginMethod
-    public void openPicker(PluginCall call) {
-        openLivePicker(call);
-    }
-
+    /**
+     * Samsung One UI 6/7 frequently rejects ACTION_CHANGE_LIVE_WALLPAPER with
+     * EXTRA_LIVE_WALLPAPER_COMPONENT and shows "NO SE PUDO APLICAR". Use the
+     * generic chooser only — the user picks AetherX from the list.
+     */
     private void openLivePicker(PluginCall call) {
-        ComponentName comp = new ComponentName(
-            getContext().getPackageName(),
-            AetherXLiveWallpaperService.class.getName()
-        );
-        String compStr = comp.flattenToShortString();
-        Log.i(TAG, "OPENING_WALLPAPER_COMPONENT=" + compStr);
-        persistStep("OPENING_WALLPAPER_COMPONENT=" + compStr);
-
-        // Verify the service is actually declared/resolvable in our manifest
-        try {
-            android.content.pm.PackageManager pm = getContext().getPackageManager();
-            android.content.pm.ServiceInfo si = pm.getServiceInfo(comp, 0);
-            Log.i(TAG, "ServiceInfo OK name=" + si.name + " perm=" + si.permission);
-        } catch (Exception e) {
-            Log.e(TAG, "SERVICE_NOT_FOUND " + compStr, e);
-            persistError(KEY_LAST_NATIVE_EXCEPTION, "SERVICE_NOT_FOUND " + compStr + " :: " + e);
-        }
-
+        persistStep("OPENING_LIVE_WALLPAPER_CHOOSER");
         Activity activity = getActivity();
-
-        // Attempt 1: direct AetherX preview via ACTION_CHANGE_LIVE_WALLPAPER
-        try {
-            Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
-            intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, comp);
-            if (activity != null) {
-                activity.startActivity(intent);
-            } else {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(intent);
-            }
-            JSObject ret = new JSObject();
-            ret.put("applied", false);
-            ret.put("openedPicker", true);
-            ret.put("needsConfirmation", true);
-            ret.put("opened", true);
-            ret.put("component", compStr);
-            ret.put("via", "ACTION_CHANGE_LIVE_WALLPAPER");
-            call.resolve(ret);
-            return;
-        } catch (Exception e) {
-            Log.e(TAG, "ACTION_CHANGE_LIVE_WALLPAPER failed", e);
-            persistError(KEY_LAST_NATIVE_EXCEPTION, "ACTION_CHANGE_LIVE_WALLPAPER " + e);
-        }
-
-        // Attempt 2: generic live wallpaper chooser as fallback
         try {
             Intent intent = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
             if (activity != null) {
@@ -264,13 +176,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         if (f != null && f.exists()) {
             try (ParcelFileDescriptor pfd = ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY)) {
                 fdOk = pfd != null;
-            } catch (Exception e) {
-                fdErr = e.getMessage();
-            }
+            } catch (Exception e) { fdErr = e.getMessage(); }
         }
-        Log.i(TAG, "getStatus path=" + path + " uri=" + uri
-            + " exists=" + exists + " size=" + size + " canRead=" + canRead
-            + " fdOk=" + fdOk + " fdErr=" + fdErr);
         JSObject ret = new JSObject();
         ret.put("savedPath", path);
         ret.put("savedUri", uri);
@@ -325,23 +232,21 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         long size = exists ? f.length() : 0;
         boolean canRead = f != null && f.canRead();
 
-        String engine = "MediaPlayer (RAW res/raw/testwallpaper.mp4)";
-
         WallpaperManager wm = WallpaperManager.getInstance(ctx);
         android.app.WallpaperInfo info = wm.getWallpaperInfo();
         String currentPkg = info == null ? "(static wallpaper)" : info.getPackageName();
-        String wallpaperInfo = info == null ? "null" :
-            (info.getPackageName() + "/" + info.getServiceName());
+        String wallpaperInfo = info == null ? "null" : (info.getPackageName() + "/" + info.getServiceName());
         boolean serviceRunning = info != null && pkg.equals(info.getPackageName());
 
         ret.put("APP_VERSION", appVersion);
         ret.put("BUILD_ID", String.valueOf(buildId));
         ret.put("PACKAGE_NAME", pkg);
+        ret.put("SERVICE_CLASS", AetherXLiveWallpaperService.class.getName());
         ret.put("VIDEO_PATH", path == null ? "(none)" : path);
         ret.put("VIDEO_EXISTS", exists);
         ret.put("VIDEO_SIZE", size);
         ret.put("VIDEO_CAN_READ", canRead);
-        ret.put("PLAYER_ENGINE", engine);
+        ret.put("PLAYER_ENGINE", "MediaPlayer (RAW res/raw/testwallpaper.mp4)");
         ret.put("LAST_SERVICE_ERROR", prefs.getString(KEY_LAST_SERVICE_ERROR, "(none)"));
         ret.put("LAST_NATIVE_EXCEPTION", prefs.getString(KEY_LAST_NATIVE_EXCEPTION, "(none)"));
         ret.put("LAST_WALLPAPER_STEP", prefs.getString(KEY_LAST_WALLPAPER_STEP, "(none)"));
@@ -354,23 +259,19 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         call.resolve(ret);
     }
 
-
     private File ensureWallpaperFile(String fileName) {
         File dir = new File(getContext().getFilesDir(), "wallpapers");
         if (!dir.exists()) dir.mkdirs();
         return new File(dir, fileName);
     }
 
-    /** Transcode the downloaded MP4 to Samsung-friendly H.264/AAC, fall back to original on failure. */
     private void transcodeAndResolve(final File input, final PluginCall call) {
         transcodeAndResolve(input, call, null);
     }
 
     private void transcodeAndResolve(final File input, final PluginCall call, final String sourceUri) {
-        Log.i(TAG, "transcodeAndResolve start input=" + input.getAbsolutePath());
         WallpaperVideoTranscoder.transcode(getContext(), input, new WallpaperVideoTranscoder.Callback() {
-            @Override
-            public void onSuccess(File output) {
+            @Override public void onSuccess(File output) {
                 persistVideoPath(output.getAbsolutePath());
                 JSObject ret = new JSObject();
                 ret.put("path", output.getAbsolutePath());
@@ -379,10 +280,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 if (sourceUri != null) ret.put("sourceUri", sourceUri);
                 call.resolve(ret);
             }
-
-            @Override
-            public void onFailure(Exception error) {
-                Log.e(TAG, "Transcode failed; refusing to persist unsupported original video", error);
+            @Override public void onFailure(Exception error) {
                 call.reject("transcode-failed: " + (error.getMessage() == null ? "unknown" : error.getMessage()), error);
             }
         });
@@ -391,14 +289,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private void persistVideoPath(String absolutePath) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         prefs.edit().putString(KEY_VIDEO_PATH, absolutePath).commit();
-        Log.i(TAG, "persistVideoPath savedWallpaperVideo=" + absolutePath
-            + " verifyRead=" + prefs.getString(KEY_VIDEO_PATH, null));
     }
 
     private void persistVideoUri(String uri) {
         SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         prefs.edit().putString(KEY_VIDEO_URI, uri).commit();
-        Log.i(TAG, "persistVideoUri savedUri=" + uri);
     }
 
     private File getCurrentVideo() {
@@ -425,7 +320,6 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             conn.setReadTimeout(60000);
             conn.setRequestProperty("User-Agent", "AetherX/1.0");
             int code = conn.getResponseCode();
-            Log.i(TAG, "download HTTP " + code + " <- " + current);
             if (code >= 300 && code < 400) {
                 String loc = conn.getHeaderField("Location");
                 conn.disconnect();
@@ -433,22 +327,14 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 current = loc;
                 continue;
             }
-            if (code < 200 || code >= 300) {
-                conn.disconnect();
-                throw new Exception("http-" + code);
-            }
+            if (code < 200 || code >= 300) { conn.disconnect(); throw new Exception("http-" + code); }
             long total = 0;
             try (InputStream in = conn.getInputStream();
                  OutputStream fos = new FileOutputStream(out)) {
                 byte[] buf = new byte[16384];
                 int n;
-                while ((n = in.read(buf)) > 0) {
-                    fos.write(buf, 0, n);
-                    total += n;
-                }
-            } finally {
-                conn.disconnect();
-            }
+                while ((n = in.read(buf)) > 0) { fos.write(buf, 0, n); total += n; }
+            } finally { conn.disconnect(); }
             return total;
         }
     }

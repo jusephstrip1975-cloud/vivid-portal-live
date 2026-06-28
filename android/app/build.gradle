@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 290
-        versionName "2.9-component-picker"
+        versionCode 300
+        versionName "3.0-samsung-final"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
@@ -122,7 +122,7 @@ try {
 tasks.register('verifyAetherXLiveWallpaperSetup') {
     doLast {
         def manifest = file("$projectDir/src/main/AndroidManifest.xml").getText('UTF-8')
-        if (!manifest.contains('com.aetherx.localfinal.wallpaper.AetherXLiveWallpaperService')) {
+        if (!manifest.contains('com.aetherx.livewallpaper.wallpaper.AetherXLiveWallpaperService')) {
             throw new GradleException('AetherXLiveWallpaperService must be declared in AndroidManifest.xml')
         }
         if (!manifest.contains('android.permission.BIND_WALLPAPER')) {
