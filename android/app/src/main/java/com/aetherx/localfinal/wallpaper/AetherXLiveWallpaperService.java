@@ -202,7 +202,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player.prepareAsync();
                 Log.i(TAG, "prepareAsync issued");
             } catch (Throwable t) {
-                Log.e(TAG, "startRawPlayer failed", t);
+                recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
                 paintMessage("Fallo: " + t.getClass().getSimpleName());
             }
         }
