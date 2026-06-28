@@ -56,8 +56,12 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer:1.4.1"
     implementation "androidx.media3:media3-common:1.4.1"
 
-    // FFmpegKit min (LGPL) — includes libx264 for H.264 baseline encode.
-    implementation "com.arthenica:ffmpeg-kit-min:6.0-2"
+    // FFmpegKit min (LGPL) — vendored AAR + smart-exception jar.
+    // The AAR is downloaded into android/app/libs/ by the GitHub Actions workflow
+    // (or by scripts/fetch-ffmpegkit.sh locally) because Arthenica retired
+    // ffmpeg-kit from Maven Central in 2025.
+    implementation files('libs/ffmpeg-kit-min-6.0-2.aar')
+    implementation files('libs/smart-exception-java-0.2.1.jar')
 
 
     testImplementation "junit:junit:$junitVersion"
