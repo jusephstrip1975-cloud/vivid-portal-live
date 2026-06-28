@@ -41,11 +41,47 @@ jobs:
         run: bash scripts/fetch-ffmpegkit.sh
 
       # ----- RELEASE APK (signed with committed stable keystore) -----
-      - name: Build signed release APK
+      - name: Build signed release APK (full diagnostics)
         working-directory: android
-        run: ./gradlew clean assembleRelease --no-daemon --stacktrace
+        shell: bash
+        run: |
+          set -x
+          rm -rf .gradle app/build
+          ./gradlew clean assembleRelease \
+            --no-daemon \
+            --stacktrace \
+            --info \
+            --warning-mode all 2>&1 | tee /tmp/gradle-release.log
+          STATUS=${PIPESTATUS[0]}
+          echo "===== GRADLE EXIT STATUS: $STATUS ====="
+          exit $STATUS
+
+      - name: Print build failure report (always)
+        if: always()
+        shell: bash
+        run: |
+          echo "===== KEY FAILURE LINES ====="
+          grep -nE "FAILURE:|What went wrong|Caused by|Execution failed|error:|\.java:[0-9]+:" /tmp/gradle-release.log | head -200 || true
+          echo "===== problems-report.html (text) ====="
+          for f in android/app/build/reports/problems/problems-report.html android/build/reports/problems/problems-report.html; do
+            if [ -f "$f" ]; then
+              echo "----- $f -----"
+              sed 's/<[^>]*>/ /g' "$f" | tr -s ' \n' | head -300
+            fi
+          done
+          echo "===== last 200 lines of gradle log ====="
+          tail -n 200 /tmp/gradle-release.log || true
+
+      - name: Upload full gradle log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-release-log
+          path: /tmp/gradle-release.log
+          if-no-files-found: warn
 
       - name: List release APK output
+        if: success()
         run: ls -la android/app/build/outputs/apk/release/
 
       - name: Verify native libs inside APK
