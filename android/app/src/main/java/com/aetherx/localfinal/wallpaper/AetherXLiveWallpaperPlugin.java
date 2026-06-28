@@ -36,6 +36,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String PREFS = "aetherx_live_wallpaper";
     public static final String KEY_VIDEO_PATH = "video_path";
     public static final String KEY_VIDEO_URI = "video_uri";
+    public static final String KEY_LAST_SERVICE_ERROR = "last_service_error";
+    public static final String KEY_LAST_NATIVE_EXCEPTION = "last_native_exception";
+    public static final String KEY_LAST_WALLPAPER_STEP = "last_wallpaper_step";
+    public static final String KEY_SERVICE_RUNNING = "service_running";
     private static final int MAX_REDIRECTS = 5;
 
     @PluginMethod
@@ -241,6 +245,56 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("sdk", Build.VERSION.SDK_INT);
         ret.put("reason", "ok");
         ret.put("message", "Live wallpaper service registered");
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void getDiagnostics(PluginCall call) {
+        JSObject ret = new JSObject();
+        Context ctx = getContext();
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+
+        String pkg = ctx.getPackageName();
+        String appVersion = "?";
+        long buildId = 0;
+        try {
+            android.content.pm.PackageInfo pi = ctx.getPackageManager().getPackageInfo(pkg, 0);
+            appVersion = pi.versionName + " (" + pi.versionCode + ")";
+            buildId = pi.lastUpdateTime;
+        } catch (Exception ignored) {}
+
+        String path = prefs.getString(KEY_VIDEO_PATH, null);
+        File f = path == null ? null : new File(path);
+        boolean exists = f != null && f.exists();
+        long size = exists ? f.length() : 0;
+        boolean canRead = f != null && f.canRead();
+
+        String engine = "MediaPlayer (RAW res/raw/testwallpaper.mp4)";
+
+        WallpaperManager wm = WallpaperManager.getInstance(ctx);
+        android.app.WallpaperInfo info = wm.getWallpaperInfo();
+        String currentPkg = info == null ? "(static wallpaper)" : info.getPackageName();
+        String wallpaperInfo = info == null ? "null" :
+            (info.getPackageName() + "/" + info.getServiceName());
+        boolean serviceRunning = info != null && pkg.equals(info.getPackageName());
+
+        ret.put("APP_VERSION", appVersion);
+        ret.put("BUILD_ID", String.valueOf(buildId));
+        ret.put("PACKAGE_NAME", pkg);
+        ret.put("VIDEO_PATH", path == null ? "(none)" : path);
+        ret.put("VIDEO_EXISTS", exists);
+        ret.put("VIDEO_SIZE", size);
+        ret.put("VIDEO_CAN_READ", canRead);
+        ret.put("PLAYER_ENGINE", engine);
+        ret.put("LAST_SERVICE_ERROR", prefs.getString(KEY_LAST_SERVICE_ERROR, "(none)"));
+        ret.put("LAST_NATIVE_EXCEPTION", prefs.getString(KEY_LAST_NATIVE_EXCEPTION, "(none)"));
+        ret.put("LAST_WALLPAPER_STEP", prefs.getString(KEY_LAST_WALLPAPER_STEP, "(none)"));
+        ret.put("SERVICE_RUNNING", serviceRunning);
+        ret.put("WALLPAPER_INFO", wallpaperInfo);
+        ret.put("CURRENT_WALLPAPER_PACKAGE", currentPkg);
+        ret.put("MANUFACTURER", Build.MANUFACTURER);
+        ret.put("MODEL", Build.MODEL);
+        ret.put("ANDROID_SDK", Build.VERSION.SDK_INT);
         call.resolve(ret);
     }
 

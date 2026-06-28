@@ -21,7 +21,26 @@ interface LiveWallpaperPlugin {
   openPicker(): Promise<{ opened: boolean }>;
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
   checkCompatibility(): Promise<CompatibilityResult>;
+  getDiagnostics(): Promise<Record<string, unknown>>;
 }
+
+export async function getSamsungDiagnostics(): Promise<string> {
+  if (!(await isNative())) return "DIAGNOSTIC unavailable: not native";
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (Capacitor.getPlatform() !== "android") return "DIAGNOSTIC unavailable: not android";
+    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    const data = await LiveWallpaper.getDiagnostics();
+    const lines = ["=== AETHERX SAMSUNG DIAGNOSTIC ==="];
+    for (const [k, v] of Object.entries(data)) lines.push(`${k}: ${v}`);
+    lines.push("=== ADB COMMAND ===");
+    lines.push("adb logcat -c && adb logcat -v time | grep -iE \"AetherXLiveWP|WallpaperService|WallpaperManager|MediaPlayer|MediaCodec|Surface|WindowManager|AndroidRuntime|SecurityException|IllegalStateException|setWallpaper|bindWallpaper\"");
+    return lines.join("\n");
+  } catch (err) {
+    return "DIAGNOSTIC error: " + String(err);
+  }
+}
+
 
 export interface CompatibilityResult {
   canApplyHome: boolean;

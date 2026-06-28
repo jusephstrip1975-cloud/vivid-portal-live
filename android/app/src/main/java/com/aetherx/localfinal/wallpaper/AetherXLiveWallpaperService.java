@@ -1,5 +1,7 @@
 package com.aetherx.localfinal.wallpaper;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -15,19 +17,36 @@ import android.view.SurfaceHolder;
 import com.aetherx.localfinal.R;
 
 /**
- * Samsung-hardened lifecycle build.
- * - Single MediaPlayer tied to Surface lifecycle.
- * - setFixedSize(720,1280) to satisfy Samsung wallpaper engine.
- * - Player only starts when Surface is valid AND prepared.
- * - Release ONLY on onSurfaceDestroyed/onDestroy, never on visibility=false.
+ * Samsung-hardened lifecycle build with diagnostics recording.
  */
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
 
+    private void recordStep(String step) {
+        Log.i(TAG, "STEP " + step);
+        try {
+            SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            p.edit().putString(AetherXLiveWallpaperPlugin.KEY_LAST_WALLPAPER_STEP,
+                System.currentTimeMillis() + " " + step).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private void recordError(String key, Throwable t) {
+        if (t == null) return;
+        Log.e(TAG, key, t);
+        try {
+            SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            String msg = t.getClass().getSimpleName() + ": " + t.getMessage();
+            p.edit().putString(key, System.currentTimeMillis() + " " + msg).apply();
+        } catch (Throwable ignored) {}
+    }
+
+
     @Override
     public Engine onCreateEngine() {
         Log.i(TAG, "ENGINE_CREATED");
+        recordStep("ENGINE_CREATED");
         return new RawVideoEngine();
     }
 
@@ -59,6 +78,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             Surface s = holder.getSurface();
             boolean valid = s != null && s.isValid();
             Log.i(TAG, "SURFACE_CREATED valid=" + valid);
+            recordStep("SURFACE_CREATED valid=" + valid);
             paintMessage("Cargando wallpaper...");
             if (valid) main.post(this::startRawPlayer);
         }
@@ -148,6 +168,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
                     Log.i(TAG, "MEDIAPLAYER_PREPARED");
+                    recordStep("MEDIAPLAYER_PREPARED");
                     try {
                         Surface cur = currentHolder != null ? currentHolder.getSurface() : null;
                         if (cur == null || !cur.isValid()) {
@@ -157,12 +178,19 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         mp.start();
                         Log.i(TAG, "MEDIAPLAYER_STARTED");
                         Log.i(TAG, "IS_PLAYING_TRUE=" + mp.isPlaying());
+                        recordStep("MEDIAPLAYER_STARTED isPlaying=" + mp.isPlaying());
                     } catch (Throwable t) {
-                        Log.e(TAG, "start() failed", t);
+                        recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
                     }
                 });
                 player.setOnErrorListener((mp, what, extra) -> {
-                    Log.e(TAG, "MEDIAPLAYER_ERROR what=" + what + " extra=" + extra);
+                    String msg = "MEDIAPLAYER_ERROR what=" + what + " extra=" + extra;
+                    Log.e(TAG, msg);
+                    try {
+                        SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                        p.edit().putString(AetherXLiveWallpaperPlugin.KEY_LAST_SERVICE_ERROR,
+                            System.currentTimeMillis() + " " + msg).apply();
+                    } catch (Throwable ignored) {}
                     paintMessage("Error " + what + "/" + extra);
                     return true;
                 });
@@ -174,7 +202,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player.prepareAsync();
                 Log.i(TAG, "prepareAsync issued");
             } catch (Throwable t) {
-                Log.e(TAG, "startRawPlayer failed", t);
+                recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
                 paintMessage("Fallo: " + t.getClass().getSimpleName());
             }
         }

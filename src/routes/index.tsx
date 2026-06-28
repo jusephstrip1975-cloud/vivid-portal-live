@@ -6,6 +6,7 @@ import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
 import {
   applyPickedVideo,
+  getSamsungDiagnostics,
   isNative,
   pickDeviceVideo,
   type PickedDeviceVideo,
@@ -37,10 +38,22 @@ function HomePage() {
   const [pickState, setPickState] = useState<"idle" | "loading" | "applying">("idle");
   const [pickToast, setPickToast] = useState<string | null>(null);
   const [preview, setPreview] = useState<PickedDeviceVideo | null>(null);
+  const [diag, setDiag] = useState<string | null>(null);
 
   function showToast(msg: string, ms = 2600) {
     setPickToast(msg);
     setTimeout(() => setPickToast(null), ms);
+  }
+
+  async function handleCopyDiagnostic() {
+    const text = await getSamsungDiagnostics();
+    setDiag(text);
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("✓ Diagnóstico copiado al portapapeles");
+    } catch {
+      showToast("Diagnóstico generado (copia manual abajo)");
+    }
   }
 
   async function handlePickDeviceVideo() {
@@ -178,6 +191,24 @@ function HomePage() {
           </div>
         )}
       </section>
+
+      {/* Samsung diagnostic */}
+      <section className="px-6 pt-3">
+        <button
+          type="button"
+          onClick={handleCopyDiagnostic}
+          className="w-full rounded-2xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-yellow-300 transition active:scale-[0.99]"
+        >
+          📋 Copiar diagnóstico Samsung
+        </button>
+        {diag && (
+          <pre className="mt-3 max-h-72 overflow-auto rounded-2xl border border-white/10 bg-black/60 p-3 text-[10px] leading-relaxed text-white/80 whitespace-pre-wrap break-words">
+{diag}
+          </pre>
+        )}
+      </section>
+
+
 
 
 
