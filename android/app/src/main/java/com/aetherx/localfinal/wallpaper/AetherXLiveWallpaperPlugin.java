@@ -169,29 +169,85 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private void openLivePicker(PluginCall call) {
+        ComponentName comp = new ComponentName(
+            getContext().getPackageName(),
+            AetherXLiveWallpaperService.class.getName()
+        );
+        String compStr = comp.flattenToShortString();
+        Log.i(TAG, "OPENING_WALLPAPER_COMPONENT=" + compStr);
+        persistStep("OPENING_WALLPAPER_COMPONENT=" + compStr);
+
+        // Verify the service is actually declared/resolvable in our manifest
         try {
-            File current = getCurrentVideo();
-            Log.i(TAG, "openLivePicker savedWallpaperVideo=" + (current == null ? "null" : current.getAbsolutePath())
-                + " exists=" + (current != null && current.exists())
-                + " size=" + (current == null ? -1 : current.length()));
-            ComponentName comp = new ComponentName(
-                getContext().getPackageName(),
-                AetherXLiveWallpaperService.class.getName()
-            );
+            android.content.pm.PackageManager pm = getContext().getPackageManager();
+            android.content.pm.ServiceInfo si = pm.getServiceInfo(comp, 0);
+            Log.i(TAG, "ServiceInfo OK name=" + si.name + " perm=" + si.permission);
+        } catch (Exception e) {
+            Log.e(TAG, "SERVICE_NOT_FOUND " + compStr, e);
+            persistError(KEY_LAST_NATIVE_EXCEPTION, "SERVICE_NOT_FOUND " + compStr + " :: " + e);
+        }
+
+        Activity activity = getActivity();
+
+        // Attempt 1: direct AetherX preview via ACTION_CHANGE_LIVE_WALLPAPER
+        try {
             Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
             intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, comp);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
+            if (activity != null) {
+                activity.startActivity(intent);
+            } else {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(intent);
+            }
             JSObject ret = new JSObject();
             ret.put("applied", false);
             ret.put("openedPicker", true);
             ret.put("needsConfirmation", true);
             ret.put("opened", true);
+            ret.put("component", compStr);
+            ret.put("via", "ACTION_CHANGE_LIVE_WALLPAPER");
+            call.resolve(ret);
+            return;
+        } catch (Exception e) {
+            Log.e(TAG, "ACTION_CHANGE_LIVE_WALLPAPER failed", e);
+            persistError(KEY_LAST_NATIVE_EXCEPTION, "ACTION_CHANGE_LIVE_WALLPAPER " + e);
+        }
+
+        // Attempt 2: generic live wallpaper chooser as fallback
+        try {
+            Intent intent = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
+            if (activity != null) {
+                activity.startActivity(intent);
+            } else {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(intent);
+            }
+            JSObject ret = new JSObject();
+            ret.put("applied", false);
+            ret.put("openedPicker", true);
+            ret.put("needsConfirmation", true);
+            ret.put("opened", true);
+            ret.put("via", "ACTION_LIVE_WALLPAPER_CHOOSER");
             call.resolve(ret);
         } catch (Exception e) {
             Log.e(TAG, "open-picker-failed", e);
+            persistError(KEY_LAST_NATIVE_EXCEPTION, "open-picker-failed " + e);
             call.reject("open-picker-failed: " + e.getMessage(), e);
         }
+    }
+
+    private void persistStep(String step) {
+        try {
+            SharedPreferences p = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            p.edit().putString(KEY_LAST_WALLPAPER_STEP, System.currentTimeMillis() + " " + step).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private void persistError(String key, String msg) {
+        try {
+            SharedPreferences p = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            p.edit().putString(key, System.currentTimeMillis() + " " + msg).apply();
+        } catch (Throwable ignored) {}
     }
 
     @PluginMethod
