@@ -41,15 +41,23 @@ jobs:
         run: bash scripts/fetch-ffmpegkit.sh
 
       # ----- DEBUG APK (always built — installable on any device) -----
-      - name: Build debug APK
+      - name: Build debug APK (universal, installable)
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload debug APK
+      - name: List debug APK output
+        run: ls -la android/app/build/outputs/apk/debug/
+
+      - name: Verify native libs inside APK
+        run: |
+          APK=android/app/build/outputs/apk/debug/AetherX-installable.apk
+          unzip -l "$APK" | grep -E "lib/(arm64-v8a|armeabi-v7a|x86|x86_64)/" | head -40 || echo "WARNING: no native libs found"
+
+      - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: AetherX-Local-Final-debug-apk
-          path: android/app/build/outputs/apk/debug/app-aetherx-localfinal-debug.apk
+          name: AetherX-installable-apk
+          path: android/app/build/outputs/apk/debug/AetherX-installable.apk
           if-no-files-found: error
 
       # ----- RELEASE APK (only if signing secrets are configured) -----

@@ -4,18 +4,52 @@ android {
     namespace = "com.aetherx.localfinal"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.aetherx.localfinal"
-        setProperty("archivesBaseName", "app-aetherx-localfinal")
+        // applicationId is the on-device package id (independent from Java namespace).
+        // Changed so Samsung installs as a fresh app (no signature clash with previous builds).
+        applicationId "com.aetherx.livewallpaper"
+        setProperty("archivesBaseName", "app-aetherx-livewallpaper")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 101
-        versionName "1.1-live-wallpaper"
+        versionCode 250
+        versionName "2.5-installable"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // Force a single universal APK that contains every native ABI.
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    // Explicitly disable ABI/density splits so CI always emits ONE universal APK.
+    splits {
+        abi { enable false }
+        density { enable false }
+    }
+
+    // Keep FFmpegKit .so libraries uncompressed and resolve duplicates from transitive deps.
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+            pickFirsts += [
+                'lib/armeabi-v7a/libc++_shared.so',
+                'lib/arm64-v8a/libc++_shared.so',
+                'lib/x86/libc++_shared.so',
+                'lib/x86_64/libc++_shared.so'
+            ]
+        }
+        resources {
+            excludes += ['META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/*.kotlin_module']
+        }
+    }
+
     buildTypes {
+        debug {
+            // Debug APK is signed with the Android debug key, installable on any device via `adb install -r`.
+            debuggable true
+            minifyEnabled false
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
@@ -32,7 +66,7 @@ repositories {
 androidComponents {
     onVariants(selector().withBuildType('debug')) { variant ->
         variant.outputs.each { output ->
-            output.outputFileName.set('app-aetherx-localfinal-debug.apk')
+            output.outputFileName.set('app-aetherx-livewallpaper-debug.apk')
         }
     }
 }
@@ -40,7 +74,7 @@ androidComponents {
 android.applicationVariants.all { variant ->
     if (variant.buildType.name == 'debug') {
         variant.outputs.all { output ->
-            outputFileName = 'app-aetherx-localfinal-debug.apk'
+            outputFileName = 'app-aetherx-livewallpaper-debug.apk'
         }
     }
 }
@@ -52,17 +86,11 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
 
-    // Media3 ExoPlayer for live wallpaper video rendering only.
     implementation "androidx.media3:media3-exoplayer:1.4.1"
     implementation "androidx.media3:media3-common:1.4.1"
 
-    // FFmpegKit min (LGPL) — vendored AAR + smart-exception jar.
-    // The AAR is downloaded into android/app/libs/ by the GitHub Actions workflow
-    // (or by scripts/fetch-ffmpegkit.sh locally) because Arthenica retired
-    // ffmpeg-kit from Maven Central in 2025.
     implementation files('libs/ffmpeg-kit-min-6.0-2.aar')
     implementation files('libs/smart-exception-java-0.2.1.jar')
-
 
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
@@ -100,35 +128,38 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
     }
 }
 
-tasks.register('copyAetherXLocalFinalDebugApk') {
+// After assembleDebug, copy the resulting universal APK to AetherX-installable.apk
+// so CI artifact and adb install commands use a single predictable filename.
+tasks.register('copyAetherXInstallableDebugApk') {
     doLast {
         def outputDir = file("$buildDir/outputs/apk/debug")
-        def expected = file("${outputDir}/app-aetherx-localfinal-debug.apk")
-        def defaultApk = file("${outputDir}/app-debug.apk")
+        def sourceApk = file("${outputDir}/app-aetherx-livewallpaper-debug.apk")
+        def fallbackApk = file("${outputDir}/app-debug.apk")
+        def installable = file("${outputDir}/AetherX-installable.apk")
 
-        if (expected.exists()) {
-            logger.lifecycle("AetherX Local Final debug APK already exists: ${expected}")
-            return
-        }
-        if (!defaultApk.exists()) {
-            throw new GradleException("Neither ${expected.name} nor ${defaultApk.name} exists in ${outputDir}")
+        def src = sourceApk.exists() ? sourceApk : fallbackApk
+        if (!src.exists()) {
+            throw new GradleException("No debug APK found in ${outputDir}. Looked for ${sourceApk.name} and ${fallbackApk.name}.")
         }
         outputDir.mkdirs()
-        expected.bytes = defaultApk.bytes
-        if (!expected.exists()) {
-            throw new GradleException("Failed to create final debug APK: ${expected}")
+        if (!sourceApk.exists()) {
+            sourceApk.bytes = src.bytes
         }
-        logger.lifecycle("Copied ${defaultApk.name} to ${expected.name}")
+        installable.bytes = src.bytes
+        if (!installable.exists() || installable.length() == 0) {
+            throw new GradleException("Failed to create ${installable}")
+        }
+        logger.lifecycle("Universal installable APK ready: ${installable} (${installable.length()} bytes)")
     }
 }
 
-tasks.register('verifyAetherXFinalDebugApk') {
+tasks.register('verifyAetherXInstallableApk') {
     doLast {
-        def expected = file("$buildDir/outputs/apk/debug/app-aetherx-localfinal-debug.apk")
-        if (!expected.exists()) {
-            throw new GradleException("Expected debug APK was not generated: ${expected}")
+        def installable = file("$buildDir/outputs/apk/debug/AetherX-installable.apk")
+        if (!installable.exists()) {
+            throw new GradleException("AetherX-installable.apk was not generated: ${installable}")
         }
-        logger.lifecycle("AetherX Local Final debug APK generated: ${expected}")
+        logger.lifecycle("Verified AetherX-installable.apk: ${installable}")
     }
 }
 
@@ -138,12 +169,12 @@ tasks.named('preBuild') {
 
 afterEvaluate {
     tasks.matching { task -> task.name == 'assembleDebug' }.configureEach {
-        finalizedBy tasks.named('copyAetherXLocalFinalDebugApk')
+        finalizedBy tasks.named('copyAetherXInstallableDebugApk')
     }
-    tasks.named('verifyAetherXFinalDebugApk') {
-        mustRunAfter tasks.named('copyAetherXLocalFinalDebugApk')
+    tasks.named('verifyAetherXInstallableApk') {
+        mustRunAfter tasks.named('copyAetherXInstallableDebugApk')
     }
-    tasks.named('copyAetherXLocalFinalDebugApk') {
-        finalizedBy tasks.named('verifyAetherXFinalDebugApk')
+    tasks.named('copyAetherXInstallableDebugApk') {
+        finalizedBy tasks.named('verifyAetherXInstallableApk')
     }
 }
