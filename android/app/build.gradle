@@ -56,8 +56,8 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer:1.4.1"
     implementation "androidx.media3:media3-common:1.4.1"
 
-    // FFmpegKit full (LGPL) — includes libx264 via the full distribution.
-    implementation "com.arthenica:ffmpeg-kit-full:6.0-2"
+    // FFmpegKit min (LGPL) — includes libx264 for H.264 baseline encode.
+    implementation "com.arthenica:ffmpeg-kit-min:6.0-2"
 
 
     testImplementation "junit:junit:$junitVersion"
