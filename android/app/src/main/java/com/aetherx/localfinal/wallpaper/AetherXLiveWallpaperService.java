@@ -1,59 +1,42 @@
 package com.aetherx.localfinal.wallpaper;
 
-import android.content.Context;
-import android.content.SharedPreferences;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.media.MediaPlayer;
-import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
+import com.aetherx.localfinal.R;
 
-import androidx.annotation.OptIn;
-import androidx.media3.common.AudioAttributes;
-import androidx.media3.common.C;
-import androidx.media3.common.MediaItem;
-import androidx.media3.common.PlaybackException;
-import androidx.media3.common.Player;
-import androidx.media3.common.VideoSize;
-import androidx.media3.common.util.UnstableApi;
-import androidx.media3.exoplayer.DefaultRenderersFactory;
-import androidx.media3.exoplayer.ExoPlayer;
-
-import java.io.File;
-
+/**
+ * Samsung OEM diagnostic build:
+ * - No ExoPlayer, no Media3, no Transformer.
+ * - No downloads, no FFmpeg, no cache/files dir, no external Uri.
+ * - Plays exclusively res/raw/testwallpaper.mp4 via MediaPlayer + SurfaceHolder.
+ */
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
 
     @Override
     public Engine onCreateEngine() {
-        Log.i(TAG, "onCreateEngine");
-        return new VideoEngine();
+        Log.i(TAG, "ENGINE_CREATED");
+        return new RawVideoEngine();
     }
 
-    @OptIn(markerClass = UnstableApi.class)
-    private class VideoEngine extends Engine {
-
-        private ExoPlayer player;
-        private MediaPlayer fallbackPlayer;
-        private Uri lastUri;
+    private class RawVideoEngine extends Engine {
+        private MediaPlayer player;
         private SurfaceHolder currentHolder;
-        private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
 
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
             super.onCreate(surfaceHolder);
-            Log.i(TAG, "Engine.onCreate");
             setOffsetNotificationsEnabled(false);
             setTouchEventsEnabled(false);
         }
@@ -62,261 +45,100 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         public void onSurfaceCreated(SurfaceHolder holder) {
             super.onSurfaceCreated(holder);
             currentHolder = holder;
-            Surface s = holder.getSurface();
-            Log.i(TAG, "onSurfaceCreated surfaceValid=" + (s != null && s.isValid()));
-            paintLoading("Cargando vídeo...");
-            main.post(this::startPlayer);
+            Log.i(TAG, "SURFACE_CREATED valid=" + (holder.getSurface() != null && holder.getSurface().isValid()));
+            paintMessage("Cargando RAW test...");
+            main.post(this::startRawPlayer);
         }
 
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
             currentHolder = holder;
-            Log.i(TAG, "onSurfaceChanged " + width + "x" + height + " format=" + format);
-            main.post(() -> {
-                if (player == null) {
-                    startPlayer();
-                } else {
-                    try {
-                        player.setVideoSurface(holder.getSurface());
-                    } catch (Throwable t) {
-                        Log.e(TAG, "setVideoSurface on change failed", t);
-                    }
-                }
-            });
+            Log.i(TAG, "SURFACE_CHANGED " + width + "x" + height);
+            if (player == null) main.post(this::startRawPlayer);
+            else {
+                try { player.setSurface(holder.getSurface()); } catch (Throwable ignored) {}
+            }
         }
 
         @Override
         public void onVisibilityChanged(boolean v) {
             super.onVisibilityChanged(v);
-            visible = v;
-            Log.i(TAG, "onVisibilityChanged visible=" + v + " player=" + (player != null));
+            Log.i(TAG, "VISIBILITY=" + v);
             main.post(() -> {
-                if (player == null && fallbackPlayer == null) {
-                    if (v) startPlayer();
+                if (player == null) {
+                    if (v) startRawPlayer();
                     return;
                 }
                 try {
-                    if (v) {
-                        if (player != null) { player.setPlayWhenReady(true); player.play(); }
-                        if (fallbackPlayer != null) fallbackPlayer.start();
-                    } else {
-                        if (player != null) { player.setPlayWhenReady(false); player.pause(); }
-                        if (fallbackPlayer != null && fallbackPlayer.isPlaying()) fallbackPlayer.pause();
-                    }
-                } catch (Throwable ignored) {}
+                    if (v) { player.start(); Log.i(TAG, "IS_PLAYING_TRUE=" + player.isPlaying()); }
+                    else if (player.isPlaying()) player.pause();
+                } catch (Throwable t) { Log.e(TAG, "visibility toggle failed", t); }
             });
         }
 
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
-            Log.i(TAG, "onSurfaceDestroyed");
-            main.post(this::releasePlayer);
+            Log.i(TAG, "SURFACE_DESTROYED");
+            main.post(this::release);
             super.onSurfaceDestroyed(holder);
         }
 
         @Override
         public void onDestroy() {
-            Log.i(TAG, "Engine.onDestroy");
-            main.post(this::releasePlayer);
+            Log.i(TAG, "ENGINE_DESTROYED");
+            main.post(this::release);
             super.onDestroy();
         }
 
-        private void startPlayer() {
+        private void startRawPlayer() {
             try {
-                releasePlayer();
+                release();
                 if (currentHolder == null || currentHolder.getSurface() == null
                         || !currentHolder.getSurface().isValid()) {
-                    Log.w(TAG, "startPlayer: surface not valid yet");
+                    Log.w(TAG, "startRawPlayer: surface not valid");
                     return;
                 }
 
-                SharedPreferences prefs = getApplicationContext()
-                        .getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
-                String path = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
-                String savedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
-                Log.i(TAG, "startPlayer savedWallpaperVideo=" + path + " savedUri=" + savedUri);
-
-                File convertedOutput = new File(getApplicationContext().getFilesDir(), "wallpapers/converted/output.mp4");
-                if (convertedOutput.exists() && convertedOutput.length() > 0 && convertedOutput.canRead()) {
-                    path = convertedOutput.getAbsolutePath();
-                    Log.i(TAG, "Using mandatory converted output.mp4 path=" + path
-                        + " size=" + convertedOutput.length());
-                } else {
-                    Log.w(TAG, "Converted output.mp4 missing; refusing to play original unsupported video");
-                    paintMessage("Guarda el vídeo otra vez en la app");
+                AssetFileDescriptor afd = getResources().openRawResourceFd(R.raw.testwallpaper);
+                if (afd == null) {
+                    Log.e(TAG, "openRawResourceFd returned null for R.raw.testwallpaper");
+                    paintMessage("RAW no encontrado");
                     return;
                 }
+                Log.i(TAG, "RAW afd length=" + afd.getLength() + " start=" + afd.getStartOffset());
 
-                Uri uri = null;
-                long sizeForLog = -1;
+                player = new MediaPlayer();
+                player.setSurface(currentHolder.getSurface());
+                player.setLooping(true);
+                try { player.setVolume(0f, 0f); } catch (Throwable ignored) {}
 
-                if (path != null) {
-                    File f = new File(path);
-                    boolean exists = f.exists();
-                    boolean canRead = f.canRead();
-                    sizeForLog = exists ? f.length() : -1;
-                    Log.i(TAG, "File exists=" + exists + " canRead=" + canRead + " size=" + sizeForLog
-                        + " path=" + path);
-                    if (exists && sizeForLog > 0) {
-                        // Verify we can actually open it
-                        try (android.os.ParcelFileDescriptor pfd =
-                                 android.os.ParcelFileDescriptor.open(f, android.os.ParcelFileDescriptor.MODE_READ_ONLY)) {
-                            Log.i(TAG, "ContentResolver openFileDescriptor (file) ok fd=" + (pfd != null));
-                            uri = Uri.fromFile(f);
-                        } catch (Exception e) {
-                            Log.w(TAG, "openFileDescriptor on file path failed: " + e.getMessage());
-                        }
-                    }
-                }
-                if (uri == null) {
-                    paintMessage("Vídeo convertido no encontrado");
-                    return;
-                }
-
-                Log.i(TAG, "ExoPlayer media item=" + uri + " size=" + sizeForLog);
-                lastUri = uri;
-
-                DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(getApplicationContext())
-                    .setEnableDecoderFallback(true);
-                player = new ExoPlayer.Builder(getApplicationContext(), renderersFactory).build();
-                player.setRepeatMode(Player.REPEAT_MODE_ALL);
-                player.setVolume(0f);
-                player.setAudioAttributes(
-                        new AudioAttributes.Builder().setUsage(C.USAGE_UNKNOWN).build(),
-                        false);
-                player.setVideoSurface(currentHolder.getSurface());
-                player.addListener(new Player.Listener() {
-                    @Override
-                    public void onPlaybackStateChanged(int state) {
-                        Log.i(TAG, "ExoPlayer state=" + state);
-                    }
-
-                    @Override
-                    public void onPlayerError(PlaybackException error) {
-                        Log.e(TAG, "ExoPlayer error code=" + error.errorCode
-                                + " name=" + error.getErrorCodeName(), error);
-                        Log.i(TAG, "Falling back to native MediaPlayer due to ExoPlayer failure");
-                        main.post(() -> startMediaPlayerFallback(lastUri));
-                    }
-
-                    @Override
-                    public void onRenderedFirstFrame() {
-                        Log.i(TAG, "ExoPlayer onRenderedFirstFrame");
-                    }
-
-                    @Override
-                    public void onVideoSizeChanged(VideoSize videoSize) {
-                        Log.i(TAG, "ExoPlayer videoSize " + videoSize.width + "x" + videoSize.height);
+                player.setOnPreparedListener(mp -> {
+                    Log.i(TAG, "MEDIAPLAYER_PREPARED");
+                    try {
+                        mp.start();
+                        Log.i(TAG, "MEDIAPLAYER_STARTED");
+                        Log.i(TAG, "IS_PLAYING_TRUE=" + mp.isPlaying());
+                    } catch (Throwable t) {
+                        Log.e(TAG, "start() failed", t);
                     }
                 });
-                player.setMediaItem(MediaItem.fromUri(uri));
-                player.prepare();
-                player.setPlayWhenReady(true);
-                player.play();
-                Log.i(TAG, "ExoPlayer.prepare+play issued");
+                player.setOnErrorListener((mp, what, extra) -> {
+                    Log.e(TAG, "MEDIAPLAYER_ERROR what=" + what + " extra=" + extra);
+                    paintMessage("Error MediaPlayer " + what + "/" + extra);
+                    return true;
+                });
+                player.setOnVideoSizeChangedListener((mp, w, h) ->
+                        Log.i(TAG, "VIDEO_SIZE " + w + "x" + h));
+
+                player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+                afd.close();
+                player.prepareAsync();
+                Log.i(TAG, "prepareAsync issued");
             } catch (Throwable t) {
-                Log.e(TAG, "startPlayer failed, trying MediaPlayer fallback", t);
-                startMediaPlayerFallback(lastUri);
+                Log.e(TAG, "startRawPlayer failed", t);
+                paintMessage("Fallo RAW: " + t.getClass().getSimpleName());
             }
-        }
-
-        private void startMediaPlayerFallback(Uri uri) {
-            // Full reset/release before attempting any prepare
-            releasePlayer();
-            if (uri == null) {
-                Log.w(TAG, "MediaPlayer fallback: uri is null");
-                paintMessage("Vídeo no disponible");
-                return;
-            }
-            if (currentHolder == null || currentHolder.getSurface() == null
-                    || !currentHolder.getSurface().isValid()) {
-                Log.w(TAG, "MediaPlayer fallback: surface not valid yet");
-                return;
-            }
-
-            // Resolve a File from the uri so we can try FileDescriptor first
-            File file = null;
-            try {
-                if ("file".equalsIgnoreCase(uri.getScheme()) && uri.getPath() != null) {
-                    file = new File(uri.getPath());
-                }
-            } catch (Throwable t) {
-                Log.e(TAG, "MediaPlayer fallback: failed to resolve file from uri " + uri, t);
-            }
-
-            Log.i(TAG, "MediaPlayer fallback start uri=" + uri
-                    + " file=" + (file == null ? "null" : file.getAbsolutePath())
-                    + " exists=" + (file != null && file.exists())
-                    + " canRead=" + (file != null && file.canRead())
-                    + " size=" + (file != null && file.exists() ? file.length() : -1));
-
-            // Attempt #1: FileDescriptor via FileInputStream.getFD()
-            if (file != null && file.exists() && file.canRead() && file.length() > 0) {
-                FileInputStream fis = null;
-                try {
-                    fallbackPlayer = newConfiguredMediaPlayer();
-                    fis = new FileInputStream(file);
-                    FileDescriptor fd = fis.getFD();
-                    fallbackPlayer.setDataSource(fd);
-                    fallbackPlayer.prepareAsync();
-                    Log.i(TAG, "MediaPlayer setDataSource(FileDescriptor) ok, prepareAsync issued");
-                    return;
-                } catch (Throwable t) {
-                    Log.e(TAG, "MediaPlayer setDataSource(FileDescriptor) failed; will try Uri fallback", t);
-                    releasePlayer();
-                } finally {
-                    if (fis != null) {
-                        try { fis.close(); } catch (Throwable ignored) {}
-                    }
-                }
-            }
-
-            // Attempt #2: setDataSource(Context, Uri)
-            try {
-                fallbackPlayer = newConfiguredMediaPlayer();
-                fallbackPlayer.setDataSource(getApplicationContext(), uri);
-                fallbackPlayer.prepareAsync();
-                Log.i(TAG, "MediaPlayer setDataSource(Context, Uri) ok, prepareAsync issued");
-            } catch (Throwable t) {
-                Log.e(TAG, "MediaPlayer setDataSource(Context, Uri) failed: "
-                        + (t.getMessage() == null ? t.getClass().getName() : t.getMessage()), t);
-                releasePlayer();
-                paintMessage("Vídeo no soportado por el dispositivo");
-            }
-        }
-
-        private MediaPlayer newConfiguredMediaPlayer() {
-            MediaPlayer mp = new MediaPlayer();
-            try {
-                mp.setSurface(currentHolder.getSurface());
-            } catch (Throwable t) {
-                Log.e(TAG, "MediaPlayer setSurface failed", t);
-            }
-            mp.setLooping(true);
-            try { mp.setVolume(0f, 0f); } catch (Throwable ignored) {}
-            mp.setOnErrorListener((p, what, extra) -> {
-                Log.e(TAG, "MediaPlayer onError what=" + what + " extra=" + extra
-                        + " (see logcat above for stacktrace if any)");
-                paintMessage("Vídeo no soportado por el dispositivo");
-                return true;
-            });
-            mp.setOnPreparedListener(p -> {
-                Log.i(TAG, "MediaPlayer prepared, starting playback");
-                try {
-                    p.start();
-                } catch (Throwable t) {
-                    Log.e(TAG, "MediaPlayer start() failed", t);
-                }
-            });
-            mp.setOnVideoSizeChangedListener((p, w, h) ->
-                    Log.i(TAG, "MediaPlayer videoSize " + w + "x" + h));
-            return mp;
-        }
-
-
-        private void paintLoading(String text) {
-            paintMessage(text);
         }
 
         private void paintMessage(String text) {
@@ -331,27 +153,14 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 p.setTextSize(36f);
                 c.drawText(text == null ? "" : text, 40f, c.getHeight() / 2f, p);
                 currentHolder.unlockCanvasAndPost(c);
-            } catch (Throwable ignored) {
-            }
+            } catch (Throwable ignored) {}
         }
 
-        private void releasePlayer() {
+        private void release() {
             if (player != null) {
-                try {
-                    player.stop();
-                    player.clearVideoSurface();
-                    player.release();
-                } catch (Throwable ignored) {
-                }
+                try { if (player.isPlaying()) player.stop(); } catch (Throwable ignored) {}
+                try { player.release(); } catch (Throwable ignored) {}
                 player = null;
-            }
-            if (fallbackPlayer != null) {
-                try {
-                    if (fallbackPlayer.isPlaying()) fallbackPlayer.stop();
-                    fallbackPlayer.release();
-                } catch (Throwable ignored) {
-                }
-                fallbackPlayer = null;
             }
         }
     }
