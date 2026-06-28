@@ -1,4 +1,4 @@
-package com.aetherx.localfinal;
+package com.aetherx.livewallpaper;
 
 import android.os.Bundle;
 

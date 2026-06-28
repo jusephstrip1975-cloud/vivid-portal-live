@@ -28,8 +28,8 @@ bunx cap sync android
 # 4. Enforce native MainActivity and package id.
 echo ""
 echo "🧩  Step 4/5: Locking native local-final Android project..."
-node scripts/lock-android-local-final.mjs
-echo "    ✓ package/applicationId: com.aetherx.localfinal"
+node scripts/lock-android-livewallpaper.mjs
+echo "    ✓ package/applicationId: com.aetherx.livewallpaper"
 echo "    ✓ app_name: AetherX Local Final"
 echo "    ✓ pantalla nativa local sin navegador externo."
 
@@ -41,7 +41,7 @@ echo "    cd android"
 echo "    ./gradlew clean assembleDebug      # Linux/macOS"
 echo "    .\\gradlew.bat clean assembleDebug  # Windows"
 echo ""
-echo "    El APK quedará en android/app/build/outputs/apk/debug/app-aetherx-localfinal-debug.apk"
+echo "    El APK quedará en android/app/build/outputs/apk/debug/AetherX-release-signed-debug.apk"
 echo ""
 echo "    O abre Android Studio con: bunx cap open android"
 echo "=========================================="
