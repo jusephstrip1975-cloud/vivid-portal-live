@@ -46,6 +46,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
     @Override
     public Engine onCreateEngine() {
         Log.i(TAG, "ENGINE_CREATED");
+        recordStep("ENGINE_CREATED");
         return new RawVideoEngine();
     }
 
