@@ -168,6 +168,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
                     Log.i(TAG, "MEDIAPLAYER_PREPARED");
+                    recordStep("MEDIAPLAYER_PREPARED");
                     try {
                         Surface cur = currentHolder != null ? currentHolder.getSurface() : null;
                         if (cur == null || !cur.isValid()) {
@@ -177,12 +178,19 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         mp.start();
                         Log.i(TAG, "MEDIAPLAYER_STARTED");
                         Log.i(TAG, "IS_PLAYING_TRUE=" + mp.isPlaying());
+                        recordStep("MEDIAPLAYER_STARTED isPlaying=" + mp.isPlaying());
                     } catch (Throwable t) {
-                        Log.e(TAG, "start() failed", t);
+                        recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
                     }
                 });
                 player.setOnErrorListener((mp, what, extra) -> {
-                    Log.e(TAG, "MEDIAPLAYER_ERROR what=" + what + " extra=" + extra);
+                    String msg = "MEDIAPLAYER_ERROR what=" + what + " extra=" + extra;
+                    Log.e(TAG, msg);
+                    try {
+                        SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                        p.edit().putString(AetherXLiveWallpaperPlugin.KEY_LAST_SERVICE_ERROR,
+                            System.currentTimeMillis() + " " + msg).apply();
+                    } catch (Throwable ignored) {}
                     paintMessage("Error " + what + "/" + extra);
                     return true;
                 });
