@@ -9,15 +9,17 @@ import android.os.Handler;
 import android.os.Looper;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 
 import com.aetherx.localfinal.R;
 
 /**
- * Samsung OEM diagnostic build:
- * - No ExoPlayer, no Media3, no Transformer.
- * - No downloads, no FFmpeg, no cache/files dir, no external Uri.
- * - Plays exclusively res/raw/testwallpaper.mp4 via MediaPlayer + SurfaceHolder.
+ * Samsung-hardened lifecycle build.
+ * - Single MediaPlayer tied to Surface lifecycle.
+ * - setFixedSize(720,1280) to satisfy Samsung wallpaper engine.
+ * - Player only starts when Surface is valid AND prepared.
+ * - Release ONLY on onSurfaceDestroyed/onDestroy, never on visibility=false.
  */
 public class AetherXLiveWallpaperService extends WallpaperService {
 
@@ -32,6 +34,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
     private class RawVideoEngine extends Engine {
         private MediaPlayer player;
         private SurfaceHolder currentHolder;
+        private boolean prepared = false;
+        private boolean visible = false;
         private final Handler main = new Handler(Looper.getMainLooper());
 
         @Override
@@ -39,15 +43,24 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             super.onCreate(surfaceHolder);
             setOffsetNotificationsEnabled(false);
             setTouchEventsEnabled(false);
+            try {
+                // Samsung wallpaper engine prefers a fixed surface size.
+                surfaceHolder.setFixedSize(720, 1280);
+            } catch (Throwable t) {
+                Log.w(TAG, "setFixedSize failed", t);
+            }
+            Log.i(TAG, "ENGINE_ONCREATE");
         }
 
         @Override
         public void onSurfaceCreated(SurfaceHolder holder) {
             super.onSurfaceCreated(holder);
             currentHolder = holder;
-            Log.i(TAG, "SURFACE_CREATED valid=" + (holder.getSurface() != null && holder.getSurface().isValid()));
-            paintMessage("Cargando RAW test...");
-            main.post(this::startRawPlayer);
+            Surface s = holder.getSurface();
+            boolean valid = s != null && s.isValid();
+            Log.i(TAG, "SURFACE_CREATED valid=" + valid);
+            paintMessage("Cargando wallpaper...");
+            if (valid) main.post(this::startRawPlayer);
         }
 
         @Override
@@ -55,25 +68,40 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             super.onSurfaceChanged(holder, format, width, height);
             currentHolder = holder;
             Log.i(TAG, "SURFACE_CHANGED " + width + "x" + height);
-            if (player == null) main.post(this::startRawPlayer);
-            else {
-                try { player.setSurface(holder.getSurface()); } catch (Throwable ignored) {}
-            }
+            main.post(() -> {
+                if (player == null) {
+                    startRawPlayer();
+                } else {
+                    try {
+                        player.setSurface(holder.getSurface());
+                        if (prepared && visible && !player.isPlaying()) {
+                            player.start();
+                            Log.i(TAG, "IS_PLAYING_TRUE=" + player.isPlaying());
+                        }
+                    } catch (Throwable t) {
+                        Log.e(TAG, "setSurface failed", t);
+                    }
+                }
+            });
         }
 
         @Override
         public void onVisibilityChanged(boolean v) {
             super.onVisibilityChanged(v);
+            visible = v;
             Log.i(TAG, "VISIBILITY=" + v);
             main.post(() -> {
-                if (player == null) {
-                    if (v) startRawPlayer();
-                    return;
-                }
+                if (player == null || !prepared) return;
                 try {
-                    if (v) { player.start(); Log.i(TAG, "IS_PLAYING_TRUE=" + player.isPlaying()); }
-                    else if (player.isPlaying()) player.pause();
-                } catch (Throwable t) { Log.e(TAG, "visibility toggle failed", t); }
+                    if (v && !player.isPlaying()) {
+                        player.start();
+                        Log.i(TAG, "IS_PLAYING_TRUE=" + player.isPlaying());
+                    } else if (!v && player.isPlaying()) {
+                        player.pause();
+                    }
+                } catch (Throwable t) {
+                    Log.e(TAG, "visibility toggle failed", t);
+                }
             });
         }
 
@@ -94,28 +122,38 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private void startRawPlayer() {
             try {
                 release();
-                if (currentHolder == null || currentHolder.getSurface() == null
-                        || !currentHolder.getSurface().isValid()) {
-                    Log.w(TAG, "startRawPlayer: surface not valid");
+                if (currentHolder == null) {
+                    Log.w(TAG, "startRawPlayer: no holder");
+                    return;
+                }
+                Surface surface = currentHolder.getSurface();
+                if (surface == null || !surface.isValid()) {
+                    Log.w(TAG, "startRawPlayer: surface invalid, skipping");
                     return;
                 }
 
                 AssetFileDescriptor afd = getResources().openRawResourceFd(R.raw.testwallpaper);
                 if (afd == null) {
-                    Log.e(TAG, "openRawResourceFd returned null for R.raw.testwallpaper");
+                    Log.e(TAG, "openRawResourceFd null");
                     paintMessage("RAW no encontrado");
                     return;
                 }
-                Log.i(TAG, "RAW afd length=" + afd.getLength() + " start=" + afd.getStartOffset());
+                Log.i(TAG, "RAW afd length=" + afd.getLength());
 
                 player = new MediaPlayer();
-                player.setSurface(currentHolder.getSurface());
+                player.setSurface(surface);
                 player.setLooping(true);
                 try { player.setVolume(0f, 0f); } catch (Throwable ignored) {}
 
                 player.setOnPreparedListener(mp -> {
+                    prepared = true;
                     Log.i(TAG, "MEDIAPLAYER_PREPARED");
                     try {
+                        Surface cur = currentHolder != null ? currentHolder.getSurface() : null;
+                        if (cur == null || !cur.isValid()) {
+                            Log.w(TAG, "Prepared but surface invalid, deferring");
+                            return;
+                        }
                         mp.start();
                         Log.i(TAG, "MEDIAPLAYER_STARTED");
                         Log.i(TAG, "IS_PLAYING_TRUE=" + mp.isPlaying());
@@ -125,7 +163,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 });
                 player.setOnErrorListener((mp, what, extra) -> {
                     Log.e(TAG, "MEDIAPLAYER_ERROR what=" + what + " extra=" + extra);
-                    paintMessage("Error MediaPlayer " + what + "/" + extra);
+                    paintMessage("Error " + what + "/" + extra);
                     return true;
                 });
                 player.setOnVideoSizeChangedListener((mp, w, h) ->
@@ -137,13 +175,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 Log.i(TAG, "prepareAsync issued");
             } catch (Throwable t) {
                 Log.e(TAG, "startRawPlayer failed", t);
-                paintMessage("Fallo RAW: " + t.getClass().getSimpleName());
+                paintMessage("Fallo: " + t.getClass().getSimpleName());
             }
         }
 
         private void paintMessage(String text) {
             try {
                 if (currentHolder == null) return;
+                Surface s = currentHolder.getSurface();
+                if (s == null || !s.isValid()) return;
                 Canvas c = currentHolder.lockCanvas();
                 if (c == null) return;
                 c.drawColor(Color.BLACK);
@@ -157,8 +197,10 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         }
 
         private void release() {
+            prepared = false;
             if (player != null) {
                 try { if (player.isPlaying()) player.stop(); } catch (Throwable ignored) {}
+                try { player.reset(); } catch (Throwable ignored) {}
                 try { player.release(); } catch (Throwable ignored) {}
                 player = null;
             }
