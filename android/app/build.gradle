@@ -52,13 +52,12 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
 
-    // Media3 ExoPlayer for live wallpaper video rendering
+    // Media3 ExoPlayer for live wallpaper video rendering only.
     implementation "androidx.media3:media3-exoplayer:1.4.1"
     implementation "androidx.media3:media3-common:1.4.1"
-    // Media3 Transformer for transcoding to Samsung-compatible H.264/AAC (no FFmpeg)
-    implementation "androidx.media3:media3-transformer:1.4.1"
-    implementation "androidx.media3:media3-effect:1.4.1"
-    implementation "androidx.media3:media3-muxer:1.4.1"
+
+    // FFmpegKit GPL is required because the final wallpaper transcode MUST use libx264.
+    implementation "com.arthenica:ffmpeg-kit-full-gpl:6.0-2"
 
 
     testImplementation "junit:junit:$junitVersion"
