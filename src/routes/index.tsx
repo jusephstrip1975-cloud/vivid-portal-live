@@ -6,6 +6,7 @@ import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
 import {
   applyPickedVideo,
+  getSamsungDiagnostics,
   isNative,
   pickDeviceVideo,
   type PickedDeviceVideo,
