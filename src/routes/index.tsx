@@ -38,10 +38,22 @@ function HomePage() {
   const [pickState, setPickState] = useState<"idle" | "loading" | "applying">("idle");
   const [pickToast, setPickToast] = useState<string | null>(null);
   const [preview, setPreview] = useState<PickedDeviceVideo | null>(null);
+  const [diag, setDiag] = useState<string | null>(null);
 
   function showToast(msg: string, ms = 2600) {
     setPickToast(msg);
     setTimeout(() => setPickToast(null), ms);
+  }
+
+  async function handleCopyDiagnostic() {
+    const text = await getSamsungDiagnostics();
+    setDiag(text);
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("✓ Diagnóstico copiado al portapapeles");
+    } catch {
+      showToast("Diagnóstico generado (copia manual abajo)");
+    }
   }
 
   async function handlePickDeviceVideo() {
