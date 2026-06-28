@@ -28,7 +28,7 @@ bunx cap sync android
 # 4. Enforce native MainActivity and package id.
 echo ""
 echo "🧩  Step 4/5: Locking native local-final Android project..."
-node scripts/lock-android-local-final.mjs
+node scripts/lock-android-livewallpaper.mjs
 echo "    ✓ package/applicationId: com.aetherx.localfinal"
 echo "    ✓ app_name: AetherX Local Final"
 echo "    ✓ pantalla nativa local sin navegador externo."

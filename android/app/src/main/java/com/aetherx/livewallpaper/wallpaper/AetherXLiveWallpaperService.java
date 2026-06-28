@@ -14,7 +14,7 @@ import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 
-import com.aetherx.localfinal.R;
+import com.aetherx.livewallpaper.R;
 
 /**
  * Samsung One UI hardened WallpaperService.
