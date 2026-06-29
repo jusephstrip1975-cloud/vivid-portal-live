@@ -1,15 +1,15 @@
 {
-  "appId": "com.aetherx.livewallpaper",
-  "appName": "AetherX Live Wallpaper",
-  "webDir": "public/dist",
-  "backgroundColor": "#000000",
-  "android": {
-    "backgroundColor": "#000000",
-    "allowMixedContent": true,
-    "webContentsDebuggingEnabled": true
-  },
-  "ios": {
-    "backgroundColor": "#000000",
-    "contentInset": "always"
-  }
+	"appId": "com.aetherx.livewallpaper",
+	"appName": "AetherX Live Wallpaper",
+	"webDir": "public/dist",
+	"backgroundColor": "#000000",
+	"android": {
+		"backgroundColor": "#000000",
+		"allowMixedContent": true,
+		"webContentsDebuggingEnabled": true
+	},
+	"ios": {
+		"backgroundColor": "#000000",
+		"contentInset": "always"
+	}
 }
