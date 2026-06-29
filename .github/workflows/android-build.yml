@@ -37,8 +37,7 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Fetch vendored FFmpegKit AAR (retired from Maven)
-        run: bash scripts/fetch-ffmpegkit.sh
+      # FFmpegKit removed — RAW wallpaper plays directly via MediaPlayer, no transcode.
 
       # ----- RELEASE APK (signed with committed stable keystore) -----
       - name: Build signed release APK (full diagnostics)
