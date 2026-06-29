@@ -280,6 +280,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("LAST_SERVICE_ERROR", prefs.getString(KEY_LAST_SERVICE_ERROR, "(none)"));
         ret.put("LAST_NATIVE_EXCEPTION", prefs.getString(KEY_LAST_NATIVE_EXCEPTION, "(none)"));
         ret.put("LAST_WALLPAPER_STEP", prefs.getString(KEY_LAST_WALLPAPER_STEP, "(none)"));
+        ret.put("LAST_SERVICE_EVENT", prefs.getString(KEY_LAST_SERVICE_EVENT, "(none)"));
+        ret.put("LAST_ENGINE_EVENT", prefs.getString(KEY_LAST_ENGINE_EVENT, "(none)"));
+        ret.put("LAST_SURFACE_EVENT", prefs.getString(KEY_LAST_SURFACE_EVENT, "(none)"));
         ret.put("SERVICE_RUNNING", serviceRunning);
         ret.put("WALLPAPER_INFO", wallpaperInfo);
         ret.put("CURRENT_WALLPAPER_PACKAGE", currentPkg);
