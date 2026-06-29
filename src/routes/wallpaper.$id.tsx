@@ -71,11 +71,34 @@ function WallpaperDetail() {
 
   async function handleApply(target: WallpaperTarget) {
     const fileName = `aetherx-${wp.id}.mp4`;
+    const buttonTag =
+      target === "home" ? "BUTTON_APPLY_HOME_CLICKED"
+      : target === "lock" ? "BUTTON_APPLY_LOCK_CLICKED"
+      : "BUTTON_APPLY_BOTH_CLICKED";
+    const frontendTag =
+      target === "home" ? "FRONTEND_CALL_PLUGIN_APPLY_HOME"
+      : target === "lock" ? "FRONTEND_CALL_PLUGIN_APPLY_LOCK"
+      : "FRONTEND_CALL_PLUGIN_APPLY_BOTH";
+    // Visible UI marker — confirms the button click reached React.
+    setToast(`▶ ${buttonTag}`);
+    console.info("[AetherX]", buttonTag);
     try {
       setActiveTarget(target);
       setDownloadState("downloading");
 
       if (await isNative()) {
+        // Confirm plugin presence before doing anything else.
+        const available = await isLiveWallpaperPluginAvailable();
+        if (!available) {
+          console.warn("[AetherX] PLUGIN_NOT_FOUND");
+          await recordFrontendStep("PLUGIN_NOT_FOUND");
+          setDownloadState("idle");
+          setActiveTarget(null);
+          setToast("⚠ PLUGIN_NOT_FOUND — el plugin nativo no está registrado");
+          setTimeout(() => setToast(null), 3600);
+          return;
+        }
+        await recordFrontendStep(frontendTag);
         // Verificación previa de compatibilidad (solo bloquea si el destino requiere Live Wallpaper)
         const compat = await checkWallpaperCompatibility();
         if (compat) {
