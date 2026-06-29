@@ -2,6 +2,7 @@ package com.aetherx.livewallpaper.wallpaper;
 
 import android.app.Activity;
 import android.app.WallpaperManager;
+import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -133,19 +134,26 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
      */
     private void openLivePicker(PluginCall call) {
         Activity activity = getActivity();
-        Context ctx = getContext();
-        android.content.ComponentName component = new android.content.ComponentName(
-            ctx, AetherXLiveWallpaperService.class);
-        persistStep("OPEN_WALLPAPER_INTENT component=" + component.flattenToShortString());
-        Log.i(TAG, "OPEN_WALLPAPER_INTENT " + component.flattenToShortString());
+        if (activity == null) {
+            persistNativeException("ACTIVITY_NULL");
+            Log.e(TAG, "ACTIVITY_NULL opening live wallpaper picker");
+            call.reject("open-picker-failed: ACTIVITY_NULL");
+            return;
+        }
+
+        ComponentName component = new ComponentName(
+            "com.aetherx.livewallpaper",
+            "com.aetherx.livewallpaper.wallpaper.AetherXLiveWallpaperService");
+        persistStep("OPEN_WALLPAPER_INTENT");
+        Log.i(TAG, "OPEN_WALLPAPER_INTENT component=" + component.flattenToString());
 
         // 1) Direct preview of our component
         try {
             Intent direct = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
             direct.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component);
-            direct.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            if (activity != null) activity.startActivity(direct);
-            else ctx.startActivity(direct);
+            direct.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            Log.i(TAG, "OPEN_WALLPAPER_INTENT_URI " + direct.toUri(Intent.URI_INTENT_SCHEME));
+            activity.startActivity(direct);
             persistStep("LIVE_COMPONENT_SENT");
             Log.i(TAG, "LIVE_COMPONENT_SENT");
             JSObject ret = new JSObject();
@@ -158,16 +166,16 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             return;
         } catch (Exception e) {
             Log.w(TAG, "ACTION_CHANGE_LIVE_WALLPAPER rejected, falling back", e);
-            persistError(KEY_LAST_NATIVE_EXCEPTION, "CHANGE_LIVE_WALLPAPER " + e);
+            persistStep("SAMSUNG_PICKER_OPENED");
+            persistNativeException(Log.getStackTraceString(e));
         }
 
         // 2) Samsung fallback — generic chooser
         try {
             Intent chooser = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
-            chooser.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            if (activity != null) activity.startActivity(chooser);
-            else ctx.startActivity(chooser);
-            persistStep("SAMSUNG_PICKER_OPENED");
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            Log.i(TAG, "SAMSUNG_PICKER_INTENT_URI " + chooser.toUri(Intent.URI_INTENT_SCHEME));
+            activity.startActivity(chooser);
             Log.i(TAG, "SAMSUNG_PICKER_OPENED");
             JSObject ret = new JSObject();
             ret.put("applied", false);
@@ -178,7 +186,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             call.resolve(ret);
         } catch (Exception e) {
             Log.e(TAG, "open-picker-failed", e);
-            persistError(KEY_LAST_NATIVE_EXCEPTION, "open-picker-failed " + e);
+            persistNativeException(Log.getStackTraceString(e));
             call.reject("open-picker-failed: " + e.getMessage(), e);
         }
     }
@@ -195,6 +203,10 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             SharedPreferences p = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             p.edit().putString(key, System.currentTimeMillis() + " " + msg).apply();
         } catch (Throwable ignored) {}
+    }
+
+    private void persistNativeException(String msg) {
+        persistError(KEY_LAST_NATIVE_EXCEPTION, msg);
     }
 
     @PluginMethod
