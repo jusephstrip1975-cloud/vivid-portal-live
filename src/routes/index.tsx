@@ -232,6 +232,10 @@ function HomePage() {
             ["LAST_SERVICE_EVENT", diagFields.LAST_SERVICE_EVENT ?? "(none)"],
             ["LAST_ENGINE_EVENT", diagFields.LAST_ENGINE_EVENT ?? "(none)"],
             ["LAST_SURFACE_EVENT", diagFields.LAST_SURFACE_EVENT ?? "(none)"],
+            ["RAW_VIDEO_FOUND", diagFields.RAW_VIDEO_FOUND ?? "(none)"],
+            ["RAW_VIDEO_OPEN_OK", diagFields.RAW_VIDEO_OPEN_OK ?? "(none)"],
+            ["RAW_VIDEO_OPEN_FAIL", diagFields.RAW_VIDEO_OPEN_FAIL ?? "(none)"],
+            ["SERVICE_RUNNING", String(diagFields.SERVICE_RUNNING ?? "(none)")],
           ];
           return (
             <div className="mt-3 space-y-3">
