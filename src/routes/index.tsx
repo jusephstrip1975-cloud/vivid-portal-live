@@ -227,6 +227,9 @@ function HomePage() {
               ? { tag: "RAMA 2 · SAMSUNG_PICKER_OPENED + CHANGE_LIVE_WALLPAPER exception (Samsung rechazó el intent directo)", cls: "border-red-400/50 bg-red-400/10 text-red-300" }
               : { tag: "Sin datos · pulsa 'Abrir Live Wallpaper' antes de leer el diagnóstico", cls: "border-white/20 bg-white/5 text-white/60" };
           const rows: Array<[string, string]> = [
+            ["LAST_FRONTEND_STEP", diagFields.LAST_FRONTEND_STEP ?? "(none)"],
+            ["LAST_PLUGIN_ENTERED", diagFields.LAST_PLUGIN_ENTERED ?? "(none)"],
+            ["PLUGIN_JS_ERROR", diagFields.PLUGIN_JS_ERROR ?? "(none)"],
             ["LAST_WALLPAPER_STEP", step],
             ["LAST_NATIVE_EXCEPTION", nativeEx],
             ["LAST_SERVICE_EVENT", diagFields.LAST_SERVICE_EVENT ?? "(none)"],

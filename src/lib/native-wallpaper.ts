@@ -22,6 +22,33 @@ interface LiveWallpaperPlugin {
   pickVideoFromDevice(): Promise<{ path: string; bytes: number; sourceUri: string; galleryUri?: string }>;
   checkCompatibility(): Promise<CompatibilityResult>;
   getDiagnostics(): Promise<Record<string, unknown>>;
+  recordFrontendStep(options: { step: string; error?: string }): Promise<{ ok: boolean }>;
+}
+
+/** Persist a step from the WebView into native SharedPreferences for diagnostics. */
+export async function recordFrontendStep(step: string, error?: string): Promise<void> {
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
+    if (!Capacitor.isPluginAvailable("AetherXLiveWallpaper")) {
+      console.warn("[AetherX] PLUGIN_NOT_FOUND");
+      return;
+    }
+    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    await LiveWallpaper.recordFrontendStep({ step, error });
+  } catch (err) {
+    console.warn("recordFrontendStep failed", err);
+  }
+}
+
+/** True if the AetherXLiveWallpaper native plugin is registered in this WebView. */
+export async function isLiveWallpaperPluginAvailable(): Promise<boolean> {
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("AetherXLiveWallpaper");
+  } catch {
+    return false;
+  }
 }
 
 export async function getSamsungDiagnostics(): Promise<string> {

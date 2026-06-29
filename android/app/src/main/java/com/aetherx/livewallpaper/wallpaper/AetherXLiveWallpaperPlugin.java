@@ -48,6 +48,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_RAW_VIDEO_FOUND = "raw_video_found";
     public static final String KEY_RAW_VIDEO_OPEN_OK = "raw_video_open_ok";
     public static final String KEY_RAW_VIDEO_OPEN_FAIL = "raw_video_open_fail";
+    public static final String KEY_LAST_FRONTEND_STEP = "last_frontend_step";
+    public static final String KEY_LAST_PLUGIN_ENTERED = "last_plugin_entered";
+    public static final String KEY_PLUGIN_JS_ERROR = "plugin_js_error";
     private static final int MAX_REDIRECTS = 5;
 
     @PluginMethod
@@ -122,10 +125,28 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
     }
 
-    @PluginMethod public void applyHome(PluginCall call)  { openLivePicker(call); }
-    @PluginMethod public void applyLock(PluginCall call)  { openLivePicker(call); }
-    @PluginMethod public void applyBoth(PluginCall call)  { openLivePicker(call); }
-    @PluginMethod public void openPicker(PluginCall call) { openLivePicker(call); }
+    @PluginMethod public void applyHome(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyHome"); openLivePicker(call); }
+    @PluginMethod public void applyLock(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyLock"); openLivePicker(call); }
+    @PluginMethod public void applyBoth(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyBoth"); openLivePicker(call); }
+    @PluginMethod public void openPicker(PluginCall call) { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED openPicker"); openLivePicker(call); }
+
+    @PluginMethod
+    public void recordFrontendStep(PluginCall call) {
+        String step = call.getString("step");
+        String error = call.getString("error");
+        if (step != null) persistKey(KEY_LAST_FRONTEND_STEP, step);
+        if (error != null) persistKey(KEY_PLUGIN_JS_ERROR, error);
+        JSObject ret = new JSObject();
+        ret.put("ok", true);
+        call.resolve(ret);
+    }
+
+    private void persistKey(String key, String value) {
+        try {
+            SharedPreferences p = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            p.edit().putString(key, System.currentTimeMillis() + " " + value).apply();
+        } catch (Throwable ignored) {}
+    }
 
     /**
      * Open Samsung One UI live-wallpaper preview directly on our service via
@@ -352,6 +373,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("RAW_VIDEO_FOUND", prefs.getString(KEY_RAW_VIDEO_FOUND, "(none)"));
         ret.put("RAW_VIDEO_OPEN_OK", prefs.getString(KEY_RAW_VIDEO_OPEN_OK, "(none)"));
         ret.put("RAW_VIDEO_OPEN_FAIL", prefs.getString(KEY_RAW_VIDEO_OPEN_FAIL, "(none)"));
+        ret.put("LAST_FRONTEND_STEP", prefs.getString(KEY_LAST_FRONTEND_STEP, "(none)"));
+        ret.put("LAST_PLUGIN_ENTERED", prefs.getString(KEY_LAST_PLUGIN_ENTERED, "(none)"));
+        ret.put("PLUGIN_JS_ERROR", prefs.getString(KEY_PLUGIN_JS_ERROR, "(none)"));
         call.resolve(ret);
     }
 
