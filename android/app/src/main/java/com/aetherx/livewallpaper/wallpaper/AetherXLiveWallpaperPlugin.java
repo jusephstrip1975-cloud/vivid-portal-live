@@ -38,6 +38,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_LAST_SERVICE_ERROR = "last_service_error";
     public static final String KEY_LAST_NATIVE_EXCEPTION = "last_native_exception";
     public static final String KEY_LAST_WALLPAPER_STEP = "last_wallpaper_step";
+    public static final String KEY_LAST_SERVICE_EVENT = "last_service_event";
+    public static final String KEY_LAST_ENGINE_EVENT = "last_engine_event";
+    public static final String KEY_LAST_SURFACE_EVENT = "last_surface_event";
     public static final String KEY_SERVICE_RUNNING = "service_running";
     private static final int MAX_REDIRECTS = 5;
 
