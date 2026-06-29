@@ -48,6 +48,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_RAW_VIDEO_FOUND = "raw_video_found";
     public static final String KEY_RAW_VIDEO_OPEN_OK = "raw_video_open_ok";
     public static final String KEY_RAW_VIDEO_OPEN_FAIL = "raw_video_open_fail";
+    public static final String KEY_LAST_FRONTEND_STEP = "last_frontend_step";
+    public static final String KEY_LAST_PLUGIN_ENTERED = "last_plugin_entered";
+    public static final String KEY_PLUGIN_JS_ERROR = "plugin_js_error";
     private static final int MAX_REDIRECTS = 5;
 
     @PluginMethod
