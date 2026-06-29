@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 303
-        versionName "3.0.3-ci-resource-fix"
+        versionCode 304
+        versionName "3.0.4-frontend-plugin-trace"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
