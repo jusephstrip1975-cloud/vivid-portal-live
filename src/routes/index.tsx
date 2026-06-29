@@ -39,15 +39,29 @@ function HomePage() {
   const [pickToast, setPickToast] = useState<string | null>(null);
   const [preview, setPreview] = useState<PickedDeviceVideo | null>(null);
   const [diag, setDiag] = useState<string | null>(null);
+  const [diagFields, setDiagFields] = useState<Record<string, string> | null>(null);
 
   function showToast(msg: string, ms = 2600) {
     setPickToast(msg);
     setTimeout(() => setPickToast(null), ms);
   }
 
+  function parseDiag(text: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const line of text.split("\n")) {
+      const idx = line.indexOf(":");
+      if (idx <= 0) continue;
+      const key = line.slice(0, idx).trim();
+      const val = line.slice(idx + 1).trim();
+      if (key && /^[A-Z_]+$/.test(key)) out[key] = val;
+    }
+    return out;
+  }
+
   async function handleCopyDiagnostic() {
     const text = await getSamsungDiagnostics();
     setDiag(text);
+    setDiagFields(parseDiag(text));
     try {
       await navigator.clipboard.writeText(text);
       showToast("✓ Diagnóstico copiado al portapapeles");
@@ -201,12 +215,47 @@ function HomePage() {
         >
           📋 Copiar diagnóstico Samsung
         </button>
+        {diagFields && (() => {
+          const step = diagFields.LAST_WALLPAPER_STEP ?? "(none)";
+          const nativeEx = diagFields.LAST_NATIVE_EXCEPTION ?? "(none)";
+          const sentDirect = step.includes("LIVE_COMPONENT_SENT");
+          const fellBack = step.includes("SAMSUNG_PICKER_OPENED");
+          const changeFailed = nativeEx.includes("CHANGE_LIVE_WALLPAPER");
+          const branch = sentDirect && !fellBack
+            ? { tag: "RAMA 1 · LIVE_COMPONENT_SENT (preview directa AetherX)", cls: "border-emerald-400/50 bg-emerald-400/10 text-emerald-300" }
+            : fellBack || changeFailed
+              ? { tag: "RAMA 2 · SAMSUNG_PICKER_OPENED + CHANGE_LIVE_WALLPAPER exception (Samsung rechazó el intent directo)", cls: "border-red-400/50 bg-red-400/10 text-red-300" }
+              : { tag: "Sin datos · pulsa 'Abrir Live Wallpaper' antes de leer el diagnóstico", cls: "border-white/20 bg-white/5 text-white/60" };
+          const rows: Array<[string, string]> = [
+            ["LAST_WALLPAPER_STEP", step],
+            ["LAST_NATIVE_EXCEPTION", nativeEx],
+            ["LAST_SERVICE_EVENT", diagFields.LAST_SERVICE_EVENT ?? "(none)"],
+            ["LAST_ENGINE_EVENT", diagFields.LAST_ENGINE_EVENT ?? "(none)"],
+            ["LAST_SURFACE_EVENT", diagFields.LAST_SURFACE_EVENT ?? "(none)"],
+          ];
+          return (
+            <div className="mt-3 space-y-3">
+              <div className={`rounded-2xl border px-4 py-3 text-[11px] font-bold uppercase tracking-[0.16em] ${branch.cls}`}>
+                {branch.tag}
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/60 p-3 text-[11px] leading-relaxed">
+                {rows.map(([k, v]) => (
+                  <div key={k} className="flex flex-col gap-0.5 border-b border-white/5 py-1.5 last:border-b-0">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-electric-blue/80">{k}</span>
+                    <span className="break-words text-white/85">{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {diag && (
           <pre className="mt-3 max-h-72 overflow-auto rounded-2xl border border-white/10 bg-black/60 p-3 text-[10px] leading-relaxed text-white/80 whitespace-pre-wrap break-words">
 {diag}
           </pre>
         )}
       </section>
+
 
 
 

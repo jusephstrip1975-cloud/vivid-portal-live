@@ -38,6 +38,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_LAST_SERVICE_ERROR = "last_service_error";
     public static final String KEY_LAST_NATIVE_EXCEPTION = "last_native_exception";
     public static final String KEY_LAST_WALLPAPER_STEP = "last_wallpaper_step";
+    public static final String KEY_LAST_SERVICE_EVENT = "last_service_event";
+    public static final String KEY_LAST_ENGINE_EVENT = "last_engine_event";
+    public static final String KEY_LAST_SURFACE_EVENT = "last_surface_event";
     public static final String KEY_SERVICE_RUNNING = "service_running";
     private static final int MAX_REDIRECTS = 5;
 
@@ -277,6 +280,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("LAST_SERVICE_ERROR", prefs.getString(KEY_LAST_SERVICE_ERROR, "(none)"));
         ret.put("LAST_NATIVE_EXCEPTION", prefs.getString(KEY_LAST_NATIVE_EXCEPTION, "(none)"));
         ret.put("LAST_WALLPAPER_STEP", prefs.getString(KEY_LAST_WALLPAPER_STEP, "(none)"));
+        ret.put("LAST_SERVICE_EVENT", prefs.getString(KEY_LAST_SERVICE_EVENT, "(none)"));
+        ret.put("LAST_ENGINE_EVENT", prefs.getString(KEY_LAST_ENGINE_EVENT, "(none)"));
+        ret.put("LAST_SURFACE_EVENT", prefs.getString(KEY_LAST_SURFACE_EVENT, "(none)"));
         ret.put("SERVICE_RUNNING", serviceRunning);
         ret.put("WALLPAPER_INFO", wallpaperInfo);
         ret.put("CURRENT_WALLPAPER_PACKAGE", currentPkg);
