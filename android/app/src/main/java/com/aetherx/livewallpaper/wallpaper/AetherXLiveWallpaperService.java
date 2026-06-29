@@ -86,6 +86,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             }
             Log.i(TAG, "ENGINE_CREATED");
             recordStep("ENGINE_CREATED");
+            recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_ENGINE_EVENT, "engineOnCreate");
         }
 
         @Override
@@ -96,6 +97,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             boolean valid = s != null && s.isValid();
             Log.i(TAG, "ON_SURFACE_CREATED valid=" + valid);
             recordStep("ON_SURFACE_CREATED valid=" + valid);
+            recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SURFACE_EVENT, "surfaceCreated valid=" + valid);
             paintMessage("Cargando wallpaper...");
             if (valid) main.post(this::startRawPlayer);
         }
@@ -105,6 +107,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             super.onSurfaceChanged(holder, format, width, height);
             currentHolder = holder;
             Log.i(TAG, "SURFACE_CHANGED " + width + "x" + height);
+            recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SURFACE_EVENT, "surfaceChanged " + width + "x" + height);
             main.post(() -> {
                 if (player == null) {
                     startRawPlayer();
