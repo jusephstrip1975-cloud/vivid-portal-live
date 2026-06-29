@@ -12,6 +12,8 @@ import android.os.ParcelFileDescriptor;
 import android.util.Base64;
 import android.util.Log;
 
+import com.aetherx.livewallpaper.R;
+
 import androidx.activity.result.ActivityResult;
 
 import com.getcapacitor.JSObject;
