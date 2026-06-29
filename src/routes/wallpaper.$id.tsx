@@ -172,10 +172,12 @@ function WallpaperDetail() {
       }, 1800);
     } catch (err) {
       console.error(err);
+      const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      void recordFrontendStep("PLUGIN_JS_ERROR", msg);
       setDownloadState("idle");
       setActiveTarget(null);
-      setToast("No se pudo aplicar. Inténtalo de nuevo.");
-      setTimeout(() => setToast(null), 2600);
+      setToast(`✗ PLUGIN_JS_ERROR: ${msg.slice(0, 120)}`);
+      setTimeout(() => setToast(null), 4000);
     }
   }
 
