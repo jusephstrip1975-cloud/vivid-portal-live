@@ -150,9 +150,23 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
                 AssetFileDescriptor afd = getResources().openRawResourceFd(R.raw.testwallpaper);
                 if (afd == null) {
+                    try {
+                        SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                        p.edit().putString(AetherXLiveWallpaperPlugin.KEY_RAW_VIDEO_OPEN_FAIL,
+                            System.currentTimeMillis() + " openRawResourceFd returned null").apply();
+                    } catch (Throwable ignored) {}
                     paintMessage("RAW no encontrado");
                     return;
                 }
+                try {
+                    SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                    p.edit()
+                        .putString(AetherXLiveWallpaperPlugin.KEY_RAW_VIDEO_FOUND,
+                            "true size=" + afd.getLength())
+                        .putString(AetherXLiveWallpaperPlugin.KEY_RAW_VIDEO_OPEN_OK,
+                            System.currentTimeMillis() + " afd opened in service")
+                        .apply();
+                } catch (Throwable ignored) {}
 
                 player = new MediaPlayer();
                 player.setSurface(surface);

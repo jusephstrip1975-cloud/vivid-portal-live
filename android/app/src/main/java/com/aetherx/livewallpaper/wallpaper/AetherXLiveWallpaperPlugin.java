@@ -12,6 +12,8 @@ import android.os.ParcelFileDescriptor;
 import android.util.Base64;
 import android.util.Log;
 
+import com.aetherx.livewallpaper.R;
+
 import androidx.activity.result.ActivityResult;
 
 import com.getcapacitor.JSObject;
@@ -42,6 +44,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_LAST_ENGINE_EVENT = "last_engine_event";
     public static final String KEY_LAST_SURFACE_EVENT = "last_surface_event";
     public static final String KEY_SERVICE_RUNNING = "service_running";
+    public static final String KEY_RAW_VIDEO_FOUND = "raw_video_found";
+    public static final String KEY_RAW_VIDEO_OPEN_OK = "raw_video_open_ok";
+    public static final String KEY_RAW_VIDEO_OPEN_FAIL = "raw_video_open_fail";
     private static final int MAX_REDIRECTS = 5;
 
     @PluginMethod
@@ -289,6 +294,52 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("MANUFACTURER", Build.MANUFACTURER);
         ret.put("MODEL", Build.MODEL);
         ret.put("ANDROID_SDK", Build.VERSION.SDK_INT);
+
+        // Probe the embedded RAW video so diagnostics show whether MediaPlayer
+        // can actually open android.resource://<pkg>/raw/testwallpaper.
+        boolean rawFound = false;
+        long rawSize = 0;
+        try {
+            android.content.res.AssetFileDescriptor afd =
+                ctx.getResources().openRawResourceFd(R.raw.testwallpaper);
+            if (afd != null) {
+                rawFound = true;
+                rawSize = afd.getLength();
+                try { afd.close(); } catch (Throwable ignored) {}
+            }
+        } catch (Throwable t) {
+            prefs.edit().putString(KEY_RAW_VIDEO_OPEN_FAIL,
+                System.currentTimeMillis() + " openRawResourceFd: " + t.getClass().getSimpleName() + ": " + t.getMessage()).apply();
+        }
+        prefs.edit().putString(KEY_RAW_VIDEO_FOUND, rawFound + " size=" + rawSize).apply();
+
+        boolean openOk = false;
+        String openFail = null;
+        if (rawFound) {
+            android.media.MediaPlayer probe = null;
+            try {
+                Uri rawUri = Uri.parse("android.resource://" + pkg + "/raw/testwallpaper");
+                probe = new android.media.MediaPlayer();
+                probe.setDataSource(ctx, rawUri);
+                probe.prepare();
+                openOk = true;
+            } catch (Throwable t) {
+                openFail = t.getClass().getSimpleName() + ": " + t.getMessage();
+            } finally {
+                if (probe != null) { try { probe.release(); } catch (Throwable ignored) {} }
+            }
+            if (openOk) {
+                prefs.edit().putString(KEY_RAW_VIDEO_OPEN_OK,
+                    System.currentTimeMillis() + " android.resource://" + pkg + "/raw/testwallpaper").apply();
+            } else if (openFail != null) {
+                prefs.edit().putString(KEY_RAW_VIDEO_OPEN_FAIL,
+                    System.currentTimeMillis() + " " + openFail).apply();
+            }
+        }
+
+        ret.put("RAW_VIDEO_FOUND", prefs.getString(KEY_RAW_VIDEO_FOUND, "(none)"));
+        ret.put("RAW_VIDEO_OPEN_OK", prefs.getString(KEY_RAW_VIDEO_OPEN_OK, "(none)"));
+        ret.put("RAW_VIDEO_OPEN_FAIL", prefs.getString(KEY_RAW_VIDEO_OPEN_FAIL, "(none)"));
         call.resolve(ret);
     }
 
