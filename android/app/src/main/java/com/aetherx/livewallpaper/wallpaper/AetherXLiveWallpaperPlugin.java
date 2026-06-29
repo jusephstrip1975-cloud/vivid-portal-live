@@ -119,21 +119,48 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     @PluginMethod public void openPicker(PluginCall call) { openLivePicker(call); }
 
     /**
-     * Samsung One UI 6/7 frequently rejects ACTION_CHANGE_LIVE_WALLPAPER with
-     * EXTRA_LIVE_WALLPAPER_COMPONENT and shows "NO SE PUDO APLICAR". Use the
-     * generic chooser only — the user picks AetherX from the list.
+     * Open Samsung One UI live-wallpaper preview directly on our service via
+     * ACTION_CHANGE_LIVE_WALLPAPER + EXTRA_LIVE_WALLPAPER_COMPONENT. If Samsung
+     * rejects it, fall back to the generic ACTION_LIVE_WALLPAPER_CHOOSER.
      */
     private void openLivePicker(PluginCall call) {
-        persistStep("OPENING_LIVE_WALLPAPER_CHOOSER");
         Activity activity = getActivity();
+        Context ctx = getContext();
+        android.content.ComponentName component = new android.content.ComponentName(
+            ctx, AetherXLiveWallpaperService.class);
+        persistStep("OPEN_WALLPAPER_INTENT component=" + component.flattenToShortString());
+        Log.i(TAG, "OPEN_WALLPAPER_INTENT " + component.flattenToShortString());
+
+        // 1) Direct preview of our component
         try {
-            Intent intent = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
-            if (activity != null) {
-                activity.startActivity(intent);
-            } else {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(intent);
-            }
+            Intent direct = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+            direct.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component);
+            direct.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (activity != null) activity.startActivity(direct);
+            else ctx.startActivity(direct);
+            persistStep("LIVE_COMPONENT_SENT");
+            Log.i(TAG, "LIVE_COMPONENT_SENT");
+            JSObject ret = new JSObject();
+            ret.put("applied", false);
+            ret.put("openedPicker", true);
+            ret.put("needsConfirmation", true);
+            ret.put("opened", true);
+            ret.put("via", "ACTION_CHANGE_LIVE_WALLPAPER");
+            call.resolve(ret);
+            return;
+        } catch (Exception e) {
+            Log.w(TAG, "ACTION_CHANGE_LIVE_WALLPAPER rejected, falling back", e);
+            persistError(KEY_LAST_NATIVE_EXCEPTION, "CHANGE_LIVE_WALLPAPER " + e);
+        }
+
+        // 2) Samsung fallback — generic chooser
+        try {
+            Intent chooser = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
+            chooser.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (activity != null) activity.startActivity(chooser);
+            else ctx.startActivity(chooser);
+            persistStep("SAMSUNG_PICKER_OPENED");
+            Log.i(TAG, "SAMSUNG_PICKER_OPENED");
             JSObject ret = new JSObject();
             ret.put("applied", false);
             ret.put("openedPicker", true);
