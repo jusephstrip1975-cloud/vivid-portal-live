@@ -6,7 +6,9 @@ import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
 import {
   checkWallpaperCompatibility,
+  isLiveWallpaperPluginAvailable,
   isNative,
+  recordFrontendStep,
   resolveDownloadUrl,
   saveWallpaperToDevice,
   type WallpaperTarget,
