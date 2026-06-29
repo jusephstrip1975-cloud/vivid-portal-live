@@ -42,6 +42,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_LAST_ENGINE_EVENT = "last_engine_event";
     public static final String KEY_LAST_SURFACE_EVENT = "last_surface_event";
     public static final String KEY_SERVICE_RUNNING = "service_running";
+    public static final String KEY_RAW_VIDEO_FOUND = "raw_video_found";
+    public static final String KEY_RAW_VIDEO_OPEN_OK = "raw_video_open_ok";
+    public static final String KEY_RAW_VIDEO_OPEN_FAIL = "raw_video_open_fail";
     private static final int MAX_REDIRECTS = 5;
 
     @PluginMethod
