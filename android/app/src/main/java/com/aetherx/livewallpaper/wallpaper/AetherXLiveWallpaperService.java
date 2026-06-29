@@ -33,6 +33,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         } catch (Throwable ignored) {}
     }
 
+    private void recordKey(String key, String value) {
+        try {
+            SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            p.edit().putString(key, System.currentTimeMillis() + " " + value).apply();
+        } catch (Throwable ignored) {}
+    }
+
     private void recordError(String key, Throwable t) {
         if (t == null) return;
         Log.e(TAG, key, t);
@@ -48,12 +55,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         super.onCreate();
         Log.i(TAG, "SERVICE_ONCREATE");
         recordStep("SERVICE_ONCREATE");
+        recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SERVICE_EVENT, "onCreate");
     }
 
     @Override
     public Engine onCreateEngine() {
         Log.i(TAG, "ON_CREATE_ENGINE");
         recordStep("ON_CREATE_ENGINE");
+        recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SERVICE_EVENT, "onCreateEngine");
+        recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_ENGINE_EVENT, "onCreateEngine");
         return new RawVideoEngine();
     }
 
