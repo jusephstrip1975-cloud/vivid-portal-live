@@ -39,15 +39,29 @@ function HomePage() {
   const [pickToast, setPickToast] = useState<string | null>(null);
   const [preview, setPreview] = useState<PickedDeviceVideo | null>(null);
   const [diag, setDiag] = useState<string | null>(null);
+  const [diagFields, setDiagFields] = useState<Record<string, string> | null>(null);
 
   function showToast(msg: string, ms = 2600) {
     setPickToast(msg);
     setTimeout(() => setPickToast(null), ms);
   }
 
+  function parseDiag(text: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const line of text.split("\n")) {
+      const idx = line.indexOf(":");
+      if (idx <= 0) continue;
+      const key = line.slice(0, idx).trim();
+      const val = line.slice(idx + 1).trim();
+      if (key && /^[A-Z_]+$/.test(key)) out[key] = val;
+    }
+    return out;
+  }
+
   async function handleCopyDiagnostic() {
     const text = await getSamsungDiagnostics();
     setDiag(text);
+    setDiagFields(parseDiag(text));
     try {
       await navigator.clipboard.writeText(text);
       showToast("✓ Diagnóstico copiado al portapapeles");
