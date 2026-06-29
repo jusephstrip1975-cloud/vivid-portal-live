@@ -125,10 +125,28 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }
     }
 
-    @PluginMethod public void applyHome(PluginCall call)  { openLivePicker(call); }
-    @PluginMethod public void applyLock(PluginCall call)  { openLivePicker(call); }
-    @PluginMethod public void applyBoth(PluginCall call)  { openLivePicker(call); }
-    @PluginMethod public void openPicker(PluginCall call) { openLivePicker(call); }
+    @PluginMethod public void applyHome(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyHome"); openLivePicker(call); }
+    @PluginMethod public void applyLock(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyLock"); openLivePicker(call); }
+    @PluginMethod public void applyBoth(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyBoth"); openLivePicker(call); }
+    @PluginMethod public void openPicker(PluginCall call) { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED openPicker"); openLivePicker(call); }
+
+    @PluginMethod
+    public void recordFrontendStep(PluginCall call) {
+        String step = call.getString("step");
+        String error = call.getString("error");
+        if (step != null) persistKey(KEY_LAST_FRONTEND_STEP, step);
+        if (error != null) persistKey(KEY_PLUGIN_JS_ERROR, error);
+        JSObject ret = new JSObject();
+        ret.put("ok", true);
+        call.resolve(ret);
+    }
+
+    private void persistKey(String key, String value) {
+        try {
+            SharedPreferences p = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            p.edit().putString(key, System.currentTimeMillis() + " " + value).apply();
+        } catch (Throwable ignored) {}
+    }
 
     /**
      * Open Samsung One UI live-wallpaper preview directly on our service via
