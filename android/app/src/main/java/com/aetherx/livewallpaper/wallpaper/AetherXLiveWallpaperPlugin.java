@@ -373,6 +373,9 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("RAW_VIDEO_FOUND", prefs.getString(KEY_RAW_VIDEO_FOUND, "(none)"));
         ret.put("RAW_VIDEO_OPEN_OK", prefs.getString(KEY_RAW_VIDEO_OPEN_OK, "(none)"));
         ret.put("RAW_VIDEO_OPEN_FAIL", prefs.getString(KEY_RAW_VIDEO_OPEN_FAIL, "(none)"));
+        ret.put("LAST_FRONTEND_STEP", prefs.getString(KEY_LAST_FRONTEND_STEP, "(none)"));
+        ret.put("LAST_PLUGIN_ENTERED", prefs.getString(KEY_LAST_PLUGIN_ENTERED, "(none)"));
+        ret.put("PLUGIN_JS_ERROR", prefs.getString(KEY_PLUGIN_JS_ERROR, "(none)"));
         call.resolve(ret);
     }
 
