@@ -1,5 +1,6 @@
 package com.aetherx.livewallpaper.wallpaper;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.AssetFileDescriptor;
@@ -7,8 +8,10 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
 import android.view.Surface;
@@ -18,6 +21,7 @@ import com.aetherx.livewallpaper.R;
 
 import java.io.File;
 import java.io.FileInputStream;
+
 
 /**
  * Samsung One UI hardened WallpaperService.
