@@ -5,20 +5,11 @@ import { WallpaperTile } from "@/components/WallpaperTile";
 
 const search = z.object({
   cat: z
-    .enum([
-      "todos",
-      "universo",
-      "oceano",
-      "naturaleza",
-      "clima",
-      "cyberpunk",
-      "zen",
-      "manga",
-      "coches",
-      "gym",
-      "mma",
-      "playa",
-    ])
+    .custom<Category | "todos">(
+      (value) =>
+        typeof value === "string" &&
+        CATEGORIES.some((category) => category.id === value),
+    )
     .catch("todos"),
 });
 

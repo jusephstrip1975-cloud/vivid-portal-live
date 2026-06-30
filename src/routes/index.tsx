@@ -271,36 +271,45 @@ function HomePage() {
       {/* Categories */}
       <section className="py-4">
         <div className="no-scrollbar flex gap-3 overflow-x-auto px-6">
-          {CATEGORIES.filter((c) => c.id !== "todos").map((c, i) => (
-            <Link
-              key={c.id}
-              to="/explore"
-              search={{ cat: c.id }}
-              className="flex-none text-center"
-            >
-              <div
-                className={`flex size-16 items-center justify-center rounded-2xl glass-card transition ${
-                  i === 0 ? "ring-1 ring-electric-blue/40" : ""
-                }`}
-              >
-                <span
-                  className={`size-6 rounded-full border-2 border-dashed ${
-                    i === 0
-                      ? "border-electric-blue animate-shimmer"
-                      : "border-white/25"
-                  }`}
-                  style={{ animationDuration: "3s" }}
-                />
-              </div>
-              <span
-                className={`mt-2 block text-[11px] font-semibold ${
-                  i === 0 ? "text-electric-blue" : "text-white/45"
-                }`}
-              >
-                {c.label}
-              </span>
-            </Link>
-          ))}
+          {CATEGORIES.filter((c) => c.id !== "todos").map((c, i) => {
+            const previewWp = WALLPAPERS.find((w) => w.category === c.id) ?? WALLPAPERS[0];
+            const is3D = String(c.id).startsWith("3d-");
+            return (
+                <Link
+                  key={c.id}
+                  to="/explore"
+                  search={{ cat: c.id }}
+                  className="flex-none text-center"
+                >
+                  <div
+                    className={`relative size-16 overflow-hidden rounded-2xl glass-card transition ${
+                      i === 0 || is3D ? "ring-1 ring-electric-blue/40" : ""
+                    }`}
+                  >
+                    <img
+                      src={previewWp.src}
+                      alt={c.label}
+                      loading="lazy"
+                      decoding="async"
+                      className="absolute inset-0 size-full object-cover"
+                    />
+                    <span className="absolute inset-0 bg-gradient-to-t from-space-black/70 via-space-black/5 to-transparent" />
+                    {is3D && (
+                      <span className="absolute bottom-1 left-1 rounded-full bg-electric-blue/90 px-1.5 py-0.5 text-[8px] font-black text-space-black">
+                        3D
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`mt-2 block max-w-20 text-[11px] font-semibold leading-tight ${
+                      i === 0 || is3D ? "text-electric-blue" : "text-white/45"
+                    }`}
+                  >
+                    {c.label}
+                  </span>
+                </Link>
+            );
+          })}
         </div>
       </section>
 
