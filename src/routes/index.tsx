@@ -89,7 +89,7 @@ function HomePage() {
 
   async function handleConfirmApply() {
     setPickState("applying");
-    const result = await applyPickedVideo();
+    const result = await applyPickedVideo("both");
     setPickState("idle");
     if (!result.ok) {
       showToast("No se pudo aplicar el fondo");
@@ -97,10 +97,8 @@ function HomePage() {
     }
     setPreview(null);
     showToast(
-      result.needsPicker
-        ? "✓ Pulsa Aplicar y elige Pantalla de inicio"
-        : "✓ Fondo animado aplicado",
-      2800,
+      "✓ SAMSUNG ABRIRÁ SU SELECTOR · PULSA «APLICAR EN INICIO Y BLOQUEO»",
+      6000,
     );
   }
 
