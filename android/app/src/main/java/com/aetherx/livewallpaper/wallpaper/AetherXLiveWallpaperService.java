@@ -2,11 +2,11 @@ package com.aetherx.livewallpaper.wallpaper;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.media.MediaPlayer;
-import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.wallpaper.WallpaperService;
@@ -70,6 +70,16 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             String stack = t == null ? "" : "\n" + Log.getStackTraceString(t);
             p.edit().putString(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION,
                 System.currentTimeMillis() + " " + message + stack).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private void clearNativeFailureState() {
+        try {
+            SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            p.edit()
+                .putString(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, "(none)")
+                .putString(AetherXLiveWallpaperPlugin.KEY_LAST_SERVICE_ERROR, "(none)")
+                .apply();
         } catch (Throwable ignored) {}
     }
 
@@ -168,7 +178,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         }
 
         private void startRawPlayer() {
+            AssetFileDescriptor afd = null;
             try {
+                clearNativeFailureState();
                 releasePlayer();
 
                 SurfaceHolder holder = currentHolder;
@@ -183,11 +195,22 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     return;
                 }
 
-                if (surface == null || !surface.isValid()) {
+                if (!surface.isValid()) {
                     persistStep("MEDIA_SURFACE_INVALID");
                     return;
                 }
                 persistStep("MEDIA_SURFACE_VALID");
+
+                clearSurface(holder);
+                persistStep("MEDIA_SURFACE_CLEARED");
+
+                afd = getResources().openRawResourceFd(R.raw.testwallpaper);
+                if (afd == null) {
+                    persistStep("MEDIA_RAW_FD_NULL");
+                    persistNativeException("MEDIA_RAW_FD_NULL");
+                    return;
+                }
+                persistStep("MEDIA_RAW_FD_OPENED len=" + afd.getDeclaredLength());
 
                 player = new MediaPlayer();
                 persistStep("MEDIA_PLAYER_CREATED");
@@ -208,10 +231,11 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 persistStep("MEDIA_SCREEN_ON_SET");
 
                 player.setDataSource(
-                    AetherXLiveWallpaperService.this,
-                    Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.testwallpaper)
+                    afd.getFileDescriptor(),
+                    afd.getStartOffset(),
+                    afd.getDeclaredLength()
                 );
-                persistStep("MEDIA_DATASOURCE_SET");
+                persistStep("MEDIA_DATASOURCE_SET_RAW_FD");
 
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
@@ -241,6 +265,26 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             } catch (Throwable t) {
                 persistNativeException("MEDIA_START_RAW_PLAYER_EXCEPTION", t);
                 paintMessage("Fallo: " + t.getClass().getSimpleName());
+            } finally {
+                if (afd != null) {
+                    try { afd.close(); } catch (Throwable ignored) {}
+                }
+            }
+        }
+
+        private void clearSurface(SurfaceHolder holder) {
+            Canvas c = null;
+            try {
+                c = holder.lockCanvas();
+                if (c != null) {
+                    c.drawColor(Color.BLACK);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "clearSurface failed", t);
+            } finally {
+                if (c != null) {
+                    try { holder.unlockCanvasAndPost(c); } catch (Throwable ignored) {}
+                }
             }
         }
 

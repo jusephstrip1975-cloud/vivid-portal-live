@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 307
-        versionName "3.0.7-mediaplayer-statefix"
+        versionCode 308
+        versionName "3.0.8-raw-fd-mediaplayer-fix"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
