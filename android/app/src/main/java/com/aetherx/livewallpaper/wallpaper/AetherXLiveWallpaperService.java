@@ -115,11 +115,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             super.onCreate(surfaceHolder);
             setOffsetNotificationsEnabled(false);
             setTouchEventsEnabled(false);
-            try {
-                surfaceHolder.setFixedSize(720, 1280);
-            } catch (Throwable t) {
-                Log.w(TAG, "setFixedSize failed", t);
-            }
+            // NO setFixedSize: Samsung One UI 7 (SDK 35+) rechaza tamaños fijos
+            // y deja el wallpaper en negro. Dejamos que el sistema gestione el tamaño.
             Log.i(TAG, "ENGINE_CREATED");
             recordStep("ENGINE_CREATED");
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_ENGINE_EVENT, "engineOnCreate");
