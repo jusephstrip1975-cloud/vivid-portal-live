@@ -16,6 +16,9 @@ import android.view.SurfaceHolder;
 
 import com.aetherx.livewallpaper.R;
 
+import java.io.File;
+import java.io.FileInputStream;
+
 /**
  * Samsung One UI hardened WallpaperService.
  * Records every lifecycle step into SharedPreferences for diagnostics.
@@ -179,6 +182,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
         private void startRawPlayer() {
             AssetFileDescriptor afd = null;
+            FileInputStream fis = null;
             try {
                 clearNativeFailureState();
                 releasePlayer();
@@ -204,14 +208,6 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 clearSurface(holder);
                 persistStep("MEDIA_SURFACE_CLEARED");
 
-                afd = getResources().openRawResourceFd(R.raw.testwallpaper);
-                if (afd == null) {
-                    persistStep("MEDIA_RAW_FD_NULL");
-                    persistNativeException("MEDIA_RAW_FD_NULL");
-                    return;
-                }
-                persistStep("MEDIA_RAW_FD_OPENED len=" + afd.getDeclaredLength());
-
                 player = new MediaPlayer();
                 persistStep("MEDIA_PLAYER_CREATED");
 
@@ -230,12 +226,29 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 player.setScreenOnWhilePlaying(true);
                 persistStep("MEDIA_SCREEN_ON_SET");
 
-                player.setDataSource(
-                    afd.getFileDescriptor(),
-                    afd.getStartOffset(),
-                    afd.getDeclaredLength()
-                );
-                persistStep("MEDIA_DATASOURCE_SET_RAW_FD");
+                SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                String selectedPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
+                File selectedFile = selectedPath == null ? null : new File(selectedPath);
+                if (selectedFile != null && selectedFile.exists() && selectedFile.canRead() && selectedFile.length() > 0) {
+                    fis = new FileInputStream(selectedFile);
+                    player.setDataSource(fis.getFD());
+                    persistStep("MEDIA_DATASOURCE_SET_SELECTED_FILE len=" + selectedFile.length());
+                } else {
+                    persistStep("MEDIA_SELECTED_FILE_MISSING_USE_RAW");
+                    afd = getResources().openRawResourceFd(R.raw.testwallpaper);
+                    if (afd == null) {
+                        persistStep("MEDIA_RAW_FD_NULL");
+                        persistNativeException("MEDIA_RAW_FD_NULL");
+                        return;
+                    }
+                    persistStep("MEDIA_RAW_FD_OPENED len=" + afd.getDeclaredLength());
+                    player.setDataSource(
+                        afd.getFileDescriptor(),
+                        afd.getStartOffset(),
+                        afd.getDeclaredLength()
+                    );
+                    persistStep("MEDIA_DATASOURCE_SET_RAW_FD");
+                }
 
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
@@ -268,6 +281,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             } finally {
                 if (afd != null) {
                     try { afd.close(); } catch (Throwable ignored) {}
+                }
+                if (fis != null) {
+                    try { fis.close(); } catch (Throwable ignored) {}
                 }
             }
         }
