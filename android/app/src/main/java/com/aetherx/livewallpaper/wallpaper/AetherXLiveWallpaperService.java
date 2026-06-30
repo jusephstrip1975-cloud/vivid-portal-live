@@ -2,11 +2,11 @@ package com.aetherx.livewallpaper.wallpaper;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.content.res.AssetFileDescriptor;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.wallpaper.WallpaperService;
@@ -159,47 +159,39 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 release();
                 if (currentHolder == null) return;
                 Surface surface = currentHolder.getSurface();
-                if (surface == null || !surface.isValid()) return;
-
-                AssetFileDescriptor afd = getResources().openRawResourceFd(R.raw.testwallpaper);
-                if (afd == null) {
-                    try {
-                        SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
-                        p.edit().putString(AetherXLiveWallpaperPlugin.KEY_RAW_VIDEO_OPEN_FAIL,
-                            System.currentTimeMillis() + " openRawResourceFd returned null").apply();
-                    } catch (Throwable ignored) {}
-                    paintMessage("RAW no encontrado");
+                if (surface == null || !surface.isValid()) {
+                    recordStep("MEDIA_SURFACE_INVALID");
                     return;
                 }
-                try {
-                    SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
-                    p.edit()
-                        .putString(AetherXLiveWallpaperPlugin.KEY_RAW_VIDEO_FOUND,
-                            "true size=" + afd.getLength())
-                        .putString(AetherXLiveWallpaperPlugin.KEY_RAW_VIDEO_OPEN_OK,
-                            System.currentTimeMillis() + " afd opened in service")
-                        .apply();
-                } catch (Throwable ignored) {}
 
                 player = new MediaPlayer();
+                recordStep("MEDIA_PLAYER_CREATED");
+
                 player.setSurface(surface);
+                recordStep("MEDIA_SURFACE_ATTACHED");
+
+                player.setDataSource(
+                    AetherXLiveWallpaperService.this,
+                    Uri.parse("android.resource://com.aetherx.livewallpaper/raw/testwallpaper")
+                );
+                recordStep("MEDIA_DATASOURCE_SET");
+
                 player.setLooping(true);
-                try { player.setVolume(0f, 0f); } catch (Throwable ignored) {}
 
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
-                    recordStep("MEDIAPLAYER_PREPARED");
+                    recordStep("MEDIA_PREPARED");
                     try {
                         Surface cur = currentHolder != null ? currentHolder.getSurface() : null;
                         if (cur == null || !cur.isValid()) return;
                         mp.start();
-                        recordStep("MEDIAPLAYER_STARTED");
+                        recordStep("MEDIA_STARTED");
                     } catch (Throwable t) {
                         recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
                     }
                 });
                 player.setOnErrorListener((mp, what, extra) -> {
-                    String msg = "MEDIAPLAYER_ERROR what=" + what + " extra=" + extra;
+                    String msg = "MEDIA_ERROR what=" + what + " extra=" + extra;
                     Log.e(TAG, msg);
                     try {
                         SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
@@ -210,9 +202,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     return true;
                 });
 
-                player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-                afd.close();
                 player.prepareAsync();
+                recordStep("MEDIA_PREPARE_ASYNC");
             } catch (Throwable t) {
                 recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
                 paintMessage("Fallo: " + t.getClass().getSimpleName());
@@ -240,7 +231,6 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             prepared = false;
             if (player != null) {
                 try { if (player.isPlaying()) player.stop(); } catch (Throwable ignored) {}
-                try { player.reset(); } catch (Throwable ignored) {}
                 try { player.release(); } catch (Throwable ignored) {}
                 player = null;
             }
