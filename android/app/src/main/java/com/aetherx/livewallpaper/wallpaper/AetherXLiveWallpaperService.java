@@ -45,8 +45,31 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         Log.e(TAG, key, t);
         try {
             SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
-            String msg = t.getClass().getSimpleName() + ": " + t.getMessage();
+            String msg = t.getClass().getSimpleName() + ": " + t.getMessage() + "\n" + Log.getStackTraceString(t);
             p.edit().putString(key, System.currentTimeMillis() + " " + msg).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private void persistStep(String step) {
+        recordStep(step);
+    }
+
+    private void persistNativeException(String message) {
+        Log.e(TAG, message);
+        try {
+            SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            p.edit().putString(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION,
+                System.currentTimeMillis() + " " + message).apply();
+        } catch (Throwable ignored) {}
+    }
+
+    private void persistNativeException(String message, Throwable t) {
+        Log.e(TAG, message, t);
+        try {
+            SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            String stack = t == null ? "" : "\n" + Log.getStackTraceString(t);
+            p.edit().putString(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION,
+                System.currentTimeMillis() + " " + message + stack).apply();
         } catch (Throwable ignored) {}
     }
 
@@ -139,56 +162,77 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
             Log.i(TAG, "SURFACE_DESTROYED");
-            main.post(this::release);
+            main.post(this::releasePlayer);
             super.onSurfaceDestroyed(holder);
         }
 
         @Override
         public void onDestroy() {
             Log.i(TAG, "ENGINE_DESTROYED");
-            main.post(this::release);
+            main.post(this::releasePlayer);
             super.onDestroy();
         }
 
         private void startRawPlayer() {
             try {
-                release();
-                if (currentHolder == null) return;
-                Surface surface = currentHolder.getSurface();
-                if (surface == null || !surface.isValid()) {
-                    recordStep("MEDIA_SURFACE_INVALID");
+                releasePlayer();
+
+                SurfaceHolder holder = currentHolder;
+                if (holder == null) {
+                    persistStep("MEDIA_HOLDER_NULL");
                     return;
                 }
 
+                Surface surface = holder.getSurface();
+                if (surface == null) {
+                    persistStep("MEDIA_SURFACE_NULL");
+                    return;
+                }
+
+                if (surface == null || !surface.isValid()) {
+                    persistStep("MEDIA_SURFACE_INVALID");
+                    return;
+                }
+                persistStep("MEDIA_SURFACE_VALID");
+
                 player = new MediaPlayer();
-                recordStep("MEDIA_PLAYER_CREATED");
+                persistStep("MEDIA_PLAYER_CREATED");
+
+                player.reset();
+                persistStep("MEDIA_RESET");
 
                 player.setSurface(surface);
-                recordStep("MEDIA_SURFACE_ATTACHED");
+                persistStep("MEDIA_SURFACE_ATTACHED");
+
+                player.setLooping(true);
+                persistStep("MEDIA_LOOPING_SET");
+
+                player.setVolume(0f, 0f);
+                persistStep("MEDIA_VOLUME_MUTED");
+
+                player.setScreenOnWhilePlaying(true);
+                persistStep("MEDIA_SCREEN_ON_SET");
 
                 player.setDataSource(
                     AetherXLiveWallpaperService.this,
-                    Uri.parse("android.resource://com.aetherx.livewallpaper/raw/testwallpaper")
+                    Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.testwallpaper)
                 );
-                recordStep("MEDIA_DATASOURCE_SET");
-
-                player.setLooping(true);
+                persistStep("MEDIA_DATASOURCE_SET");
 
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
-                    recordStep("MEDIA_PREPARED");
+                    persistStep("MEDIA_PREPARED");
                     try {
-                        Surface cur = currentHolder != null ? currentHolder.getSurface() : null;
-                        if (cur == null || !cur.isValid()) return;
                         mp.start();
-                        recordStep("MEDIA_STARTED");
+                        persistStep("MEDIA_STARTED");
                     } catch (Throwable t) {
-                        recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
+                        persistNativeException("MEDIA_START_EXCEPTION", t);
                     }
                 });
                 player.setOnErrorListener((mp, what, extra) -> {
                     String msg = "MEDIA_ERROR what=" + what + " extra=" + extra;
-                    Log.e(TAG, msg);
+                    persistStep("MEDIA_ERROR");
+                    persistNativeException(msg);
                     try {
                         SharedPreferences p = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
                         p.edit().putString(AetherXLiveWallpaperPlugin.KEY_LAST_SERVICE_ERROR,
@@ -199,9 +243,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 });
 
                 player.prepareAsync();
-                recordStep("MEDIA_PREPARE_ASYNC");
+                persistStep("MEDIA_PREPARE_ASYNC");
             } catch (Throwable t) {
-                recordError(AetherXLiveWallpaperPlugin.KEY_LAST_NATIVE_EXCEPTION, t);
+                persistNativeException("MEDIA_START_RAW_PLAYER_EXCEPTION", t);
                 paintMessage("Fallo: " + t.getClass().getSimpleName());
             }
         }
@@ -223,10 +267,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             } catch (Throwable ignored) {}
         }
 
-        private void release() {
+        private void releasePlayer() {
             prepared = false;
             if (player != null) {
-                try { if (player.isPlaying()) player.stop(); } catch (Throwable ignored) {}
+                try { player.setOnPreparedListener(null); } catch (Throwable ignored) {}
+                try { player.setOnErrorListener(null); } catch (Throwable ignored) {}
+                try { player.stop(); } catch (Throwable ignored) {}
                 try { player.release(); } catch (Throwable ignored) {}
                 player = null;
             }
