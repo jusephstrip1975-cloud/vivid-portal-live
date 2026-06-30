@@ -8,15 +8,17 @@ interface Props {
   className?: string;
 }
 
-const isCoarsePointer =
-  typeof window !== "undefined" &&
-  window.matchMedia?.("(pointer: coarse)").matches === true;
+const isNativeWebView = () => {
+  if (typeof window === "undefined") return false;
+  const bridge = (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  return bridge?.isNativePlatform?.() === true;
+};
 
 /**
  * Preview en tiempo real con bucle suave.
  * - Solo carga/reproduce el vídeo cuando entra en viewport.
- * - En móvil (pointer coarse) usa preload="none" para no saturar el decoder.
- * - Atributos playsInline + webkit-playsinline para iOS.
+ * - En Android WebView precalienta más margen para evitar tarjetas negras.
+ * - Atributos playsInline + webkit-playsinline para reproducción embebida.
  * - Si autoplay es bloqueado, reintenta tras el primer toque del usuario.
  */
 export function LiveMedia({ src, poster, alt, className = "" }: Props) {
@@ -24,25 +26,47 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [active, setActive] = useState(false);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const videoSrc = resolveDownloadUrl(src);
 
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
+    const margin = isNativeWebView() ? 700 : 300;
+    const markIfVisible = () => {
+      const rect = el.getBoundingClientRect();
+      const height = window.innerHeight || document.documentElement.clientHeight;
+      setActive(rect.top < height + margin && rect.bottom > -margin);
+    };
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) setActive(e.isIntersecting);
       },
-      { rootMargin: "200px 0px", threshold: 0.1 },
+      { rootMargin: `${margin}px 0px`, threshold: 0.01 },
     );
     io.observe(el);
-    return () => io.disconnect();
+    markIfVisible();
+    const raf = window.requestAnimationFrame(markIfVisible);
+    const timer = window.setTimeout(markIfVisible, 300);
+    return () => {
+      io.disconnect();
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute("muted", "");
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "true");
 
     const tryPlay = () => {
+      if (failed) return;
+      v.load();
       v.play().catch(() => {
         // Autoplay bloqueado: reintenta tras primera interacción del usuario.
         const retry = () => {
@@ -55,26 +79,31 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
       });
     };
 
-    if (active && document.visibilityState === "visible") {
+    if (active && document.visibilityState === "visible" && !failed) {
       tryPlay();
     } else {
       v.pause();
     }
-  }, [active]);
+  }, [active, failed]);
+
+  useEffect(() => {
+    setReady(false);
+    setFailed(false);
+  }, [src, poster]);
 
   useEffect(() => {
     const onVis = () => {
       const v = videoRef.current;
       if (!v) return;
       if (document.visibilityState === "visible" && active) {
-        v.play().catch(() => {});
+        if (!failed) v.play().catch(() => {});
       } else {
         v.pause();
       }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [active]);
+  }, [active, failed]);
 
   return (
     <div ref={wrapRef} className={`relative overflow-hidden ${className}`}>
@@ -85,10 +114,11 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
         decoding="async"
         className="absolute inset-0 size-full object-cover"
       />
-      {active && (
+      {active && !failed && (
         <video
+          key={videoSrc}
           ref={videoRef}
-          src={resolveDownloadUrl(src)}
+          src={videoSrc}
           poster={poster}
           aria-hidden
           autoPlay
@@ -96,11 +126,17 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
           muted
           playsInline
           {...({ "webkit-playsinline": "true", "x5-playsinline": "true" } as Record<string, string>)}
-          preload={isCoarsePointer ? "none" : "auto"}
+          preload="metadata"
           disablePictureInPicture
           controls={false}
           onCanPlay={() => setReady(true)}
+          onLoadedData={() => setReady(true)}
           onPlaying={() => setReady(true)}
+          onError={() => {
+            setFailed(true);
+            setReady(false);
+            console.warn("[AetherX] VIDEO_PREVIEW_ERROR", videoSrc);
+          }}
           className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${
             ready ? "opacity-100" : "opacity-0"
           }`}

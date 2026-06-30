@@ -224,14 +224,10 @@ export async function saveWallpaperToDevice(
     const platform = Capacitor.getPlatform();
 
     if (platform === "android") {
-      // RAW internal wallpaper: the WallpaperService plays res/raw/testwallpaper.mp4.
-      // Skip saveVideoFromUrl / transcode entirely and go straight to the live picker.
-      // This avoids the FFmpegKit NoClassDefFoundError that killed the plugin before
-      // it could open the picker.
-      void registerPlugin;
-      void fileName;
-      void videoUrl;
-      await recordFrontendStep("SKIP_FFMPEG_RAW_VIDEO");
+      const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+      const downloadUrl = resolveDownloadUrl(videoUrl);
+      await recordFrontendStep("ANDROID_SAVE_SELECTED_VIDEO " + fileName);
+      await LiveWallpaper.saveVideoFromUrl({ url: downloadUrl, fileName });
       return applyPickedVideo(target);
     }
 
