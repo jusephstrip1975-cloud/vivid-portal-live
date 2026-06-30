@@ -134,12 +134,6 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             main.post(() -> {
                 if (player == null) {
                     startRawPlayer();
-                } else {
-                    try {
-                        player.setSurface(holder.getSurface());
-                    } catch (Throwable t) {
-                        Log.e(TAG, "setSurface failed", t);
-                    }
                 }
             });
         }
@@ -152,7 +146,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             main.post(() -> {
                 if (player == null || !prepared) return;
                 try {
-                    if (!v && player.isPlaying()) player.pause();
+                    if (!v) player.pause();
                 } catch (Throwable t) {
                     Log.e(TAG, "visibility toggle failed", t);
                 }
