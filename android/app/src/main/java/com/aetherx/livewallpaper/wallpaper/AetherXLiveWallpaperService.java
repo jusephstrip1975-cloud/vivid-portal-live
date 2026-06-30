@@ -227,9 +227,11 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 String selectedPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
                 File selectedFile = selectedPath == null ? null : new File(selectedPath);
                 if (selectedFile != null && selectedFile.exists() && selectedFile.canRead() && selectedFile.length() > 0) {
-                    fis = new FileInputStream(selectedFile);
-                    player.setDataSource(fis.getFD());
-                    persistStep("MEDIA_DATASOURCE_SET_SELECTED_FILE len=" + selectedFile.length());
+                    // Usar ruta absoluta (String) en lugar de FD: prepareAsync es async
+                    // y cerrar el FileInputStream antes de que termine invalida el FD,
+                    // causando IllegalStateException en prepareAsync.
+                    player.setDataSource(selectedFile.getAbsolutePath());
+                    persistStep("MEDIA_DATASOURCE_SET_SELECTED_PATH len=" + selectedFile.length());
                 } else {
                     persistStep("MEDIA_SELECTED_FILE_MISSING_USE_RAW");
                     afd = getResources().openRawResourceFd(R.raw.testwallpaper);
