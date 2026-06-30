@@ -229,14 +229,55 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
                 SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
                 String selectedPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
+                String selectedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
                 File selectedFile = selectedPath == null ? null : new File(selectedPath);
+                boolean sourceSet = false;
+
                 if (selectedFile != null && selectedFile.exists() && selectedFile.canRead() && selectedFile.length() > 0) {
-                    // Usar ruta absoluta (String) en lugar de FD: prepareAsync es async
-                    // y cerrar el FileInputStream antes de que termine invalida el FD,
-                    // causando IllegalStateException en prepareAsync.
+                    // Ruta absoluta (String): prepareAsync abre el archivo internamente.
                     player.setDataSource(selectedFile.getAbsolutePath());
                     persistStep("MEDIA_DATASOURCE_SET_SELECTED_PATH len=" + selectedFile.length());
-                } else {
+                    sourceSet = true;
+                } else if (selectedUri != null && !selectedUri.isEmpty()) {
+                    // Fallback content:// URI (SAF / MediaStore). Necesita permiso
+                    // persistente concedido en pickVideoFromDevice via takePersistableUriPermission.
+                    persistStep("MEDIA_DATASOURCE_TRY_URI " + selectedUri);
+                    try {
+                        Uri uri = Uri.parse(selectedUri);
+                        ContentResolver resolver = getContentResolver();
+                        // Re-aplicar el permiso de lectura sobre el caller actual (el WallpaperService
+                        // se ejecuta en el mismo proceso/package que recibió el grant, así que esto
+                        // valida que la URI sigue siendo accesible).
+                        ParcelFileDescriptor pfd = resolver.openFileDescriptor(uri, "r");
+                        if (pfd != null) {
+                            player.setDataSource(pfd.getFileDescriptor());
+                            persistStep("MEDIA_DATASOURCE_SET_URI_FD");
+                            // Cerramos el wrapper PFD: MediaPlayer dup'a el FD nativo internamente,
+                            // así que el descriptor original puede cerrarse sin invalidar el playback.
+                            try { pfd.close(); } catch (Throwable ignored) {}
+                            sourceSet = true;
+                        } else {
+                            persistStep("MEDIA_URI_PFD_NULL");
+                        }
+                    } catch (SecurityException se) {
+                        persistNativeException("MEDIA_URI_SECURITY", se);
+                    } catch (Throwable t) {
+                        persistNativeException("MEDIA_URI_OPEN_FAIL", t);
+                    }
+                    if (!sourceSet) {
+                        // Último intento: dejar que MediaPlayer abra la URI con el context (resuelve
+                        // content://, file:// y android.resource://).
+                        try {
+                            player.setDataSource(getApplicationContext(), Uri.parse(selectedUri));
+                            persistStep("MEDIA_DATASOURCE_SET_URI_CONTEXT");
+                            sourceSet = true;
+                        } catch (Throwable t) {
+                            persistNativeException("MEDIA_URI_CONTEXT_FAIL", t);
+                        }
+                    }
+                }
+
+                if (!sourceSet) {
                     persistStep("MEDIA_SELECTED_FILE_MISSING_USE_RAW");
                     afd = getResources().openRawResourceFd(R.raw.testwallpaper);
                     if (afd == null) {
@@ -252,6 +293,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     );
                     persistStep("MEDIA_DATASOURCE_SET_RAW_FD");
                 }
+
 
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
