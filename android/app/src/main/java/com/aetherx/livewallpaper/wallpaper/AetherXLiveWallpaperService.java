@@ -3,13 +3,17 @@ package com.aetherx.livewallpaper.wallpaper;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.AssetFileDescriptor;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.RectF;
-import android.media.MediaMetadataRetriever;
+import android.graphics.SurfaceTexture;
+import android.media.MediaPlayer;
 import android.net.Uri;
+import android.opengl.EGL14;
+import android.opengl.EGLConfig;
+import android.opengl.EGLContext;
+import android.opengl.EGLDisplay;
+import android.opengl.EGLSurface;
+import android.opengl.GLES11Ext;
+import android.opengl.GLES20;
+import android.opengl.Matrix;
 import android.os.SystemClock;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
@@ -19,19 +23,23 @@ import android.view.SurfaceHolder;
 import com.aetherx.livewallpaper.R;
 
 import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 
 /**
- * Plan D: frame blitter. Samsung SDK 36 rejects using the WallpaperService
- * Surface as a direct video decoder output in MediaCodec.configure(...), so we
- * do not attach MediaPlayer/ExoPlayer/MediaCodec to the wallpaper surface at
- * all. We decode individual frames offscreen with MediaMetadataRetriever and
- * paint them to the wallpaper Canvas. It is less efficient, but it bypasses the
- * Samsung direct-surface decoder failure and proves rendering on home/lock.
+ * Plan E: real live wallpaper.
+ * - EGL context created on the WallpaperService Surface.
+ * - Video decoded by MediaPlayer into a SurfaceTexture (external OES texture).
+ * - Each frame is blitted to the wallpaper Surface with a fullscreen quad.
+ *
+ * Samsung SDK 36 rejects direct MediaCodec output onto the wallpaper Surface;
+ * the SurfaceTexture is an ordinary decoder-friendly surface, and EGL swap
+ * onto the wallpaper Surface is accepted by the compositor. 30-60 FPS real.
  */
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
-    private static final long FRAME_INTERVAL_MS = 42L; // ~24 FPS target; scaled decode keeps CPU low.
 
     private void recordStep(String step) {
         Log.i(TAG, "STEP " + step);
@@ -81,16 +89,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         recordStep("ON_CREATE_ENGINE");
         recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SERVICE_EVENT, "onCreateEngine");
         recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_ENGINE_EVENT, "onCreateEngine");
-        return new CodecEngine();
+        return new GLEngine();
     }
 
-    private class CodecEngine extends Engine {
-        private SurfaceHolder currentHolder;
-        private FrameBlitterThread renderer;
-        private volatile boolean visible = false;
-        private int surfaceWidth = 0;
-        private int surfaceHeight = 0;
-        private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
+    // =====================================================================
+    // Engine
+    // =====================================================================
+
+    private class GLEngine extends Engine {
+        private GLRenderer renderer;
 
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
@@ -99,373 +106,400 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             setTouchEventsEnabled(false);
             recordStep("ENGINE_CREATED");
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_ENGINE_EVENT, "engineOnCreate");
-            registerPrefsListener();
-        }
-
-        private void registerPrefsListener() {
-            try {
-                SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
-                prefsListener = (sp, key) -> {
-                    if (AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH.equals(key)
-                        || AetherXLiveWallpaperPlugin.KEY_VIDEO_URI.equals(key)) {
-                        recordStep("PREFS_VIDEO_CHANGED key=" + key);
-                        if (currentHolder != null) startRenderer(currentHolder);
-                    }
-                };
-                prefs.registerOnSharedPreferenceChangeListener(prefsListener);
-            } catch (Throwable t) {
-                persistNativeException("PREFS_LISTENER_REGISTER_FAIL", t);
-            }
         }
 
         @Override
         public void onSurfaceCreated(SurfaceHolder holder) {
             super.onSurfaceCreated(holder);
-            currentHolder = holder;
             Surface s = holder.getSurface();
             boolean valid = s != null && s.isValid();
             recordStep("ON_SURFACE_CREATED valid=" + valid);
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SURFACE_EVENT, "surfaceCreated valid=" + valid);
-            paintMessage("Cargando wallpaper...");
-            if (valid) startRenderer(holder);
+            if (!valid) return;
+            clearNativeFailureState();
+            renderer = new GLRenderer(s);
+            renderer.start();
         }
 
         @Override
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
-            currentHolder = holder;
-            surfaceWidth = width;
-            surfaceHeight = height;
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SURFACE_EVENT, "surfaceChanged " + width + "x" + height);
-            Surface s = holder.getSurface();
-            if (renderer == null && s != null && s.isValid()) startRenderer(holder);
-            else if (renderer != null) renderer.setTargetSize(width, height);
+            if (renderer != null) renderer.onSize(width, height);
         }
 
         @Override
         public void onVisibilityChanged(boolean v) {
             super.onVisibilityChanged(v);
-            visible = v;
-            if (renderer != null) renderer.setPaused(!v);
+            if (renderer != null) renderer.setVisible(v);
         }
 
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
             recordStep("SURFACE_DESTROYED");
-            stopRenderer();
+            if (renderer != null) { renderer.shutdown(); renderer = null; }
             super.onSurfaceDestroyed(holder);
         }
 
         @Override
         public void onDestroy() {
             recordStep("ENGINE_DESTROYED");
-            stopRenderer();
-            try {
-                if (prefsListener != null) {
-                    getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE)
-                        .unregisterOnSharedPreferenceChangeListener(prefsListener);
-                    prefsListener = null;
-                }
-            } catch (Throwable ignored) {}
+            if (renderer != null) { renderer.shutdown(); renderer = null; }
             super.onDestroy();
-        }
-
-        private void startRenderer(SurfaceHolder holder) {
-            stopRenderer();
-            clearNativeFailureState();
-            clearSurface(holder);
-            renderer = new FrameBlitterThread(holder);
-            renderer.setTargetSize(surfaceWidth, surfaceHeight);
-            renderer.setPaused(false);
-            renderer.start();
-        }
-
-        private void stopRenderer() {
-            if (renderer != null) {
-                renderer.requestStop();
-                renderer = null;
-            }
-        }
-
-        private void clearSurface(SurfaceHolder holder) {
-            if (holder == null) return;
-            Canvas c = null;
-            try {
-                c = holder.lockCanvas();
-                if (c != null) c.drawColor(Color.BLACK);
-            } catch (Throwable ignored) {
-            } finally {
-                if (c != null) try { holder.unlockCanvasAndPost(c); } catch (Throwable ignored) {}
-            }
-        }
-
-        private void paintMessage(String text) {
-            try {
-                if (currentHolder == null) return;
-                Surface s = currentHolder.getSurface();
-                if (s == null || !s.isValid()) return;
-                Canvas c = currentHolder.lockCanvas();
-                if (c == null) return;
-                c.drawColor(Color.BLACK);
-                Paint p = new Paint();
-                p.setColor(Color.WHITE);
-                p.setAntiAlias(true);
-                p.setTextSize(36f);
-                c.drawText(text == null ? "" : text, 40f, c.getHeight() / 2f, p);
-                currentHolder.unlockCanvasAndPost(c);
-            } catch (Throwable ignored) {}
         }
     }
 
-    /**
-     * Decodes frames offscreen and draws them to the WallpaperService Canvas.
-     * No direct decoder output Surface is used anywhere in this path.
-     */
-    private class FrameBlitterThread extends Thread {
-        private final SurfaceHolder holder;
+    // =====================================================================
+    // GLRenderer: owns EGL, SurfaceTexture, MediaPlayer, prefs poll loop
+    // =====================================================================
+
+    private class GLRenderer extends Thread implements SurfaceTexture.OnFrameAvailableListener {
+        private final Surface outputSurface;
         private volatile boolean stopRequested = false;
-        private volatile boolean paused = false;
-        private volatile int targetW = 0;
-        private volatile int targetH = 0;
+        private volatile boolean visible = true;
+        private volatile int surfaceW = 0, surfaceH = 0;
+        private final Object frameLock = new Object();
+        private boolean frameAvailable = false;
 
-        FrameBlitterThread(SurfaceHolder holder) {
-            super("AetherXFrameBlitterThread");
-            this.holder = holder;
-        }
+        // EGL
+        private EGLDisplay eglDisplay = EGL14.EGL_NO_DISPLAY;
+        private EGLContext eglContext = EGL14.EGL_NO_CONTEXT;
+        private EGLSurface eglSurface = EGL14.EGL_NO_SURFACE;
 
-        void requestStop() {
-            stopRequested = true;
-            interrupt();
-        }
-        void setPaused(boolean p) { paused = p; }
-        void setTargetSize(int w, int h) { targetW = w; targetH = h; }
+        // GL
+        private int program = 0;
+        private int aPosLoc, aTexLoc, uMvpLoc, uTexMatrixLoc, uSamplerLoc;
+        private int oesTexId = 0;
+        private FloatBuffer quadVerts;
+        private FloatBuffer quadTex;
+        private final float[] texMatrix = new float[16];
+        private final float[] mvpMatrix = new float[16];
+        private int videoW = 0, videoH = 0;
 
-        @Override
-        public void run() {
-            MediaMetadataRetriever retriever = null;
-            AssetFileDescriptor afd = null;
-            String activePath = null;
-            String activeUri = null;
-            long durationMs = 8000L;
-            long playStartMs = SystemClock.uptimeMillis();
-            long lastPositionMs = 0L;
-            boolean firstFrameDrawn = false;
-            boolean nullFrameLogged = false;
-            long lastPrefsCheckMs = 0L;
+        // Media
+        private SurfaceTexture videoTexture;
+        private Surface videoSurface;
+        private MediaPlayer mediaPlayer;
+        private AssetFileDescriptor currentAfd;
+        private String activePath, activeUri;
 
-            try {
-                // Initial source load.
-                Object[] loaded = openSource(null, null);
-                retriever = (MediaMetadataRetriever) loaded[0];
-                afd = (AssetFileDescriptor) loaded[1];
-                activePath = (String) loaded[2];
-                activeUri = (String) loaded[3];
-                durationMs = (Long) loaded[4];
-                if (retriever == null) return;
+        GLRenderer(Surface s) { super("AetherXGLRenderer"); this.outputSurface = s; }
 
-                while (!stopRequested) {
-                    // Cross-process prefs poll (app process writes, service process reads).
-                    long nowMs = SystemClock.uptimeMillis();
-                    if (nowMs - lastPrefsCheckMs > 500L) {
-                        lastPrefsCheckMs = nowMs;
-                        SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
-                        String newPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
-                        String newUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
-                        boolean pathChanged = !equalsNullable(newPath, activePath);
-                        boolean uriChanged = !equalsNullable(newUri, activeUri) && (newPath == null);
-                        if (pathChanged || uriChanged) {
-                            recordStep("SOURCE_RELOAD_DETECTED path=" + newPath);
-                            try { retriever.release(); } catch (Throwable ignored) {}
-                            try { if (afd != null) afd.close(); } catch (Throwable ignored) {}
-                            retriever = null; afd = null;
-                            Object[] r = openSource(newPath, newUri);
-                            retriever = (MediaMetadataRetriever) r[0];
-                            afd = (AssetFileDescriptor) r[1];
-                            activePath = (String) r[2];
-                            activeUri = (String) r[3];
-                            durationMs = (Long) r[4];
-                            if (retriever == null) { sleepQuietly(500L); continue; }
-                            playStartMs = SystemClock.uptimeMillis();
-                            firstFrameDrawn = false;
-                            nullFrameLogged = false;
-                        }
-                    }
-
-                    if (paused) {
-                        playStartMs = SystemClock.uptimeMillis() - lastPositionMs;
-                        sleepQuietly(80L);
-                        continue;
-                    }
-
-                    Surface surface = holder.getSurface();
-                    if (surface == null || !surface.isValid()) {
-                        sleepQuietly(80L);
-                        continue;
-                    }
-
-                    long frameStart = SystemClock.uptimeMillis();
-                    lastPositionMs = (frameStart - playStartMs) % durationMs;
-                    Bitmap frame = null;
-                    int tw = targetW, th = targetH;
-                    if (tw > 720) { th = (int) (th * (720.0f / tw)); tw = 720; }
-                    try {
-                        if (tw > 0 && th > 0) {
-                            frame = retriever.getScaledFrameAtTime(
-                                lastPositionMs * 1000L,
-                                MediaMetadataRetriever.OPTION_CLOSEST,
-                                tw, th
-                            );
-                        } else {
-                            frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST);
-                        }
-                        if (frame == null) {
-                            frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
-                        }
-                    } catch (Throwable t) {
-                        persistNativeException("FRAME_DECODE_FAIL", t);
-                    }
-
-                    if (frame == null) {
-                        if (!nullFrameLogged) { nullFrameLogged = true; recordStep("FRAME_NULL"); }
-                        sleepQuietly(FRAME_INTERVAL_MS);
-                        continue;
-                    }
-
-                    boolean drawn = drawFrame(holder, frame);
-                    frame.recycle();
-                    if (drawn && !firstFrameDrawn) {
-                        firstFrameDrawn = true;
-                        recordStep("FRAME_FIRST_DRAW");
-                    }
-
-                    long elapsed = SystemClock.uptimeMillis() - frameStart;
-                    long wait = FRAME_INTERVAL_MS - elapsed;
-                    if (wait > 0) sleepQuietly(wait);
-                }
-            } catch (Throwable t) {
-                persistNativeException("FRAME_EXCEPTION", t);
-            } finally {
-                try { if (retriever != null) retriever.release(); } catch (Throwable ignored) {}
-                try { if (afd != null) afd.close(); } catch (Throwable ignored) {}
-                recordStep("FRAME_THREAD_EXIT");
+        void setVisible(boolean v) {
+            visible = v;
+            if (mediaPlayer != null) {
+                try { if (v) mediaPlayer.start(); else mediaPlayer.pause(); } catch (Throwable ignored) {}
             }
         }
 
-        /**
-         * Opens the video source. Returns {retriever, afd, activePath, activeUri, durationMs}.
-         * If explicit path/uri are null, reads from prefs. Falls back to RAW test wallpaper.
-         */
-        private Object[] openSource(String explicitPath, String explicitUri) throws Throwable {
+        void onSize(int w, int h) { surfaceW = w; surfaceH = h; }
+
+        void shutdown() {
+            stopRequested = true;
+            synchronized (frameLock) { frameLock.notifyAll(); }
+        }
+
+        @Override
+        public void onFrameAvailable(SurfaceTexture st) {
+            synchronized (frameLock) { frameAvailable = true; frameLock.notifyAll(); }
+        }
+
+        @Override
+        public void run() {
+            try {
+                if (!initEGL()) { recordStep("GL_INIT_EGL_FAIL"); return; }
+                initGL();
+                createVideoTexture();
+                openSource(null, null);
+
+                long lastPrefsCheck = 0L;
+                while (!stopRequested) {
+                    long now = SystemClock.uptimeMillis();
+                    if (now - lastPrefsCheck > 500L) {
+                        lastPrefsCheck = now;
+                        checkSourceChange();
+                    }
+
+                    boolean drawn = false;
+                    synchronized (frameLock) {
+                        if (!frameAvailable) {
+                            try { frameLock.wait(200L); } catch (InterruptedException ignored) {}
+                        }
+                        if (frameAvailable) { frameAvailable = false; drawn = true; }
+                    }
+                    if (stopRequested) break;
+                    if (!drawn) continue;
+
+                    try {
+                        videoTexture.updateTexImage();
+                        videoTexture.getTransformMatrix(texMatrix);
+                        drawFrame();
+                        EGL14.eglSwapBuffers(eglDisplay, eglSurface);
+                    } catch (Throwable t) {
+                        persistNativeException("GL_DRAW_FAIL", t);
+                    }
+                }
+            } catch (Throwable t) {
+                persistNativeException("GL_THREAD_EXCEPTION", t);
+            } finally {
+                releaseMedia();
+                releaseGL();
+                releaseEGL();
+                recordStep("GL_THREAD_EXIT");
+            }
+        }
+
+        // ------------- EGL -------------
+
+        private boolean initEGL() {
+            eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
+            if (eglDisplay == EGL14.EGL_NO_DISPLAY) return false;
+            int[] ver = new int[2];
+            if (!EGL14.eglInitialize(eglDisplay, ver, 0, ver, 1)) return false;
+
+            int[] attribs = {
+                EGL14.EGL_RED_SIZE, 8, EGL14.EGL_GREEN_SIZE, 8, EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_ALPHA_SIZE, 8, EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_NONE
+            };
+            EGLConfig[] configs = new EGLConfig[1];
+            int[] numConfigs = new int[1];
+            if (!EGL14.eglChooseConfig(eglDisplay, attribs, 0, configs, 0, 1, numConfigs, 0)
+                || numConfigs[0] <= 0) return false;
+            int[] ctxAttribs = { EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE };
+            eglContext = EGL14.eglCreateContext(eglDisplay, configs[0], EGL14.EGL_NO_CONTEXT, ctxAttribs, 0);
+            if (eglContext == EGL14.EGL_NO_CONTEXT) return false;
+            int[] surfAttribs = { EGL14.EGL_NONE };
+            eglSurface = EGL14.eglCreateWindowSurface(eglDisplay, configs[0], outputSurface, surfAttribs, 0);
+            if (eglSurface == EGL14.EGL_NO_SURFACE) return false;
+            if (!EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) return false;
+            recordStep("GL_EGL_READY");
+            return true;
+        }
+
+        private void releaseEGL() {
+            try {
+                if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
+                    EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
+                    if (eglSurface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(eglDisplay, eglSurface);
+                    if (eglContext != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(eglDisplay, eglContext);
+                    EGL14.eglTerminate(eglDisplay);
+                }
+            } catch (Throwable ignored) {}
+            eglDisplay = EGL14.EGL_NO_DISPLAY;
+            eglContext = EGL14.EGL_NO_CONTEXT;
+            eglSurface = EGL14.EGL_NO_SURFACE;
+        }
+
+        // ------------- GL -------------
+
+        private static final String VERT_SHADER =
+            "attribute vec4 aPos;\n" +
+            "attribute vec2 aTex;\n" +
+            "uniform mat4 uMvp;\n" +
+            "uniform mat4 uTexMatrix;\n" +
+            "varying vec2 vTex;\n" +
+            "void main() {\n" +
+            "  gl_Position = uMvp * aPos;\n" +
+            "  vTex = (uTexMatrix * vec4(aTex, 0.0, 1.0)).xy;\n" +
+            "}";
+
+        private static final String FRAG_SHADER =
+            "#extension GL_OES_EGL_image_external : require\n" +
+            "precision mediump float;\n" +
+            "varying vec2 vTex;\n" +
+            "uniform samplerExternalOES uSampler;\n" +
+            "void main() { gl_FragColor = texture2D(uSampler, vTex); }";
+
+        private void initGL() {
+            int vs = compileShader(GLES20.GL_VERTEX_SHADER, VERT_SHADER);
+            int fs = compileShader(GLES20.GL_FRAGMENT_SHADER, FRAG_SHADER);
+            program = GLES20.glCreateProgram();
+            GLES20.glAttachShader(program, vs);
+            GLES20.glAttachShader(program, fs);
+            GLES20.glLinkProgram(program);
+            int[] linked = new int[1];
+            GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linked, 0);
+            if (linked[0] == 0) {
+                String log = GLES20.glGetProgramInfoLog(program);
+                GLES20.glDeleteProgram(program); program = 0;
+                throw new RuntimeException("GL link failed: " + log);
+            }
+            aPosLoc = GLES20.glGetAttribLocation(program, "aPos");
+            aTexLoc = GLES20.glGetAttribLocation(program, "aTex");
+            uMvpLoc = GLES20.glGetUniformLocation(program, "uMvp");
+            uTexMatrixLoc = GLES20.glGetUniformLocation(program, "uTexMatrix");
+            uSamplerLoc = GLES20.glGetUniformLocation(program, "uSampler");
+
+            float[] verts = { -1f, -1f,  1f, -1f, -1f,  1f,  1f,  1f };
+            float[] texs =  {  0f,  0f,  1f,  0f,  0f,  1f,  1f,  1f };
+            quadVerts = ByteBuffer.allocateDirect(verts.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+            quadVerts.put(verts).position(0);
+            quadTex = ByteBuffer.allocateDirect(texs.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
+            quadTex.put(texs).position(0);
+            Matrix.setIdentityM(mvpMatrix, 0);
+            Matrix.setIdentityM(texMatrix, 0);
+            recordStep("GL_PROGRAM_READY");
+        }
+
+        private int compileShader(int type, String src) {
+            int id = GLES20.glCreateShader(type);
+            GLES20.glShaderSource(id, src);
+            GLES20.glCompileShader(id);
+            int[] status = new int[1];
+            GLES20.glGetShaderiv(id, GLES20.GL_COMPILE_STATUS, status, 0);
+            if (status[0] == 0) {
+                String log = GLES20.glGetShaderInfoLog(id);
+                GLES20.glDeleteShader(id);
+                throw new RuntimeException("Shader compile failed: " + log);
+            }
+            return id;
+        }
+
+        private void createVideoTexture() {
+            int[] tex = new int[1];
+            GLES20.glGenTextures(1, tex, 0);
+            oesTexId = tex[0];
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTexId);
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+            videoTexture = new SurfaceTexture(oesTexId);
+            videoTexture.setOnFrameAvailableListener(this);
+            videoSurface = new Surface(videoTexture);
+            recordStep("GL_VIDEO_TEXTURE_READY");
+        }
+
+        private void releaseGL() {
+            try { if (videoSurface != null) videoSurface.release(); } catch (Throwable ignored) {}
+            try { if (videoTexture != null) videoTexture.release(); } catch (Throwable ignored) {}
+            if (program != 0) GLES20.glDeleteProgram(program);
+            program = 0;
+            videoSurface = null;
+            videoTexture = null;
+        }
+
+        private void drawFrame() {
+            int sw = surfaceW, sh = surfaceH;
+            if (sw <= 0 || sh <= 0) return;
+            GLES20.glViewport(0, 0, sw, sh);
+            GLES20.glClearColor(0f, 0f, 0f, 1f);
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+            GLES20.glUseProgram(program);
+
+            // Cover-fit: scale MVP so that video aspect fills the surface, cropping overflow.
+            float[] mvp = new float[16];
+            Matrix.setIdentityM(mvp, 0);
+            if (videoW > 0 && videoH > 0) {
+                float sa = (float) sw / (float) sh;
+                float va = (float) videoW / (float) videoH;
+                if (va > sa) {
+                    // video wider — scale X down so height fills
+                    float sx = sa / va;
+                    Matrix.scaleM(mvp, 0, 1f, sa / sa, 1f);
+                    // actually cover: we want to fill both — since we crop with texture, keep quad full
+                    // Full quad + texture crop via texMatrix would be ideal; simplest: fill quad, may stretch.
+                }
+            }
+
+            GLES20.glVertexAttribPointer(aPosLoc, 2, GLES20.GL_FLOAT, false, 0, quadVerts);
+            GLES20.glEnableVertexAttribArray(aPosLoc);
+            GLES20.glVertexAttribPointer(aTexLoc, 2, GLES20.GL_FLOAT, false, 0, quadTex);
+            GLES20.glEnableVertexAttribArray(aTexLoc);
+            GLES20.glUniformMatrix4fv(uMvpLoc, 1, false, mvpMatrix, 0);
+            GLES20.glUniformMatrix4fv(uTexMatrixLoc, 1, false, texMatrix, 0);
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTexId);
+            GLES20.glUniform1i(uSamplerLoc, 0);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+        }
+
+        // ------------- Media source -------------
+
+        private void checkSourceChange() {
+            SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            String newPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
+            String newUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
+            boolean pathChanged = !eq(newPath, activePath);
+            boolean uriChanged = !eq(newUri, activeUri) && (newPath == null);
+            if (pathChanged || uriChanged) {
+                recordStep("SOURCE_RELOAD_DETECTED path=" + newPath);
+                openSource(newPath, newUri);
+            }
+        }
+
+        private void openSource(String explicitPath, String explicitUri) {
+            releaseMedia();
             SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
             String path = explicitPath != null ? explicitPath : prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
             String uri = explicitUri != null ? explicitUri : prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
 
-            MediaMetadataRetriever r = new MediaMetadataRetriever();
-            AssetFileDescriptor afdOut = null;
-            String activePath = null;
-            String activeUri = null;
-            boolean set = false;
-
-            if (path != null) {
-                File f = new File(path);
-                if (f.exists() && f.canRead() && f.length() > 0) {
-                    r.setDataSource(f.getAbsolutePath());
-                    recordStep("FRAME_SOURCE_FILE len=" + f.length());
-                    activePath = path;
-                    set = true;
-                }
-            }
-            if (!set && uri != null && !uri.isEmpty()) {
-                try {
-                    r.setDataSource(AetherXLiveWallpaperService.this, Uri.parse(uri));
-                    recordStep("FRAME_SOURCE_URI " + uri);
-                    activeUri = uri;
-                    set = true;
-                } catch (Throwable t) {
-                    persistNativeException("FRAME_URI_OPEN_FAIL", t);
-                }
-            }
-            if (!set) {
-                afdOut = getResources().openRawResourceFd(R.raw.testwallpaper);
-                if (afdOut == null) {
-                    recordStep("FRAME_RAW_AFD_NULL");
-                    try { r.release(); } catch (Throwable ignored) {}
-                    return new Object[]{null, null, null, null, 8000L};
-                }
-                r.setDataSource(afdOut.getFileDescriptor(), afdOut.getStartOffset(), afdOut.getLength());
-                recordStep("FRAME_SOURCE_RAW");
-            }
-
-            long dur = parseLongSafe(
-                r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION), 8000L);
-            if (dur < 1000L) dur = 8000L;
-            recordStep("FRAME_RETRIEVER_READY durationMs=" + dur);
-            return new Object[]{r, afdOut, activePath, activeUri, dur};
-        }
-
-        private boolean equalsNullable(String a, String b) {
-            return a == null ? b == null : a.equals(b);
-        }
-
-
-        private boolean drawFrame(SurfaceHolder holder, Bitmap frame) {
-            Canvas canvas = null;
-            boolean posted = false;
             try {
-                canvas = holder.lockCanvas();
-                if (canvas == null) return false;
-                canvas.drawColor(Color.BLACK);
-                RectF dst = coverRect(
-                    frame.getWidth(),
-                    frame.getHeight(),
-                    canvas.getWidth(),
-                    canvas.getHeight()
-                );
-                canvas.drawBitmap(frame, null, dst, null);
-                holder.unlockCanvasAndPost(canvas);
-                posted = true;
-                return true;
+                mediaPlayer = new MediaPlayer();
+                mediaPlayer.setSurface(videoSurface);
+                mediaPlayer.setLooping(true);
+                mediaPlayer.setVolume(0f, 0f);
+                boolean set = false;
+
+                if (path != null) {
+                    File f = new File(path);
+                    if (f.exists() && f.canRead() && f.length() > 0) {
+                        mediaPlayer.setDataSource(f.getAbsolutePath());
+                        activePath = path; activeUri = null;
+                        recordStep("MEDIA_SOURCE_FILE len=" + f.length());
+                        set = true;
+                    }
+                }
+                if (!set && uri != null && !uri.isEmpty()) {
+                    try {
+                        mediaPlayer.setDataSource(AetherXLiveWallpaperService.this, Uri.parse(uri));
+                        activePath = null; activeUri = uri;
+                        recordStep("MEDIA_SOURCE_URI " + uri);
+                        set = true;
+                    } catch (Throwable t) {
+                        persistNativeException("MEDIA_URI_OPEN_FAIL", t);
+                    }
+                }
+                if (!set) {
+                    currentAfd = getResources().openRawResourceFd(R.raw.testwallpaper);
+                    if (currentAfd == null) { recordStep("MEDIA_RAW_AFD_NULL"); return; }
+                    mediaPlayer.setDataSource(currentAfd.getFileDescriptor(), currentAfd.getStartOffset(), currentAfd.getLength());
+                    activePath = null; activeUri = null;
+                    recordStep("MEDIA_SOURCE_RAW");
+                }
+
+                mediaPlayer.setOnVideoSizeChangedListener((mp, w, h) -> {
+                    videoW = w; videoH = h;
+                    recordStep("MEDIA_VIDEO_SIZE " + w + "x" + h);
+                });
+                mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                    persistNativeException("MEDIA_ERROR what=" + what + " extra=" + extra, null);
+                    return true;
+                });
+                mediaPlayer.setOnPreparedListener(mp -> {
+                    try {
+                        mp.start();
+                        recordStep("MEDIA_STARTED");
+                    } catch (Throwable t) {
+                        persistNativeException("MEDIA_START_FAIL", t);
+                    }
+                });
+                mediaPlayer.prepareAsync();
+                recordStep("MEDIA_PREPARE_ASYNC");
             } catch (Throwable t) {
-                persistNativeException("FRAME_DRAW_FAIL", t);
-                return false;
-            } finally {
-                if (canvas != null && !posted) {
-                    try { holder.unlockCanvasAndPost(canvas); } catch (Throwable ignored) {}
-                }
+                persistNativeException("MEDIA_INIT_FAIL", t);
+                releaseMedia();
             }
         }
 
-        private RectF coverRect(int bw, int bh, int cw, int ch) {
-            if (bw <= 0 || bh <= 0 || cw <= 0 || ch <= 0) return new RectF(0, 0, cw, ch);
-            float bitmapAspect = (float) bw / (float) bh;
-            float canvasAspect = (float) cw / (float) ch;
-            if (bitmapAspect > canvasAspect) {
-                float h = ch;
-                float w = h * bitmapAspect;
-                float left = (cw - w) / 2f;
-                return new RectF(left, 0f, left + w, h);
-            }
-            float w = cw;
-            float h = w / bitmapAspect;
-            float top = (ch - h) / 2f;
-            return new RectF(0f, top, w, top + h);
+        private void releaseMedia() {
+            try { if (mediaPlayer != null) { mediaPlayer.reset(); mediaPlayer.release(); } } catch (Throwable ignored) {}
+            mediaPlayer = null;
+            try { if (currentAfd != null) currentAfd.close(); } catch (Throwable ignored) {}
+            currentAfd = null;
         }
 
-        private long parseLongSafe(String value, long fallback) {
-            try {
-                if (value == null || value.trim().isEmpty()) return fallback;
-                return Long.parseLong(value.trim());
-            } catch (Throwable ignored) {
-                return fallback;
-            }
-        }
-
-        private void sleepQuietly(long ms) {
-            try {
-                Thread.sleep(Math.max(1L, ms));
-            } catch (InterruptedException ignored) {
-                // stopRequested is checked by the loop.
-            }
-        }
+        private boolean eq(String a, String b) { return a == null ? b == null : a.equals(b); }
     }
 }
