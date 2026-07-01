@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-     versionCode 317
-     versionName "3.1.7-planc-mediacodec-wallpaper"
+     versionCode 318
+     versionName "3.1.8-pland-frameblitter-canvas"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
