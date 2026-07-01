@@ -37,7 +37,7 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const hero = WALLPAPERS[0];
-  const trending = WALLPAPERS.slice(1, 5);
+
   const [pickState, setPickState] = useState<"idle" | "loading" | "applying">("idle");
   const [pickToast, setPickToast] = useState<string | null>(null);
   const [preview, setPreview] = useState<PickedDeviceVideo | null>(null);
@@ -356,34 +356,30 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Trending */}
+      {/* Todos los fondos 3D — grid completo, scroll infinito */}
       <section className="px-6 pt-6">
-        <div className="mb-5 flex items-end justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/40">
-              En tendencia
-            </p>
-            <h3 className="mt-1 text-lg font-bold text-display">Universos vivos</h3>
-          </div>
-          <Link
-            to="/explore"
-            search={{ cat: "todos" }}
-            className="text-xs font-bold uppercase tracking-[0.18em] text-electric-blue"
-          >
-            Ver todos
-          </Link>
+        <div className="mb-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/40">
+            Todos los universos
+          </p>
+          <h3 className="mt-1 text-lg font-bold text-display">
+            Pantallas 3D · desliza para ver más
+          </h3>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-4">
-            <WallpaperTile wp={trending[0]} index={0} />
-            <WallpaperTile wp={trending[2]} index={2} />
+            {WALLPAPERS.filter((_, i) => i % 2 === 1).map((wp, i) => (
+              <WallpaperTile key={wp.id} wp={wp} index={i * 2 + 1} />
+            ))}
           </div>
           <div className="space-y-4 pt-8">
-            <WallpaperTile wp={trending[1]} index={1} />
-            <WallpaperTile wp={trending[3]} index={3} />
+            {WALLPAPERS.filter((_, i) => i % 2 === 0).map((wp, i) => (
+              <WallpaperTile key={wp.id} wp={wp} index={i * 2} />
+            ))}
           </div>
         </div>
       </section>
+
 
       {/* Premium teaser */}
       <section className="px-6 pt-10">
