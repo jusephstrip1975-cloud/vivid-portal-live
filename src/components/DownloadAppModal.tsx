@@ -7,7 +7,7 @@ const STORAGE_KEY = "aetherx-download-prompt-dismissed";
 // redirige al último APK subido, así el botón nunca queda desactualizado.
 // IMPORTANTE: sustituye OWNER/REPO por el nombre real del repo cuando
 // conectes el proyecto a GitHub.
-const GITHUB_OWNER_REPO = "OWNER/REPO";
+const GITHUB_OWNER_REPO = "jusephstrip1975-cloud/vivid-portal-live";
 const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk`;
 
 function detectOS(): "android" | "ios" | "other" {
