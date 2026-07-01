@@ -43,6 +43,17 @@ function HomePage() {
   const [preview, setPreview] = useState<PickedDeviceVideo | null>(null);
   const [diag, setDiag] = useState<string | null>(null);
   const [diagFields, setDiagFields] = useState<Record<string, string> | null>(null);
+  const [fitMode, setFitModeState] = useState<FitMode>("cover");
+
+  useEffect(() => {
+    getWallpaperFitMode().then(setFitModeState).catch(() => {});
+  }, []);
+
+  async function handleFitModeChange(mode: FitMode) {
+    setFitModeState(mode);
+    await setWallpaperFitMode(mode);
+    showToast(`Modo: ${mode === "cover" ? "Recortar (Cover)" : mode === "stretch" ? "Estirar" : "Ajustar (Contain)"}`);
+  }
 
   function showToast(msg: string, ms = 2600) {
     setPickToast(msg);
