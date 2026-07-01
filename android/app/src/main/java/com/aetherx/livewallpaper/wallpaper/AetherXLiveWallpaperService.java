@@ -20,7 +20,7 @@ import android.view.SurfaceHolder;
 import com.aetherx.livewallpaper.R;
 
 import java.io.File;
-import java.io.FileInputStream;
+
 
 
 /**
