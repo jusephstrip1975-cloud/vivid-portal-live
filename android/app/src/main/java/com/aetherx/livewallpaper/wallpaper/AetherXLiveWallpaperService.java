@@ -308,8 +308,19 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     long frameStart = SystemClock.uptimeMillis();
                     lastPositionMs = (frameStart - playStartMs) % durationMs;
                     Bitmap frame = null;
+                    int tw = targetW, th = targetH;
+                    // Cap scaled decode to a reasonable size to keep CPU low.
+                    if (tw > 720) { th = (int) (th * (720.0f / tw)); tw = 720; }
                     try {
-                        frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST);
+                        if (tw > 0 && th > 0) {
+                            frame = retriever.getScaledFrameAtTime(
+                                lastPositionMs * 1000L,
+                                MediaMetadataRetriever.OPTION_CLOSEST,
+                                tw, th
+                            );
+                        } else {
+                            frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST);
+                        }
                         if (frame == null) {
                             frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
                         }
