@@ -2,9 +2,13 @@ import { useEffect, useState } from "react";
 import { Apple, Smartphone, X, Download, Share, Plus } from "lucide-react";
 
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
-// APK servido desde el propio dominio. Sube el archivo firmado a
-// public/downloads/aetherx-latest.apk y el botón lo descargará directo.
-const ANDROID_APK_URL = "/downloads/aetherx-latest.apk";
+// APK generado automáticamente por GitHub Actions y publicado como
+// release "latest". La URL /releases/latest/download/<archivo> siempre
+// redirige al último APK subido, así el botón nunca queda desactualizado.
+// IMPORTANTE: sustituye OWNER/REPO por el nombre real del repo cuando
+// conectes el proyecto a GitHub.
+const GITHUB_OWNER_REPO = "OWNER/REPO";
+const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk`;
 
 function detectOS(): "android" | "ios" | "other" {
   if (typeof navigator === "undefined") return "other";
