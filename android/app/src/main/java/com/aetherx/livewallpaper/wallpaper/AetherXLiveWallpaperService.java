@@ -20,7 +20,7 @@ import android.view.SurfaceHolder;
 import com.aetherx.livewallpaper.R;
 
 import java.io.File;
-import java.io.FileInputStream;
+
 
 
 /**
@@ -183,7 +183,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
         private void startRawPlayer() {
             AssetFileDescriptor afd = null;
-            FileInputStream fis = null;
+            ParcelFileDescriptor selectedPfd = null;
             try {
                 clearNativeFailureState();
                 releasePlayer();
@@ -195,12 +195,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 }
 
                 Surface surface = holder.getSurface();
-                if (surface == null) {
-                    persistStep("MEDIA_SURFACE_NULL");
-                    return;
-                }
-
-                if (!surface.isValid()) {
+                if (surface == null || !surface.isValid()) {
                     persistStep("MEDIA_SURFACE_INVALID");
                     return;
                 }
@@ -209,23 +204,21 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 clearSurface(holder);
                 persistStep("MEDIA_SURFACE_CLEARED");
 
+                // === ORDEN CORRECTO PARA SAMSUNG ONE UI ===
+                // 1. new MediaPlayer   (Idle)
+                // 2. setAudioAttrs / setLooping / setVolume (Idle-safe)
+                // 3. setDataSource     (-> Initialized)
+                // 4. setDisplay(holder) sobre el SurfaceHolder (NO setSurface + setScreenOnWhilePlaying)
+                // 5. setOnPrepared / setOnError
+                // 6. prepareAsync      (-> Preparing)
+                // 7. onPrepared -> start (-> Started)
+
                 player = new MediaPlayer();
                 persistStep("MEDIA_PLAYER_CREATED");
 
-                player.reset();
-                persistStep("MEDIA_RESET");
-
-                player.setSurface(surface);
-                persistStep("MEDIA_SURFACE_ATTACHED");
-
                 player.setLooping(true);
-                persistStep("MEDIA_LOOPING_SET");
-
                 player.setVolume(0f, 0f);
-                persistStep("MEDIA_VOLUME_MUTED");
-
-                player.setScreenOnWhilePlaying(true);
-                persistStep("MEDIA_SCREEN_ON_SET");
+                persistStep("MEDIA_AUDIO_MUTED");
 
                 SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
                 String selectedPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
@@ -234,27 +227,35 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 boolean sourceSet = false;
 
                 if (selectedFile != null && selectedFile.exists() && selectedFile.canRead() && selectedFile.length() > 0) {
-                    // Ruta absoluta (String): prepareAsync abre el archivo internamente.
-                    player.setDataSource(selectedFile.getAbsolutePath());
-                    persistStep("MEDIA_DATASOURCE_SET_SELECTED_PATH len=" + selectedFile.length());
-                    sourceSet = true;
+                    // Abrir con ParcelFileDescriptor: más robusto en Samsung One UI 7 que
+                    // pasar la ruta como String. El WallpaperService corre en el mismo UID
+                    // pero a veces en un proceso separado del picker, y algunos SoC Exynos/Snapdragon
+                    // Samsung fallan setDataSource(String) sobre filesDir con IllegalStateException.
+                    try {
+                        selectedPfd = ParcelFileDescriptor.open(selectedFile, ParcelFileDescriptor.MODE_READ_ONLY);
+                        if (selectedPfd != null) {
+                            player.setDataSource(
+                                selectedPfd.getFileDescriptor(),
+                                0L,
+                                selectedFile.length()
+                            );
+                            persistStep("MEDIA_DATASOURCE_SET_SELECTED_PFD len=" + selectedFile.length());
+                            sourceSet = true;
+                        } else {
+                            persistStep("MEDIA_SELECTED_PFD_NULL");
+                        }
+                    } catch (Throwable t) {
+                        persistNativeException("MEDIA_SELECTED_PFD_FAIL", t);
+                    }
                 } else if (selectedUri != null && !selectedUri.isEmpty()) {
-                    // Fallback content:// URI (SAF / MediaStore). Necesita permiso
-                    // persistente concedido en pickVideoFromDevice via takePersistableUriPermission.
                     persistStep("MEDIA_DATASOURCE_TRY_URI " + selectedUri);
                     try {
                         Uri uri = Uri.parse(selectedUri);
                         ContentResolver resolver = getContentResolver();
-                        // Re-aplicar el permiso de lectura sobre el caller actual (el WallpaperService
-                        // se ejecuta en el mismo proceso/package que recibió el grant, así que esto
-                        // valida que la URI sigue siendo accesible).
-                        ParcelFileDescriptor pfd = resolver.openFileDescriptor(uri, "r");
-                        if (pfd != null) {
-                            player.setDataSource(pfd.getFileDescriptor());
+                        selectedPfd = resolver.openFileDescriptor(uri, "r");
+                        if (selectedPfd != null) {
+                            player.setDataSource(selectedPfd.getFileDescriptor());
                             persistStep("MEDIA_DATASOURCE_SET_URI_FD");
-                            // Cerramos el wrapper PFD: MediaPlayer dup'a el FD nativo internamente,
-                            // así que el descriptor original puede cerrarse sin invalidar el playback.
-                            try { pfd.close(); } catch (Throwable ignored) {}
                             sourceSet = true;
                         } else {
                             persistStep("MEDIA_URI_PFD_NULL");
@@ -265,8 +266,6 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                         persistNativeException("MEDIA_URI_OPEN_FAIL", t);
                     }
                     if (!sourceSet) {
-                        // Último intento: dejar que MediaPlayer abra la URI con el context (resuelve
-                        // content://, file:// y android.resource://).
                         try {
                             player.setDataSource(getApplicationContext(), Uri.parse(selectedUri));
                             persistStep("MEDIA_DATASOURCE_SET_URI_CONTEXT");
@@ -294,6 +293,10 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     persistStep("MEDIA_DATASOURCE_SET_RAW_FD");
                 }
 
+                // setDisplay(holder) tras setDataSource: en Samsung One UI 7 esto
+                // conecta el output al SurfaceHolder de forma estable.
+                player.setDisplay(holder);
+                persistStep("MEDIA_DISPLAY_ATTACHED");
 
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
@@ -327,11 +330,15 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 if (afd != null) {
                     try { afd.close(); } catch (Throwable ignored) {}
                 }
-                if (fis != null) {
-                    try { fis.close(); } catch (Throwable ignored) {}
+                // Nota: NO cerramos selectedPfd aquí. MediaPlayer necesita el FD vivo
+                // durante prepareAsync (asíncrono). Se cierra en releasePlayer().
+                if (selectedPfd != null) {
+                    currentPfd = selectedPfd;
                 }
             }
         }
+
+        private ParcelFileDescriptor currentPfd;
 
         private void clearSurface(SurfaceHolder holder) {
             Canvas c = null;
@@ -374,6 +381,10 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 try { player.stop(); } catch (Throwable ignored) {}
                 try { player.release(); } catch (Throwable ignored) {}
                 player = null;
+            }
+            if (currentPfd != null) {
+                try { currentPfd.close(); } catch (Throwable ignored) {}
+                currentPfd = null;
             }
         }
     }
