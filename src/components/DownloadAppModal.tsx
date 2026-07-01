@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Apple, Smartphone, X, Download, Share, Plus } from "lucide-react";
 
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
-const ANDROID_APK_URL =
-  "https://github.com/lovable-labs/aetherx-live-wallpaper/releases/latest";
+// APK servido desde el propio dominio. Sube el archivo firmado a
+// public/downloads/aetherx-latest.apk y el botón lo descargará directo.
+const ANDROID_APK_URL = "/downloads/aetherx-latest.apk";
 
 function detectOS(): "android" | "ios" | "other" {
   if (typeof navigator === "undefined") return "other";
