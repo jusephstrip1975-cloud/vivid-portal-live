@@ -31,7 +31,7 @@ import java.io.File;
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
-    private static final long FRAME_INTERVAL_MS = 83L; // ~12 FPS for stability on live wallpaper surfaces.
+    private static final long FRAME_INTERVAL_MS = 42L; // ~24 FPS target; scaled decode keeps CPU low.
 
     private void recordStep(String step) {
         Log.i(TAG, "STEP " + step);
