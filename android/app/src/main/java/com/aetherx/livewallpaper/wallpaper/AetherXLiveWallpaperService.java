@@ -293,10 +293,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     persistStep("MEDIA_DATASOURCE_SET_RAW_FD");
                 }
 
-                // setDisplay(holder) tras setDataSource: en Samsung One UI 7 esto
-                // conecta el output al SurfaceHolder de forma estable.
-                player.setDisplay(holder);
-                persistStep("MEDIA_DISPLAY_ATTACHED");
+                // IMPORTANTE: usar setSurface(holder.getSurface()) en vez de setDisplay(holder).
+                // setDisplay() invoca internamente updateSurfaceScreenOn() -> setKeepScreenOn(),
+                // y WallpaperService lanza UnsupportedOperationException:
+                //   "Wallpapers do not support keep screen on"
+                // setSurface(Surface) NO toca esa ruta y es el API correcto para WallpaperService.
+                player.setSurface(holder.getSurface());
+                persistStep("MEDIA_SURFACE_ATTACHED");
 
                 player.setOnPreparedListener(mp -> {
                     prepared = true;
