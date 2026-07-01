@@ -388,19 +388,29 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
             GLES20.glUseProgram(program);
 
-            // Cover-fit: scale MVP so that video aspect fills the surface, cropping overflow.
-            float[] mvp = new float[16];
-            Matrix.setIdentityM(mvp, 0);
-            if (videoW > 0 && videoH > 0) {
-                float sa = (float) sw / (float) sh;
+            // Apply fit mode via texture matrix crop around center (0.5, 0.5).
+            SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            String mode = prefs.getString(AetherXLiveWallpaperPlugin.KEY_FIT_MODE, "cover");
+            float[] finalTexMatrix = texMatrix;
+            if (videoW > 0 && videoH > 0 && !"stretch".equals(mode)) {
                 float va = (float) videoW / (float) videoH;
-                if (va > sa) {
-                    // video wider — scale X down so height fills
-                    float sx = sa / va;
-                    Matrix.scaleM(mvp, 0, 1f, sa / sa, 1f);
-                    // actually cover: we want to fill both — since we crop with texture, keep quad full
-                    // Full quad + texture crop via texMatrix would be ideal; simplest: fill quad, may stretch.
+                float sa = (float) sw / (float) sh;
+                float sx = 1f, sy = 1f;
+                if ("cover".equals(mode)) {
+                    // Sample only the central strip so the video fills the surface.
+                    if (va > sa) sx = sa / va; else sy = va / sa;
+                } else if ("contain".equals(mode)) {
+                    // Expand sampling so the entire video fits (letterbox with black bars).
+                    if (va > sa) sy = sa / va; else sx = va / sa;
                 }
+                float[] crop = new float[16];
+                Matrix.setIdentityM(crop, 0);
+                Matrix.translateM(crop, 0, 0.5f, 0.5f, 0f);
+                Matrix.scaleM(crop, 0, sx, sy, 1f);
+                Matrix.translateM(crop, 0, -0.5f, -0.5f, 0f);
+                float[] combined = new float[16];
+                Matrix.multiplyMM(combined, 0, texMatrix, 0, crop, 0);
+                finalTexMatrix = combined;
             }
 
             GLES20.glVertexAttribPointer(aPosLoc, 2, GLES20.GL_FLOAT, false, 0, quadVerts);
@@ -408,7 +418,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             GLES20.glVertexAttribPointer(aTexLoc, 2, GLES20.GL_FLOAT, false, 0, quadTex);
             GLES20.glEnableVertexAttribArray(aTexLoc);
             GLES20.glUniformMatrix4fv(uMvpLoc, 1, false, mvpMatrix, 0);
-            GLES20.glUniformMatrix4fv(uTexMatrixLoc, 1, false, texMatrix, 0);
+            GLES20.glUniformMatrix4fv(uTexMatrixLoc, 1, false, finalTexMatrix, 0);
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
             GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTexId);
             GLES20.glUniform1i(uSamplerLoc, 0);
