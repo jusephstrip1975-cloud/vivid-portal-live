@@ -244,55 +244,53 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         public void run() {
             MediaMetadataRetriever retriever = null;
             AssetFileDescriptor afd = null;
+            String activePath = null;
+            String activeUri = null;
+            long durationMs = 8000L;
+            long playStartMs = SystemClock.uptimeMillis();
+            long lastPositionMs = 0L;
+            boolean firstFrameDrawn = false;
+            boolean nullFrameLogged = false;
+            long lastPrefsCheckMs = 0L;
 
             try {
-                // Resolve source: selected file -> selected content URI -> RAW fallback.
-                SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
-                String selectedPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
-                String selectedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
-
-                retriever = new MediaMetadataRetriever();
-                boolean sourceSet = false;
-                if (selectedPath != null) {
-                    File f = new File(selectedPath);
-                    if (f.exists() && f.canRead() && f.length() > 0) {
-                        retriever.setDataSource(f.getAbsolutePath());
-                        recordStep("FRAME_SOURCE_FILE len=" + f.length());
-                        sourceSet = true;
-                    }
-                }
-                if (!sourceSet && selectedUri != null && !selectedUri.isEmpty()) {
-                    try {
-                        retriever.setDataSource(AetherXLiveWallpaperService.this, Uri.parse(selectedUri));
-                        recordStep("FRAME_SOURCE_URI " + selectedUri);
-                        sourceSet = true;
-                    } catch (Throwable t) {
-                        persistNativeException("FRAME_URI_OPEN_FAIL", t);
-                    }
-                }
-                if (!sourceSet) {
-                    afd = getResources().openRawResourceFd(R.raw.testwallpaper);
-                    if (afd == null) {
-                        recordStep("FRAME_RAW_AFD_NULL");
-                        return;
-                    }
-                    retriever.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-                    recordStep("FRAME_SOURCE_RAW");
-                }
-
-                long durationMs = parseLongSafe(
-                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION),
-                    8000L
-                );
-                if (durationMs < 1000L) durationMs = 8000L;
-                recordStep("FRAME_RETRIEVER_READY durationMs=" + durationMs);
-
-                long playStartMs = SystemClock.uptimeMillis();
-                long lastPositionMs = 0L;
-                boolean firstFrameDrawn = false;
-                boolean nullFrameLogged = false;
+                // Initial source load.
+                Object[] loaded = openSource(null, null);
+                retriever = (MediaMetadataRetriever) loaded[0];
+                afd = (AssetFileDescriptor) loaded[1];
+                activePath = (String) loaded[2];
+                activeUri = (String) loaded[3];
+                durationMs = (Long) loaded[4];
+                if (retriever == null) return;
 
                 while (!stopRequested) {
+                    // Cross-process prefs poll (app process writes, service process reads).
+                    long nowMs = SystemClock.uptimeMillis();
+                    if (nowMs - lastPrefsCheckMs > 500L) {
+                        lastPrefsCheckMs = nowMs;
+                        SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                        String newPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
+                        String newUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
+                        boolean pathChanged = !equalsNullable(newPath, activePath);
+                        boolean uriChanged = !equalsNullable(newUri, activeUri) && (newPath == null);
+                        if (pathChanged || uriChanged) {
+                            recordStep("SOURCE_RELOAD_DETECTED path=" + newPath);
+                            try { retriever.release(); } catch (Throwable ignored) {}
+                            try { if (afd != null) afd.close(); } catch (Throwable ignored) {}
+                            retriever = null; afd = null;
+                            Object[] r = openSource(newPath, newUri);
+                            retriever = (MediaMetadataRetriever) r[0];
+                            afd = (AssetFileDescriptor) r[1];
+                            activePath = (String) r[2];
+                            activeUri = (String) r[3];
+                            durationMs = (Long) r[4];
+                            if (retriever == null) { sleepQuietly(500L); continue; }
+                            playStartMs = SystemClock.uptimeMillis();
+                            firstFrameDrawn = false;
+                            nullFrameLogged = false;
+                        }
+                    }
+
                     if (paused) {
                         playStartMs = SystemClock.uptimeMillis() - lastPositionMs;
                         sleepQuietly(80L);
@@ -309,7 +307,6 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     lastPositionMs = (frameStart - playStartMs) % durationMs;
                     Bitmap frame = null;
                     int tw = targetW, th = targetH;
-                    // Cap scaled decode to a reasonable size to keep CPU low.
                     if (tw > 720) { th = (int) (th * (720.0f / tw)); tw = 720; }
                     try {
                         if (tw > 0 && th > 0) {
@@ -329,10 +326,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     }
 
                     if (frame == null) {
-                        if (!nullFrameLogged) {
-                            nullFrameLogged = true;
-                            recordStep("FRAME_NULL");
-                        }
+                        if (!nullFrameLogged) { nullFrameLogged = true; recordStep("FRAME_NULL"); }
                         sleepQuietly(FRAME_INTERVAL_MS);
                         continue;
                     }
@@ -356,6 +350,63 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 recordStep("FRAME_THREAD_EXIT");
             }
         }
+
+        /**
+         * Opens the video source. Returns {retriever, afd, activePath, activeUri, durationMs}.
+         * If explicit path/uri are null, reads from prefs. Falls back to RAW test wallpaper.
+         */
+        private Object[] openSource(String explicitPath, String explicitUri) throws Throwable {
+            SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+            String path = explicitPath != null ? explicitPath : prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
+            String uri = explicitUri != null ? explicitUri : prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
+
+            MediaMetadataRetriever r = new MediaMetadataRetriever();
+            AssetFileDescriptor afdOut = null;
+            String activePath = null;
+            String activeUri = null;
+            boolean set = false;
+
+            if (path != null) {
+                File f = new File(path);
+                if (f.exists() && f.canRead() && f.length() > 0) {
+                    r.setDataSource(f.getAbsolutePath());
+                    recordStep("FRAME_SOURCE_FILE len=" + f.length());
+                    activePath = path;
+                    set = true;
+                }
+            }
+            if (!set && uri != null && !uri.isEmpty()) {
+                try {
+                    r.setDataSource(AetherXLiveWallpaperService.this, Uri.parse(uri));
+                    recordStep("FRAME_SOURCE_URI " + uri);
+                    activeUri = uri;
+                    set = true;
+                } catch (Throwable t) {
+                    persistNativeException("FRAME_URI_OPEN_FAIL", t);
+                }
+            }
+            if (!set) {
+                afdOut = getResources().openRawResourceFd(R.raw.testwallpaper);
+                if (afdOut == null) {
+                    recordStep("FRAME_RAW_AFD_NULL");
+                    try { r.release(); } catch (Throwable ignored) {}
+                    return new Object[]{null, null, null, null, 8000L};
+                }
+                r.setDataSource(afdOut.getFileDescriptor(), afdOut.getStartOffset(), afdOut.getLength());
+                recordStep("FRAME_SOURCE_RAW");
+            }
+
+            long dur = parseLongSafe(
+                r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION), 8000L);
+            if (dur < 1000L) dur = 8000L;
+            recordStep("FRAME_RETRIEVER_READY durationMs=" + dur);
+            return new Object[]{r, afdOut, activePath, activeUri, dur};
+        }
+
+        private boolean equalsNullable(String a, String b) {
+            return a == null ? b == null : a.equals(b);
+        }
+
 
         private boolean drawFrame(SurfaceHolder holder, Bitmap frame) {
             Canvas canvas = null;
