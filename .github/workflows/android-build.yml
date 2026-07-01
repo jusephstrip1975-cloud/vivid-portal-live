@@ -42,18 +42,18 @@ jobs:
 
       # FFmpegKit removed — RAW wallpaper plays directly via MediaPlayer, no transcode.
 
-      # ----- RELEASE APK (signed with committed stable keystore) -----
-      - name: Build signed release APK (full diagnostics)
+      # ----- DEBUG APK (idéntico al que funciona por USB, firmado con la misma keystore estable) -----
+      - name: Build signed debug APK (full diagnostics)
         working-directory: android
         shell: bash
         run: |
           set -x
           rm -rf .gradle app/build
-          ./gradlew clean assembleRelease \
+          ./gradlew clean assembleDebug \
             --no-daemon \
             --stacktrace \
             --info \
-            --warning-mode all 2>&1 | tee /tmp/gradle-release.log
+            --warning-mode all 2>&1 | tee /tmp/gradle-debug.log
           STATUS=${PIPESTATUS[0]}
           echo "===== GRADLE EXIT STATUS: $STATUS ====="
           exit $STATUS
@@ -63,45 +63,38 @@ jobs:
         shell: bash
         run: |
           echo "===== KEY FAILURE LINES ====="
-          grep -nE "FAILURE:|What went wrong|Caused by|Execution failed|error:|\.java:[0-9]+:" /tmp/gradle-release.log | head -200 || true
-          echo "===== problems-report.html (text) ====="
-          for f in android/app/build/reports/problems/problems-report.html android/build/reports/problems/problems-report.html; do
-            if [ -f "$f" ]; then
-              echo "----- $f -----"
-              { sed 's/<[^>]*>/ /g' "$f" | tr -s ' \n' | head -n 300; } 2>/dev/null || true
-            fi
-          done
+          grep -nE "FAILURE:|What went wrong|Caused by|Execution failed|error:|\.java:[0-9]+:" /tmp/gradle-debug.log | head -200 || true
           echo "===== last 200 lines of gradle log ====="
-          tail -n 200 /tmp/gradle-release.log || true
+          tail -n 200 /tmp/gradle-debug.log || true
 
       - name: Upload full gradle log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gradle-release-log
-          path: /tmp/gradle-release.log
+          name: gradle-debug-log
+          path: /tmp/gradle-debug.log
           if-no-files-found: warn
 
-      - name: List release APK output
+      - name: List debug APK output
         if: success()
-        run: ls -la android/app/build/outputs/apk/release/
+        run: ls -la android/app/build/outputs/apk/debug/
 
       - name: Verify native libs inside APK
         run: |
-          APK=android/app/build/outputs/apk/release/AetherX-release-signed.apk
+          APK=android/app/build/outputs/apk/debug/AetherX-release-signed-debug.apk
           unzip -l "$APK" | grep -E "lib/(arm64-v8a|armeabi-v7a|x86|x86_64)/" | head -40 || echo "WARNING: no native libs found"
 
-      - name: Upload signed release APK (artifact)
+      - name: Upload signed debug APK (artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: AetherX-release-signed
-          path: android/app/build/outputs/apk/release/AetherX-release-signed.apk
+          name: AetherX-debug-signed
+          path: android/app/build/outputs/apk/debug/AetherX-release-signed-debug.apk
           if-no-files-found: error
 
       - name: Prepare APK for public release
         run: |
           mkdir -p dist-apk
-          cp android/app/build/outputs/apk/release/AetherX-release-signed.apk dist-apk/aetherx-latest.apk
+          cp android/app/build/outputs/apk/debug/AetherX-release-signed-debug.apk dist-apk/aetherx-latest.apk
 
       - name: Publish / update "latest" GitHub Release
         uses: softprops/action-gh-release@v2
