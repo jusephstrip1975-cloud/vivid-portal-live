@@ -218,6 +218,37 @@ function HomePage() {
         )}
       </section>
 
+      {/* Fit mode selector */}
+      <section className="px-6 pt-3">
+        <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-electric-blue/90">
+            Ajuste del vídeo en el wallpaper
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {(["cover", "stretch", "contain"] as const).map((m) => {
+              const active = fitMode === m;
+              const label = m === "cover" ? "Recortar" : m === "stretch" ? "Estirar" : "Ajustar";
+              const hint = m === "cover" ? "Sin deformar" : m === "stretch" ? "Rellena todo" : "Barras negras";
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => handleFitModeChange(m)}
+                  className={`rounded-xl border px-2 py-2 text-center transition ${
+                    active
+                      ? "border-electric-blue/70 bg-electric-blue/15 text-electric-blue"
+                      : "border-white/10 bg-white/[0.03] text-white/70 hover:text-white"
+                  }`}
+                >
+                  <div className="text-[11px] font-bold uppercase tracking-[0.16em]">{label}</div>
+                  <div className="mt-0.5 text-[9px] uppercase tracking-[0.14em] opacity-70">{hint}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* Samsung diagnostic */}
       <section className="px-6 pt-3">
         <button
