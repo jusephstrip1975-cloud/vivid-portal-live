@@ -50,6 +50,7 @@ export async function getWallpaperFitMode(): Promise<FitMode> {
   } catch {
     return "cover";
   }
+}
 
 /** Persist a step from the WebView into native SharedPreferences for diagnostics. */
 export async function recordFrontendStep(step: string, error?: string): Promise<void> {
