@@ -1,14 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowUpRight, Check, FolderOpen, Sparkles, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
 import {
   applyPickedVideo,
   getSamsungDiagnostics,
+  getWallpaperFitMode,
   isNative,
   pickDeviceVideo,
+  setWallpaperFitMode,
+  type FitMode,
   type PickedDeviceVideo,
 } from "@/lib/native-wallpaper";
 
