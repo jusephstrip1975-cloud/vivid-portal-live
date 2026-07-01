@@ -95,17 +95,25 @@ export function DownloadAppModal() {
 
             <div className="mt-6 space-y-2.5">
               <a
-                href={ANDROID_APK_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={apkAvailable === false ? undefined : ANDROID_APK_URL}
+                onClick={(e) => {
+                  if (apkAvailable === false) {
+                    e.preventDefault();
+                    alert("El APK de Android aún se está preparando. Vuelve pronto — te avisaremos en cuanto esté disponible.");
+                  }
+                }}
+                download="aetherx-latest.apk"
+                aria-disabled={apkAvailable === false}
                 className={`flex items-center justify-center gap-2.5 rounded-full px-5 py-3.5 text-sm font-bold uppercase tracking-[0.15em] transition ${
-                  os === "android"
+                  apkAvailable === false
+                    ? "bg-white/10 text-white/40 cursor-not-allowed"
+                    : os === "android"
                     ? "bg-electric-blue text-space-black hover:bg-ocean-cyan"
                     : "bg-ice-white text-space-black hover:bg-electric-blue"
                 }`}
               >
                 <Smartphone className="h-4 w-4" />
-                Android (APK)
+                {apkAvailable === false ? "Android (próximamente)" : "Android (APK)"}
               </a>
               <button
                 onClick={() => setShowIosGuide(true)}
