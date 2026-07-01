@@ -61,7 +61,7 @@ export async function getSamsungDiagnostics(): Promise<string> {
     const lines = ["=== AETHERX SAMSUNG DIAGNOSTIC ==="];
     for (const [k, v] of Object.entries(data)) lines.push(`${k}: ${v}`);
     lines.push("=== ADB COMMAND ===");
-    lines.push("adb logcat -c && adb logcat -v time | grep -iE \"AetherXLiveWP|WallpaperService|WallpaperManager|MediaPlayer|MediaCodec|Surface|WindowManager|AndroidRuntime|SecurityException|IllegalStateException|setWallpaper|bindWallpaper\"");
+    lines.push("adb logcat -c && adb logcat -v time | grep -iE \"AetherXLiveWP|WallpaperService|WallpaperManager|MediaPlayer|MediaCodec|MediaMetadataRetriever|Surface|Canvas|WindowManager|AndroidRuntime|SecurityException|IllegalStateException|setWallpaper|bindWallpaper\"");
     return lines.join("\n");
   } catch (err) {
     return "DIAGNOSTIC error: " + String(err);

@@ -3,14 +3,14 @@ package com.aetherx.livewallpaper.wallpaper;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.AssetFileDescriptor;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.media.MediaCodec;
-import android.media.MediaExtractor;
-import android.media.MediaFormat;
+import android.graphics.RectF;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
-import android.os.ParcelFileDescriptor;
+import android.os.SystemClock;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
 import android.view.Surface;
@@ -19,18 +19,19 @@ import android.view.SurfaceHolder;
 import com.aetherx.livewallpaper.R;
 
 import java.io.File;
-import java.io.FileDescriptor;
-import java.nio.ByteBuffer;
 
 /**
- * Plan C: manual MediaExtractor + MediaCodec decoding straight into the
- * wallpaper Surface. No MediaPlayer, no ExoPlayer, no Player abstractions —
- * avoids every "keep screen on" / player-lifecycle pitfall that broke Plans
- * A and B on Samsung One UI.
+ * Plan D: frame blitter. Samsung SDK 36 rejects using the WallpaperService
+ * Surface as a direct video decoder output in MediaCodec.configure(...), so we
+ * do not attach MediaPlayer/ExoPlayer/MediaCodec to the wallpaper surface at
+ * all. We decode individual frames offscreen with MediaMetadataRetriever and
+ * paint them to the wallpaper Canvas. It is less efficient, but it bypasses the
+ * Samsung direct-surface decoder failure and proves rendering on home/lock.
  */
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
+    private static final long FRAME_INTERVAL_MS = 83L; // ~12 FPS for stability on live wallpaper surfaces.
 
     private void recordStep(String step) {
         Log.i(TAG, "STEP " + step);
@@ -85,7 +86,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
 
     private class CodecEngine extends Engine {
         private SurfaceHolder currentHolder;
-        private DecoderThread decoder;
+        private FrameBlitterThread renderer;
         private volatile boolean visible = false;
 
         @Override
@@ -106,7 +107,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             recordStep("ON_SURFACE_CREATED valid=" + valid);
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SURFACE_EVENT, "surfaceCreated valid=" + valid);
             paintMessage("Cargando wallpaper...");
-            if (valid) startDecoder(s);
+            if (valid) startRenderer(holder);
         }
 
         @Override
@@ -114,41 +115,46 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             super.onSurfaceChanged(holder, format, width, height);
             currentHolder = holder;
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SURFACE_EVENT, "surfaceChanged " + width + "x" + height);
+            Surface s = holder.getSurface();
+            if (renderer == null && s != null && s.isValid()) startRenderer(holder);
         }
 
         @Override
         public void onVisibilityChanged(boolean v) {
             super.onVisibilityChanged(v);
             visible = v;
-            if (decoder != null) decoder.setPaused(!v);
+            if (renderer != null) renderer.setPaused(!v);
         }
 
         @Override
         public void onSurfaceDestroyed(SurfaceHolder holder) {
             recordStep("SURFACE_DESTROYED");
-            stopDecoder();
+            stopRenderer();
             super.onSurfaceDestroyed(holder);
         }
 
         @Override
         public void onDestroy() {
             recordStep("ENGINE_DESTROYED");
-            stopDecoder();
+            stopRenderer();
             super.onDestroy();
         }
 
-        private void startDecoder(Surface surface) {
-            stopDecoder();
+        private void startRenderer(SurfaceHolder holder) {
+            stopRenderer();
             clearNativeFailureState();
-            clearSurface(currentHolder);
-            decoder = new DecoderThread(surface);
-            decoder.start();
+            clearSurface(holder);
+            renderer = new FrameBlitterThread(holder);
+            // Render immediately. Some Samsung builds deliver visibility after
+            // surface creation, so starting paused can leave a black wallpaper.
+            renderer.setPaused(false);
+            renderer.start();
         }
 
-        private void stopDecoder() {
-            if (decoder != null) {
-                decoder.requestStop();
-                decoder = null;
+        private void stopRenderer() {
+            if (renderer != null) {
+                renderer.requestStop();
+                renderer = null;
             }
         }
 
@@ -183,163 +189,188 @@ public class AetherXLiveWallpaperService extends WallpaperService {
     }
 
     /**
-     * Runs a MediaExtractor + MediaCodec loop rendering directly to the
-     * wallpaper Surface. Loops indefinitely by seeking to 0 on EOS.
+     * Decodes frames offscreen and draws them to the WallpaperService Canvas.
+     * No direct decoder output Surface is used anywhere in this path.
      */
-    private class DecoderThread extends Thread {
-        private final Surface surface;
+    private class FrameBlitterThread extends Thread {
+        private final SurfaceHolder holder;
         private volatile boolean stopRequested = false;
         private volatile boolean paused = false;
 
-        DecoderThread(Surface surface) {
-            super("AetherXCodecThread");
-            this.surface = surface;
+        FrameBlitterThread(SurfaceHolder holder) {
+            super("AetherXFrameBlitterThread");
+            this.holder = holder;
         }
 
-        void requestStop() { stopRequested = true; }
+        void requestStop() {
+            stopRequested = true;
+            interrupt();
+        }
         void setPaused(boolean p) { paused = p; }
 
         @Override
         public void run() {
-            MediaExtractor extractor = null;
-            MediaCodec codec = null;
+            MediaMetadataRetriever retriever = null;
             AssetFileDescriptor afd = null;
-            ParcelFileDescriptor pfd = null;
 
             try {
-                extractor = new MediaExtractor();
-
                 // Resolve source: selected file -> selected content URI -> RAW fallback.
                 SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
                 String selectedPath = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH, null);
                 String selectedUri = prefs.getString(AetherXLiveWallpaperPlugin.KEY_VIDEO_URI, null);
 
+                retriever = new MediaMetadataRetriever();
                 boolean sourceSet = false;
                 if (selectedPath != null) {
                     File f = new File(selectedPath);
                     if (f.exists() && f.canRead() && f.length() > 0) {
-                        extractor.setDataSource(f.getAbsolutePath());
-                        recordStep("CODEC_SOURCE_FILE len=" + f.length());
+                        retriever.setDataSource(f.getAbsolutePath());
+                        recordStep("FRAME_SOURCE_FILE len=" + f.length());
                         sourceSet = true;
                     }
                 }
                 if (!sourceSet && selectedUri != null && !selectedUri.isEmpty()) {
                     try {
-                        pfd = getContentResolver().openFileDescriptor(Uri.parse(selectedUri), "r");
-                        if (pfd != null) {
-                            extractor.setDataSource(pfd.getFileDescriptor());
-                            recordStep("CODEC_SOURCE_URI " + selectedUri);
-                            sourceSet = true;
-                        }
+                        retriever.setDataSource(AetherXLiveWallpaperService.this, Uri.parse(selectedUri));
+                        recordStep("FRAME_SOURCE_URI " + selectedUri);
+                        sourceSet = true;
                     } catch (Throwable t) {
-                        persistNativeException("CODEC_URI_OPEN_FAIL", t);
+                        persistNativeException("FRAME_URI_OPEN_FAIL", t);
                     }
                 }
                 if (!sourceSet) {
                     afd = getResources().openRawResourceFd(R.raw.testwallpaper);
                     if (afd == null) {
-                        recordStep("CODEC_RAW_AFD_NULL");
+                        recordStep("FRAME_RAW_AFD_NULL");
                         return;
                     }
-                    extractor.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-                    recordStep("CODEC_SOURCE_RAW");
+                    retriever.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+                    recordStep("FRAME_SOURCE_RAW");
                 }
 
-                // Pick the first video track.
-                int videoTrack = -1;
-                MediaFormat format = null;
-                for (int i = 0; i < extractor.getTrackCount(); i++) {
-                    MediaFormat f = extractor.getTrackFormat(i);
-                    String mime = f.getString(MediaFormat.KEY_MIME);
-                    if (mime != null && mime.startsWith("video/")) {
-                        videoTrack = i;
-                        format = f;
-                        break;
-                    }
-                }
-                if (videoTrack < 0 || format == null) {
-                    recordStep("CODEC_NO_VIDEO_TRACK");
-                    return;
-                }
-                extractor.selectTrack(videoTrack);
+                long durationMs = parseLongSafe(
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION),
+                    8000L
+                );
+                if (durationMs < 1000L) durationMs = 8000L;
+                recordStep("FRAME_RETRIEVER_READY durationMs=" + durationMs);
 
-                String mime = format.getString(MediaFormat.KEY_MIME);
-                recordStep("CODEC_TRACK_SELECTED mime=" + mime);
-
-                codec = MediaCodec.createDecoderByType(mime);
-                codec.configure(format, surface, null, 0);
-                codec.start();
-                recordStep("CODEC_STARTED");
-
-                MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-                boolean inputEOS = false;
-                long startMs = System.currentTimeMillis();
-                long firstPtsUs = -1;
-                boolean firstFrameRendered = false;
+                long playStartMs = SystemClock.uptimeMillis();
+                long lastPositionMs = 0L;
+                boolean firstFrameDrawn = false;
+                boolean nullFrameLogged = false;
 
                 while (!stopRequested) {
                     if (paused) {
-                        Thread.sleep(50);
+                        playStartMs = SystemClock.uptimeMillis() - lastPositionMs;
+                        sleepQuietly(80L);
                         continue;
                     }
 
-                    // Feed input.
-                    if (!inputEOS) {
-                        int inIndex = codec.dequeueInputBuffer(10_000);
-                        if (inIndex >= 0) {
-                            ByteBuffer buf = codec.getInputBuffer(inIndex);
-                            int sampleSize = (buf == null) ? -1 : extractor.readSampleData(buf, 0);
-                            if (sampleSize < 0) {
-                                // EOF — loop by seeking back to 0.
-                                codec.queueInputBuffer(inIndex, 0, 0, 0, 0);
-                                extractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
-                                startMs = System.currentTimeMillis();
-                                firstPtsUs = -1;
-                            } else {
-                                long ptsUs = extractor.getSampleTime();
-                                codec.queueInputBuffer(inIndex, 0, sampleSize, ptsUs, 0);
-                                extractor.advance();
-                            }
-                        }
+                    Surface surface = holder.getSurface();
+                    if (surface == null || !surface.isValid()) {
+                        sleepQuietly(80L);
+                        continue;
                     }
 
-                    // Drain output.
-                    int outIndex = codec.dequeueOutputBuffer(info, 10_000);
-                    if (outIndex >= 0) {
-                        if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                            codec.releaseOutputBuffer(outIndex, false);
-                            // shouldn't happen with loop, but be safe
-                            extractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
-                            startMs = System.currentTimeMillis();
-                            firstPtsUs = -1;
-                            continue;
+                    long frameStart = SystemClock.uptimeMillis();
+                    lastPositionMs = (frameStart - playStartMs) % durationMs;
+                    Bitmap frame = null;
+                    try {
+                        frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST);
+                        if (frame == null) {
+                            frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
                         }
-
-                        // Basic PTS pacing.
-                        if (firstPtsUs < 0) firstPtsUs = info.presentationTimeUs;
-                        long targetMs = (info.presentationTimeUs - firstPtsUs) / 1000L;
-                        long nowElapsed = System.currentTimeMillis() - startMs;
-                        long wait = targetMs - nowElapsed;
-                        if (wait > 0 && wait < 500) {
-                            try { Thread.sleep(wait); } catch (InterruptedException ignored) {}
-                        }
-                        codec.releaseOutputBuffer(outIndex, true);
-                        if (!firstFrameRendered) {
-                            firstFrameRendered = true;
-                            recordStep("CODEC_FIRST_FRAME");
-                        }
-                    } else if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        recordStep("CODEC_OUTPUT_FORMAT_CHANGED");
+                    } catch (Throwable t) {
+                        persistNativeException("FRAME_DECODE_FAIL", t);
                     }
+
+                    if (frame == null) {
+                        if (!nullFrameLogged) {
+                            nullFrameLogged = true;
+                            recordStep("FRAME_NULL");
+                        }
+                        sleepQuietly(FRAME_INTERVAL_MS);
+                        continue;
+                    }
+
+                    boolean drawn = drawFrame(holder, frame);
+                    frame.recycle();
+                    if (drawn && !firstFrameDrawn) {
+                        firstFrameDrawn = true;
+                        recordStep("FRAME_FIRST_DRAW");
+                    }
+
+                    long elapsed = SystemClock.uptimeMillis() - frameStart;
+                    long wait = FRAME_INTERVAL_MS - elapsed;
+                    if (wait > 0) sleepQuietly(wait);
                 }
             } catch (Throwable t) {
-                persistNativeException("CODEC_EXCEPTION", t);
+                persistNativeException("FRAME_EXCEPTION", t);
             } finally {
-                try { if (codec != null) { codec.stop(); codec.release(); } } catch (Throwable ignored) {}
-                try { if (extractor != null) extractor.release(); } catch (Throwable ignored) {}
+                try { if (retriever != null) retriever.release(); } catch (Throwable ignored) {}
                 try { if (afd != null) afd.close(); } catch (Throwable ignored) {}
-                try { if (pfd != null) pfd.close(); } catch (Throwable ignored) {}
-                recordStep("CODEC_THREAD_EXIT");
+                recordStep("FRAME_THREAD_EXIT");
+            }
+        }
+
+        private boolean drawFrame(SurfaceHolder holder, Bitmap frame) {
+            Canvas canvas = null;
+            boolean posted = false;
+            try {
+                canvas = holder.lockCanvas();
+                if (canvas == null) return false;
+                canvas.drawColor(Color.BLACK);
+                RectF dst = coverRect(
+                    frame.getWidth(),
+                    frame.getHeight(),
+                    canvas.getWidth(),
+                    canvas.getHeight()
+                );
+                canvas.drawBitmap(frame, null, dst, null);
+                holder.unlockCanvasAndPost(canvas);
+                posted = true;
+                return true;
+            } catch (Throwable t) {
+                persistNativeException("FRAME_DRAW_FAIL", t);
+                return false;
+            } finally {
+                if (canvas != null && !posted) {
+                    try { holder.unlockCanvasAndPost(canvas); } catch (Throwable ignored) {}
+                }
+            }
+        }
+
+        private RectF coverRect(int bw, int bh, int cw, int ch) {
+            if (bw <= 0 || bh <= 0 || cw <= 0 || ch <= 0) return new RectF(0, 0, cw, ch);
+            float bitmapAspect = (float) bw / (float) bh;
+            float canvasAspect = (float) cw / (float) ch;
+            if (bitmapAspect > canvasAspect) {
+                float h = ch;
+                float w = h * bitmapAspect;
+                float left = (cw - w) / 2f;
+                return new RectF(left, 0f, left + w, h);
+            }
+            float w = cw;
+            float h = w / bitmapAspect;
+            float top = (ch - h) / 2f;
+            return new RectF(0f, top, w, top + h);
+        }
+
+        private long parseLongSafe(String value, long fallback) {
+            try {
+                if (value == null || value.trim().isEmpty()) return fallback;
+                return Long.parseLong(value.trim());
+            } catch (Throwable ignored) {
+                return fallback;
+            }
+        }
+
+        private void sleepQuietly(long ms) {
+            try {
+                Thread.sleep(Math.max(1L, ms));
+            } catch (InterruptedException ignored) {
+                // stopRequested is checked by the loop.
             }
         }
     }

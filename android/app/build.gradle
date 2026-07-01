@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-     versionCode 317
-     versionName "3.1.7-planc-mediacodec-wallpaper"
+     versionCode 318
+     versionName "3.1.8-pland-frameblitter-canvas"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -100,7 +100,7 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer:1.4.1"
     implementation "androidx.media3:media3-common:1.4.1"
 
-    // FFmpegKit removed (NoClassDefFoundError on Samsung). RAW wallpaper plays via MediaPlayer.
+    // FFmpegKit removed (NoClassDefFoundError on Samsung). Wallpaper playback uses Plan D FrameBlitter.
 
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

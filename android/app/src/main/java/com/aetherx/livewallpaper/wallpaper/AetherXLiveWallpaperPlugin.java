@@ -314,7 +314,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         ret.put("VIDEO_EXISTS", exists);
         ret.put("VIDEO_SIZE", size);
         ret.put("VIDEO_CAN_READ", canRead);
-        ret.put("PLAYER_ENGINE", "MediaPlayer (RAW res/raw/testwallpaper.mp4)");
+        ret.put("PLAYER_ENGINE", "Plan D FrameBlitter (MediaMetadataRetriever + Canvas, no direct decoder Surface)");
         ret.put("LAST_SERVICE_ERROR", prefs.getString(KEY_LAST_SERVICE_ERROR, "(none)"));
         ret.put("LAST_NATIVE_EXCEPTION", prefs.getString(KEY_LAST_NATIVE_EXCEPTION, "(none)"));
         ret.put("LAST_WALLPAPER_STEP", prefs.getString(KEY_LAST_WALLPAPER_STEP, "(none)"));
