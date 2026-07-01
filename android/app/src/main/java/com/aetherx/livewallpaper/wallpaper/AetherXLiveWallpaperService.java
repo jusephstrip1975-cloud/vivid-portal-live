@@ -145,7 +145,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             clearNativeFailureState();
             clearSurface(holder);
             renderer = new FrameBlitterThread(holder);
-            renderer.setPaused(!visible);
+            // Render immediately. Some Samsung builds deliver visibility after
+            // surface creation, so starting paused can leave a black wallpaper.
+            renderer.setPaused(false);
             renderer.start();
         }
 
