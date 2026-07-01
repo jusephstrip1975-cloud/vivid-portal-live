@@ -23,6 +23,33 @@ interface LiveWallpaperPlugin {
   checkCompatibility(): Promise<CompatibilityResult>;
   getDiagnostics(): Promise<Record<string, unknown>>;
   recordFrontendStep(options: { step: string; error?: string }): Promise<{ ok: boolean }>;
+  setFitMode(options: { mode: FitMode }): Promise<{ mode: FitMode }>;
+  getFitMode(): Promise<{ mode: FitMode }>;
+}
+
+export type FitMode = "cover" | "stretch" | "contain";
+
+export async function setWallpaperFitMode(mode: FitMode): Promise<void> {
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
+    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    await LiveWallpaper.setFitMode({ mode });
+  } catch (err) {
+    console.warn("setWallpaperFitMode failed", err);
+  }
+}
+
+export async function getWallpaperFitMode(): Promise<FitMode> {
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return "cover";
+    const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
+    const res = await LiveWallpaper.getFitMode();
+    return res.mode;
+  } catch {
+    return "cover";
+  }
 }
 
 /** Persist a step from the WebView into native SharedPreferences for diagnostics. */
