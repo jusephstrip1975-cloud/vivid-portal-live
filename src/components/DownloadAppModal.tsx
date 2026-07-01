@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Apple, Smartphone, X, Download, Share, Plus } from "lucide-react";
 
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
-const ANDROID_APK_URL =
-  "https://github.com/lovable-labs/aetherx-live-wallpaper/releases/latest";
+// APK servido desde el propio dominio. Sube el archivo firmado a
+// public/downloads/aetherx-latest.apk y el botón lo descargará directo.
+const ANDROID_APK_URL = "/downloads/aetherx-latest.apk";
 
 function detectOS(): "android" | "ios" | "other" {
   if (typeof navigator === "undefined") return "other";
@@ -35,6 +36,7 @@ function isStandalone(): boolean {
 export function DownloadAppModal() {
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
+  const [apkAvailable, setApkAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (isCapacitor()) return;
@@ -43,6 +45,11 @@ export function DownloadAppModal() {
       if (sessionStorage.getItem(STORAGE_KEY) === "1") return;
     } catch {}
     const t = setTimeout(() => setOpen(true), 800);
+    // Probe APK availability so we can show a graceful "próximamente" state
+    // instead of a broken 404 link.
+    fetch(ANDROID_APK_URL, { method: "HEAD" })
+      .then((r) => setApkAvailable(r.ok))
+      .catch(() => setApkAvailable(false));
     return () => clearTimeout(t);
   }, []);
 
@@ -88,17 +95,25 @@ export function DownloadAppModal() {
 
             <div className="mt-6 space-y-2.5">
               <a
-                href={ANDROID_APK_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={apkAvailable === false ? undefined : ANDROID_APK_URL}
+                onClick={(e) => {
+                  if (apkAvailable === false) {
+                    e.preventDefault();
+                    alert("El APK de Android aún se está preparando. Vuelve pronto — te avisaremos en cuanto esté disponible.");
+                  }
+                }}
+                download="aetherx-latest.apk"
+                aria-disabled={apkAvailable === false}
                 className={`flex items-center justify-center gap-2.5 rounded-full px-5 py-3.5 text-sm font-bold uppercase tracking-[0.15em] transition ${
-                  os === "android"
+                  apkAvailable === false
+                    ? "bg-white/10 text-white/40 cursor-not-allowed"
+                    : os === "android"
                     ? "bg-electric-blue text-space-black hover:bg-ocean-cyan"
                     : "bg-ice-white text-space-black hover:bg-electric-blue"
                 }`}
               >
                 <Smartphone className="h-4 w-4" />
-                Android (APK)
+                {apkAvailable === false ? "Android (próximamente)" : "Android (APK)"}
               </a>
               <button
                 onClick={() => setShowIosGuide(true)}
