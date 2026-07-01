@@ -114,10 +114,10 @@ function WallpaperDetail() {
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
         const successMsg =
           target === "lock"
-            ? "✓ Fondo aplicado en pantalla de bloqueo"
+            ? "✓ Selector nativo abierto para bloqueo"
             : target === "both"
-              ? "✓ Aplicado en inicio y bloqueo"
-              : "✓ Fondo animado aplicado en Inicio";
+              ? "✓ Selector nativo abierto para inicio y bloqueo"
+              : "✓ Selector nativo abierto para inicio";
         setToast(
           result.needsPicker
             ? target === "lock"

@@ -251,6 +251,10 @@ export async function saveWallpaperToDevice(
     const platform = Capacitor.getPlatform();
 
     if (platform === "android") {
+      if (!Capacitor.isPluginAvailable("AetherXLiveWallpaper")) {
+        await recordFrontendStep("PLUGIN_NOT_AVAILABLE_ANDROID_NO_DOWNLOAD");
+        return { ok: false, reason: "plugin-not-available" };
+      }
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
       const downloadUrl = resolveDownloadUrl(videoUrl);
       await recordFrontendStep("ANDROID_SAVE_SELECTED_VIDEO " + fileName);
