@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppStateProvider } from "@/lib/app-state";
 import { BottomNav } from "@/components/BottomNav";
 import { AppliedHalo } from "@/components/AppliedHalo";
+import { DownloadAppModal } from "@/components/DownloadAppModal";
 
 function NotFoundComponent() {
   return (
@@ -87,16 +88,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "#02040a" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "apple-mobile-web-app-title", content: "AetherX" },
+      { name: "apple-mobile-web-app-title", content: "AETHERX" },
       { name: "mobile-web-app-capable", content: "yes" },
-      { title: "AetherX — Fondos animados premium en 4K/8K" },
+      { title: "AETHERX — Fondos animados premium en 4K/8K" },
       {
         name: "description",
         content:
-          "AetherX: fondos de pantalla animados ultra realistas en movimiento. Universo, océano, cyberpunk y más, en 4K cinematográfico. Descarga gratuita, solo pagas por fondos 3D exclusivos.",
+          "AETHERX: fondos de pantalla animados ultra realistas en movimiento. Universo, océano, cyberpunk y más, en 4K cinematográfico. Descarga gratuita, solo pagas por fondos 3D exclusivos.",
       },
-      { name: "author", content: "AetherX" },
-      { property: "og:title", content: "AetherX — Fondos animados premium en 4K/8K" },
+      { name: "author", content: "AETHERX" },
+      { property: "og:title", content: "AETHERX — Fondos animados premium en 4K/8K" },
       {
         property: "og:description",
         content:
@@ -104,7 +105,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "AetherX — Fondos animados premium en 4K/8K" },
+      { name: "twitter:title", content: "AETHERX — Fondos animados premium en 4K/8K" },
       { name: "twitter:description", content: "Fondos animados ultra realistas en 4K/8K. Universo, océano, cyberpunk y más. Descarga gratuita, solo pagas por fondos 3D exclusivos." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ac492e86-ad5b-4c95-9360-54ee34149006/id-preview-94602ddc--86067037-aec8-403d-b7be-5af9e39ce44c.lovable.app-1781900710226.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ac492e86-ad5b-4c95-9360-54ee34149006/id-preview-94602ddc--86067037-aec8-403d-b7be-5af9e39ce44c.lovable.app-1781900710226.png" },
@@ -159,6 +160,7 @@ function RootComponent() {
             <Outlet />
           </main>
           <BottomNav />
+          <DownloadAppModal />
         </div>
       </AppStateProvider>
     </QueryClientProvider>
