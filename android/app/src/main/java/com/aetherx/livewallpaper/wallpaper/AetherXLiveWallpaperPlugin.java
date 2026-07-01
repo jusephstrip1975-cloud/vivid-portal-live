@@ -51,7 +51,26 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_LAST_FRONTEND_STEP = "last_frontend_step";
     public static final String KEY_LAST_PLUGIN_ENTERED = "last_plugin_entered";
     public static final String KEY_PLUGIN_JS_ERROR = "plugin_js_error";
+    public static final String KEY_FIT_MODE = "fit_mode"; // "cover" | "stretch" | "contain"
     private static final int MAX_REDIRECTS = 5;
+
+    @PluginMethod
+    public void setFitMode(PluginCall call) {
+        String mode = call.getString("mode", "cover");
+        if (!"cover".equals(mode) && !"stretch".equals(mode) && !"contain".equals(mode)) mode = "cover";
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_FIT_MODE, mode).apply();
+        JSObject ret = new JSObject(); ret.put("mode", mode);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void getFitMode(PluginCall call) {
+        String mode = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_FIT_MODE, "cover");
+        JSObject ret = new JSObject(); ret.put("mode", mode);
+        call.resolve(ret);
+    }
 
     @PluginMethod
     public void saveVideoFromUrl(final PluginCall call) {
