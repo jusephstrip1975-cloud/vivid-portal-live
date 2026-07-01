@@ -382,6 +382,10 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                 try { player.release(); } catch (Throwable ignored) {}
                 player = null;
             }
+            if (currentPfd != null) {
+                try { currentPfd.close(); } catch (Throwable ignored) {}
+                currentPfd = null;
+            }
         }
     }
 }
