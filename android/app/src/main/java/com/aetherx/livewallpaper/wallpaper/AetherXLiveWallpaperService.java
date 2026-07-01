@@ -99,6 +99,23 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             setTouchEventsEnabled(false);
             recordStep("ENGINE_CREATED");
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_ENGINE_EVENT, "engineOnCreate");
+            registerPrefsListener();
+        }
+
+        private void registerPrefsListener() {
+            try {
+                SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                prefsListener = (sp, key) -> {
+                    if (AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH.equals(key)
+                        || AetherXLiveWallpaperPlugin.KEY_VIDEO_URI.equals(key)) {
+                        recordStep("PREFS_VIDEO_CHANGED key=" + key);
+                        if (currentHolder != null) startRenderer(currentHolder);
+                    }
+                };
+                prefs.registerOnSharedPreferenceChangeListener(prefsListener);
+            } catch (Throwable t) {
+                persistNativeException("PREFS_LISTENER_REGISTER_FAIL", t);
+            }
         }
 
         @Override
@@ -117,9 +134,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
             currentHolder = holder;
+            surfaceWidth = width;
+            surfaceHeight = height;
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SURFACE_EVENT, "surfaceChanged " + width + "x" + height);
             Surface s = holder.getSurface();
             if (renderer == null && s != null && s.isValid()) startRenderer(holder);
+            else if (renderer != null) renderer.setTargetSize(width, height);
         }
 
         @Override
