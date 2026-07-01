@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-     versionCode 318
-     versionName "3.1.8-pland-frameblitter-canvas"
+    versionCode 319
+    versionName "3.1.9-pland-scaled-24fps-prefs-reload"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
