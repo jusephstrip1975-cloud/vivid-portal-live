@@ -88,6 +88,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private SurfaceHolder currentHolder;
         private FrameBlitterThread renderer;
         private volatile boolean visible = false;
+        private int surfaceWidth = 0;
+        private int surfaceHeight = 0;
+        private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
 
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
