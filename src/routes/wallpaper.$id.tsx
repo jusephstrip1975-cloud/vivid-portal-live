@@ -9,7 +9,6 @@ import {
   isLiveWallpaperPluginAvailable,
   isNative,
   recordFrontendStep,
-  resolveDownloadUrl,
   saveWallpaperToDevice,
   type WallpaperTarget,
 } from "@/lib/native-wallpaper";
@@ -115,10 +114,10 @@ function WallpaperDetail() {
         if (!result.ok) throw new Error(result.reason ?? "save-failed");
         const successMsg =
           target === "lock"
-            ? "✓ Fondo aplicado en pantalla de bloqueo"
+            ? "✓ Selector nativo abierto para bloqueo"
             : target === "both"
-              ? "✓ Aplicado en inicio y bloqueo"
-              : "✓ Fondo animado aplicado en Inicio";
+              ? "✓ Selector nativo abierto para inicio y bloqueo"
+              : "✓ Selector nativo abierto para inicio";
         setToast(
           result.needsPicker
             ? target === "lock"
@@ -129,38 +128,11 @@ function WallpaperDetail() {
             : successMsg,
         );
       } else {
-        // Navegador: descarga directa vía <a download>. Evita fetch/CORS para
-        // que funcione aunque el origen publicado redirija al dominio custom.
-        const downloadUrl = resolveDownloadUrl(wp.video);
-        try {
-          const res = await fetch(downloadUrl, { mode: "cors" });
-          if (!res.ok) throw new Error("download-failed");
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = fileName;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-        } catch {
-          // Fallback 1: anchor directo siguiendo redirecciones sin CORS.
-          try {
-            const a = document.createElement("a");
-            a.href = downloadUrl;
-            a.download = fileName;
-            a.rel = "noopener";
-            a.target = "_self";
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-          } catch {
-            // Fallback final: evitamos window.location en Android/WebView para no disparar navegador externo.
-            console.warn("No se pudo iniciar la descarga directa", downloadUrl);
-          }
-        }
-        setToast("✓ MP4 descargado");
+        setDownloadState("idle");
+        setActiveTarget(null);
+        setToast("Instala y abre la app AETHERX para aplicarlo en pantalla de inicio");
+        setTimeout(() => setToast(null), 4200);
+        return;
       }
 
       apply(wp.id);
@@ -306,9 +278,9 @@ function WallpaperDetail() {
             Cómo ponerlo de fondo
           </p>
           <ol className="space-y-1.5 list-decimal pl-5 text-white/65">
-            <li>Pulsa el destino que quieras: <strong className="text-white">Inicio</strong>, <strong className="text-white">Bloqueo</strong> o <strong className="text-white">Inicio y bloqueo</strong>.</li>
-            <li>El video MP4 también queda guardado en <strong className="text-white">Galería/Fotos</strong>.</li>
-            <li>Se abre <strong className="text-white">AetherX Live Wallpaper</strong> para aplicarlo animado.</li>
+            <li>Abre AETHERX desde el icono de la app instalada, no desde Galería/Fotos.</li>
+            <li>Pulsa <strong className="text-white">Inicio y bloqueo</strong> para abrir el selector nativo.</li>
+            <li>El sistema abre <strong className="text-white">AetherX Live Wallpaper</strong> para aplicarlo animado.</li>
             <li>
               En Android pulsa <strong className="text-white">Aplicar</strong> y elige el destino que tu móvil muestre.
             </li>
