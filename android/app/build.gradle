@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-    versionCode 320
-    versionName "3.2.0-crossprocess-prefs-poll"
+    versionCode 321
+    versionName "3.2.1-plan-e-egl-gl"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
