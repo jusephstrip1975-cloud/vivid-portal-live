@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.aetherx.livewallpaper",
-  appName: "AetherX Live Wallpaper",
+  appName: "AETHERX",
   webDir: "public/dist",
   backgroundColor: "#000000",
   android: {
