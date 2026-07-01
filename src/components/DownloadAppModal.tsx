@@ -36,6 +36,7 @@ function isStandalone(): boolean {
 export function DownloadAppModal() {
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
+  const [apkAvailable, setApkAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (isCapacitor()) return;
@@ -44,6 +45,11 @@ export function DownloadAppModal() {
       if (sessionStorage.getItem(STORAGE_KEY) === "1") return;
     } catch {}
     const t = setTimeout(() => setOpen(true), 800);
+    // Probe APK availability so we can show a graceful "próximamente" state
+    // instead of a broken 404 link.
+    fetch(ANDROID_APK_URL, { method: "HEAD" })
+      .then((r) => setApkAvailable(r.ok))
+      .catch(() => setApkAvailable(false));
     return () => clearTimeout(t);
   }, []);
 
