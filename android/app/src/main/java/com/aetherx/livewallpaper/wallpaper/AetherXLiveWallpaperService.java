@@ -225,6 +225,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private final SurfaceHolder holder;
         private volatile boolean stopRequested = false;
         private volatile boolean paused = false;
+        private volatile int targetW = 0;
+        private volatile int targetH = 0;
 
         FrameBlitterThread(SurfaceHolder holder) {
             super("AetherXFrameBlitterThread");
@@ -236,6 +238,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             interrupt();
         }
         void setPaused(boolean p) { paused = p; }
+        void setTargetSize(int w, int h) { targetW = w; targetH = h; }
 
         @Override
         public void run() {
