@@ -373,17 +373,3 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         }
     }
 }
-                    }
-                }
-            } catch (Throwable t) {
-                persistNativeException("CODEC_EXCEPTION", t);
-            } finally {
-                try { if (codec != null) { codec.stop(); codec.release(); } } catch (Throwable ignored) {}
-                try { if (extractor != null) extractor.release(); } catch (Throwable ignored) {}
-                try { if (afd != null) afd.close(); } catch (Throwable ignored) {}
-                try { if (pfd != null) pfd.close(); } catch (Throwable ignored) {}
-                recordStep("CODEC_THREAD_EXIT");
-            }
-        }
-    }
-}
