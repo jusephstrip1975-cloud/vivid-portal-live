@@ -31,7 +31,7 @@ import java.io.File;
 public class AetherXLiveWallpaperService extends WallpaperService {
 
     private static final String TAG = "AetherXLiveWP";
-    private static final long FRAME_INTERVAL_MS = 83L; // ~12 FPS for stability on live wallpaper surfaces.
+    private static final long FRAME_INTERVAL_MS = 42L; // ~24 FPS target; scaled decode keeps CPU low.
 
     private void recordStep(String step) {
         Log.i(TAG, "STEP " + step);
@@ -88,6 +88,9 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private SurfaceHolder currentHolder;
         private FrameBlitterThread renderer;
         private volatile boolean visible = false;
+        private int surfaceWidth = 0;
+        private int surfaceHeight = 0;
+        private SharedPreferences.OnSharedPreferenceChangeListener prefsListener;
 
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
@@ -96,6 +99,23 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             setTouchEventsEnabled(false);
             recordStep("ENGINE_CREATED");
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_ENGINE_EVENT, "engineOnCreate");
+            registerPrefsListener();
+        }
+
+        private void registerPrefsListener() {
+            try {
+                SharedPreferences prefs = getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE);
+                prefsListener = (sp, key) -> {
+                    if (AetherXLiveWallpaperPlugin.KEY_VIDEO_PATH.equals(key)
+                        || AetherXLiveWallpaperPlugin.KEY_VIDEO_URI.equals(key)) {
+                        recordStep("PREFS_VIDEO_CHANGED key=" + key);
+                        if (currentHolder != null) startRenderer(currentHolder);
+                    }
+                };
+                prefs.registerOnSharedPreferenceChangeListener(prefsListener);
+            } catch (Throwable t) {
+                persistNativeException("PREFS_LISTENER_REGISTER_FAIL", t);
+            }
         }
 
         @Override
@@ -114,9 +134,12 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         public void onSurfaceChanged(SurfaceHolder holder, int format, int width, int height) {
             super.onSurfaceChanged(holder, format, width, height);
             currentHolder = holder;
+            surfaceWidth = width;
+            surfaceHeight = height;
             recordKey(AetherXLiveWallpaperPlugin.KEY_LAST_SURFACE_EVENT, "surfaceChanged " + width + "x" + height);
             Surface s = holder.getSurface();
             if (renderer == null && s != null && s.isValid()) startRenderer(holder);
+            else if (renderer != null) renderer.setTargetSize(width, height);
         }
 
         @Override
@@ -137,6 +160,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         public void onDestroy() {
             recordStep("ENGINE_DESTROYED");
             stopRenderer();
+            try {
+                if (prefsListener != null) {
+                    getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE)
+                        .unregisterOnSharedPreferenceChangeListener(prefsListener);
+                    prefsListener = null;
+                }
+            } catch (Throwable ignored) {}
             super.onDestroy();
         }
 
@@ -145,8 +175,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             clearNativeFailureState();
             clearSurface(holder);
             renderer = new FrameBlitterThread(holder);
-            // Render immediately. Some Samsung builds deliver visibility after
-            // surface creation, so starting paused can leave a black wallpaper.
+            renderer.setTargetSize(surfaceWidth, surfaceHeight);
             renderer.setPaused(false);
             renderer.start();
         }
@@ -196,6 +225,8 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         private final SurfaceHolder holder;
         private volatile boolean stopRequested = false;
         private volatile boolean paused = false;
+        private volatile int targetW = 0;
+        private volatile int targetH = 0;
 
         FrameBlitterThread(SurfaceHolder holder) {
             super("AetherXFrameBlitterThread");
@@ -207,6 +238,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             interrupt();
         }
         void setPaused(boolean p) { paused = p; }
+        void setTargetSize(int w, int h) { targetW = w; targetH = h; }
 
         @Override
         public void run() {
@@ -276,8 +308,19 @@ public class AetherXLiveWallpaperService extends WallpaperService {
                     long frameStart = SystemClock.uptimeMillis();
                     lastPositionMs = (frameStart - playStartMs) % durationMs;
                     Bitmap frame = null;
+                    int tw = targetW, th = targetH;
+                    // Cap scaled decode to a reasonable size to keep CPU low.
+                    if (tw > 720) { th = (int) (th * (720.0f / tw)); tw = 720; }
                     try {
-                        frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST);
+                        if (tw > 0 && th > 0) {
+                            frame = retriever.getScaledFrameAtTime(
+                                lastPositionMs * 1000L,
+                                MediaMetadataRetriever.OPTION_CLOSEST,
+                                tw, th
+                            );
+                        } else {
+                            frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST);
+                        }
                         if (frame == null) {
                             frame = retriever.getFrameAtTime(lastPositionMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
                         }
