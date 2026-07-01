@@ -160,6 +160,13 @@ public class AetherXLiveWallpaperService extends WallpaperService {
         public void onDestroy() {
             recordStep("ENGINE_DESTROYED");
             stopRenderer();
+            try {
+                if (prefsListener != null) {
+                    getSharedPreferences(AetherXLiveWallpaperPlugin.PREFS, Context.MODE_PRIVATE)
+                        .unregisterOnSharedPreferenceChangeListener(prefsListener);
+                    prefsListener = null;
+                }
+            } catch (Throwable ignored) {}
             super.onDestroy();
         }
 
@@ -168,8 +175,7 @@ public class AetherXLiveWallpaperService extends WallpaperService {
             clearNativeFailureState();
             clearSurface(holder);
             renderer = new FrameBlitterThread(holder);
-            // Render immediately. Some Samsung builds deliver visibility after
-            // surface creation, so starting paused can leave a black wallpaper.
+            renderer.setTargetSize(surfaceWidth, surfaceHeight);
             renderer.setPaused(false);
             renderer.start();
         }
