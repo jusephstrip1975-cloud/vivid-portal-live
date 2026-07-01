@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -88,9 +91,28 @@ jobs:
           APK=android/app/build/outputs/apk/release/AetherX-release-signed.apk
           unzip -l "$APK" | grep -E "lib/(arm64-v8a|armeabi-v7a|x86|x86_64)/" | head -40 || echo "WARNING: no native libs found"
 
-      - name: Upload signed release APK
+      - name: Upload signed release APK (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: AetherX-release-signed
           path: android/app/build/outputs/apk/release/AetherX-release-signed.apk
           if-no-files-found: error
+
+      - name: Prepare APK for public release
+        run: |
+          mkdir -p dist-apk
+          cp android/app/build/outputs/apk/release/AetherX-release-signed.apk dist-apk/aetherx-latest.apk
+
+      - name: Publish / update "latest" GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: AETHERX latest APK
+          body: |
+            APK release firmado, generado automáticamente desde el último commit en main.
+            Descarga directa: aetherx-latest.apk
+          files: dist-apk/aetherx-latest.apk
+          prerelease: false
+          make_latest: "true"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
