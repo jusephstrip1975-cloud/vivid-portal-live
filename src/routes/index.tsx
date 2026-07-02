@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
+import aetherxLogo from "@/assets/aetherx-logo-v2.png";
 import {
   applyPickedVideo,
   getSamsungDiagnostics,
