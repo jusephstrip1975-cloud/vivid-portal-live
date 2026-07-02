@@ -1,26 +1,10 @@
 import { useEffect, useState } from "react";
-import { Apple, Smartphone, X, Download, Share, Plus } from "lucide-react";
+import { X, Download, Smartphone } from "lucide-react";
+import logoAsset from "@/assets/aetherx-logo-v2.png";
 
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
-// APK generado automáticamente por GitHub Actions y publicado como
-// release "latest". La URL /releases/latest/download/<archivo> siempre
-// redirige al último APK subido, así el botón nunca queda desactualizado.
-// IMPORTANTE: sustituye OWNER/REPO por el nombre real del repo cuando
-// conectes el proyecto a GitHub.
 const GITHUB_OWNER_REPO = "jusephstrip1975-cloud/vivid-portal-live";
 const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk`;
-
-function detectOS(): "android" | "ios" | "other" {
-  if (typeof navigator === "undefined") return "other";
-  const ua = navigator.userAgent || "";
-  if (/android/i.test(ua)) return "android";
-  if (/iPad|iPhone|iPod/i.test(ua)) return "ios";
-  // iPadOS 13+ reports as Mac; detect touch
-  if (/Macintosh/.test(ua) && typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 1) {
-    return "ios";
-  }
-  return "other";
-}
 
 function isCapacitor(): boolean {
   if (typeof window === "undefined") return false;
@@ -39,8 +23,6 @@ function isStandalone(): boolean {
 
 export function DownloadAppModal() {
   const [open, setOpen] = useState(false);
-  const [showIosGuide, setShowIosGuide] = useState(false);
-  const [apkAvailable] = useState<boolean>(true);
 
   useEffect(() => {
     if (isCapacitor()) return;
@@ -54,22 +36,25 @@ export function DownloadAppModal() {
 
   function close() {
     setOpen(false);
-    setShowIosGuide(false);
     try {
       sessionStorage.setItem(STORAGE_KEY, "1");
     } catch {}
   }
 
   if (!open) return null;
-  const os = detectOS();
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm px-4 pb-6 sm:pb-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md px-4"
       onClick={close}
     >
       <div
-        className="glass-card relative w-full max-w-sm rounded-3xl p-6 text-center border border-white/10"
+        className="relative w-full max-w-sm rounded-3xl p-7 text-center shadow-[0_20px_80px_rgba(212,175,55,0.25)]"
+        style={{
+          background:
+            "linear-gradient(160deg, #0a1a3a 0%, #050d24 55%, #0a1a3a 100%)",
+          border: "1px solid rgba(212,175,55,0.35)",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -80,121 +65,60 @@ export function DownloadAppModal() {
           <X className="h-4 w-4" />
         </button>
 
-        {!showIosGuide ? (
-          <>
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-electric-blue/15 text-electric-blue">
-              <Download className="h-6 w-6" />
-            </div>
-            <h2 className="mt-4 text-lg font-bold text-display text-ice-white">
-              Descargar AETHERX
-            </h2>
-            <p className="mt-2 text-sm text-white/60">
-              Elige tu sistema para instalar la app y aplicar fondos animados en tu pantalla.
-            </p>
+        <div className="mx-auto h-20 w-20 rounded-2xl overflow-hidden ring-1 ring-[#d4af37]/50 shadow-[0_8px_30px_rgba(212,175,55,0.35)]">
+          <img
+            src={logoAsset}
+            alt="AETHERX"
+            width={80}
+            height={80}
+            className="h-full w-full object-cover"
+          />
+        </div>
 
-            <div className="mt-6 space-y-2.5">
-              <a
-                href={apkAvailable === false ? undefined : ANDROID_APK_URL}
-                onClick={(e) => {
-                  if (apkAvailable === false) {
-                    e.preventDefault();
-                    alert("El APK de Android aún se está preparando. Vuelve pronto — te avisaremos en cuanto esté disponible.");
-                  }
-                }}
-                download="aetherx-latest.apk"
-                aria-disabled={apkAvailable === false}
-                className={`flex items-center justify-center gap-2.5 rounded-full px-5 py-3.5 text-sm font-bold uppercase tracking-[0.15em] transition ${
-                  apkAvailable === false
-                    ? "bg-white/10 text-white/40 cursor-not-allowed"
-                    : os === "android"
-                    ? "bg-electric-blue text-space-black hover:bg-ocean-cyan"
-                    : "bg-ice-white text-space-black hover:bg-electric-blue"
-                }`}
-              >
-                <Smartphone className="h-4 w-4" />
-                {apkAvailable === false ? "Android (próximamente)" : "Android (APK)"}
-              </a>
-              <button
-                onClick={() => setShowIosGuide(true)}
-                className={`flex w-full items-center justify-center gap-2.5 rounded-full px-5 py-3.5 text-sm font-bold uppercase tracking-[0.15em] transition ${
-                  os === "ios"
-                    ? "bg-electric-blue text-space-black hover:bg-ocean-cyan"
-                    : "border border-white/15 text-white hover:bg-white/5"
-                }`}
-              >
-                <Apple className="h-4 w-4" />
-                iPhone / iPad
-              </button>
-            </div>
+        <h2
+          className="mt-5 text-xl font-bold tracking-[0.2em] text-white"
+          style={{ fontFamily: "inherit" }}
+        >
+          AETHERX
+        </h2>
+        <div
+          className="mx-auto mt-1 h-px w-16"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, #d4af37, transparent)",
+          }}
+        />
+        <p className="mt-4 text-sm text-white/70 leading-relaxed">
+          Descarga la app oficial para aplicar fondos animados 3D en tu pantalla de inicio y bloqueo.
+        </p>
 
-            <button
-              onClick={close}
-              className="mt-5 text-[10px] font-bold uppercase tracking-[0.25em] text-white/40 hover:text-white/70 transition"
-            >
-              Continuar en el navegador
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-electric-blue/15 text-electric-blue">
-              <Apple className="h-6 w-6" />
-            </div>
-            <h2 className="mt-4 text-lg font-bold text-display text-ice-white">
-              Instalar en iPhone / iPad
-            </h2>
-            <p className="mt-2 text-sm text-white/60">
-              Añade AETHERX a tu pantalla de inicio para abrirlo como una app nativa desde Safari.
-            </p>
+        <a
+          href={ANDROID_APK_URL}
+          download="aetherx-latest.apk"
+          className="mt-6 flex items-center justify-center gap-2.5 rounded-full px-6 py-3.5 text-sm font-bold uppercase tracking-[0.2em] transition"
+          style={{
+            background:
+              "linear-gradient(135deg, #f4d160 0%, #d4af37 50%, #b8892b 100%)",
+            color: "#050d24",
+            boxShadow: "0 8px 24px rgba(212,175,55,0.35)",
+          }}
+        >
+          <Download className="h-4 w-4" />
+          Descargar Android
+        </a>
 
-            <ol className="mt-5 space-y-3 text-left">
-              <li className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-electric-blue/15 text-[11px] font-black text-electric-blue">
-                  1
-                </span>
-                <span className="text-xs text-white/75">
-                  Abre esta web en <b className="text-white">Safari</b> (no Chrome ni la app de Instagram).
-                </span>
-              </li>
-              <li className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-electric-blue/15 text-electric-blue">
-                  <Share className="h-3.5 w-3.5" />
-                </span>
-                <span className="text-xs text-white/75">
-                  Pulsa el botón <b className="text-white">Compartir</b> en la barra inferior.
-                </span>
-              </li>
-              <li className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-electric-blue/15 text-electric-blue">
-                  <Plus className="h-3.5 w-3.5" />
-                </span>
-                <span className="text-xs text-white/75">
-                  Elige <b className="text-white">"Añadir a pantalla de inicio"</b> y confirma.
-                </span>
-              </li>
-            </ol>
+        <div className="mt-4 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-white/50">
+          <Smartphone className="h-3 w-3" />
+          APK · Android 8.0+
+        </div>
 
-            <p className="mt-4 text-[10px] uppercase tracking-[0.2em] text-white/40">
-              La app en la App Store llegará próximamente
-            </p>
-
-            <div className="mt-5 flex gap-2">
-              <button
-                onClick={() => setShowIosGuide(false)}
-                className="flex-1 rounded-full border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-white/70 hover:bg-white/5 transition"
-              >
-                Atrás
-              </button>
-              <button
-                onClick={close}
-                className="flex-1 rounded-full bg-ice-white px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.18em] text-space-black hover:bg-electric-blue transition"
-              >
-                Entendido
-              </button>
-            </div>
-          </>
-        )}
+        <button
+          onClick={close}
+          className="mt-4 text-[10px] font-bold uppercase tracking-[0.25em] text-white/40 hover:text-white/70 transition"
+        >
+          Continuar en el navegador
+        </button>
       </div>
     </div>
   );
 }
-
