@@ -127,13 +127,20 @@ function HomePage() {
 
       {/* Header */}
       <header className="glass-nav sticky top-0 z-40 flex items-center justify-between px-6 py-5">
-        <div>
-          <h1 className="text-xl font-bold uppercase italic tracking-tight text-display">
-            Aether<span className="text-electric-blue">X</span>
-          </h1>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/40">
-            Cinematic Reality
-          </p>
+        <div className="flex items-center gap-3">
+          <img
+            src={aetherxLogo}
+            alt="AETHERX"
+            className="size-11 rounded-xl shadow-lg shadow-electric-blue/20 ring-1 ring-white/10"
+          />
+          <div>
+            <h1 className="text-xl font-bold uppercase italic tracking-tight text-display">
+              Aether<span className="text-electric-blue">X</span>
+            </h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-white/40">
+              Cinematic Reality
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link
