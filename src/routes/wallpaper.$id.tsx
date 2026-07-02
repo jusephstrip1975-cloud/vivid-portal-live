@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound, useRouter } from "@tanstack/react-router";
 import { ArrowLeft, Check, Heart, Home, Layers, Lock, Share2, Volume2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
@@ -12,6 +12,9 @@ import {
   saveWallpaperToDevice,
   type WallpaperTarget,
 } from "@/lib/native-wallpaper";
+
+const ANDROID_APK_URL =
+  "https://github.com/jusephstrip1975-cloud/vivid-portal-live/releases/latest/download/aetherx-latest.apk";
 
 export const Route = createFileRoute("/wallpaper/$id")({
   loader: ({ params }) => {
@@ -58,9 +61,20 @@ function WallpaperDetail() {
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
   const [activeTarget, setActiveTarget] = useState<WallpaperTarget | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [nativeReady, setNativeReady] = useState(false);
 
   const isDownloaded = appliedId === wp.id;
   const fav = isFavorite(wp.id);
+
+  useEffect(() => {
+    let alive = true;
+    void isNative().then((native) => {
+      if (alive) setNativeReady(native);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const targetLabels: Record<WallpaperTarget, string> = {
     home: "Pantalla de inicio",
@@ -225,38 +239,53 @@ function WallpaperDetail() {
           </dl>
 
           <div className="mt-5 grid gap-2">
-            {(["home", "lock", "both"] as WallpaperTarget[]).map((target) => {
-              const isActive = activeTarget === target;
-              const Icon = target === "home" ? Home : target === "lock" ? Lock : Layers;
-              const isPrimary = target === "both";
-              return (
-                <button
-                  key={target}
-                  type="button"
-                  onClick={() => handleApply(target)}
-                  disabled={downloadState === "downloading"}
-                  className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[12px] font-bold uppercase tracking-[0.18em] transition disabled:opacity-60 ${
-                    isPrimary
-                      ? "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
-                      : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
-                  }`}
+            {nativeReady ? (
+              (["home", "lock", "both"] as WallpaperTarget[]).map((target) => {
+                const isActive = activeTarget === target;
+                const Icon = target === "home" ? Home : target === "lock" ? Lock : Layers;
+                const isPrimary = target === "both";
+                return (
+                  <button
+                    key={target}
+                    type="button"
+                    onClick={() => handleApply(target)}
+                    disabled={downloadState === "downloading"}
+                    className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[12px] font-bold uppercase tracking-[0.18em] transition disabled:opacity-60 ${
+                      isPrimary
+                        ? "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
+                        : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    }`}
+                  >
+                    {isActive && downloadState === "downloading" ? (
+                      "Aplicando..."
+                    ) : isActive && downloadState === "done" ? (
+                      <>
+                        <Check className="size-4" strokeWidth={3} />
+                        Aplicado
+                      </>
+                    ) : (
+                      <>
+                        <Icon className="size-4" />
+                        Establecer en {targetLabels[target]}
+                      </>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <>
+                <a
+                  href={ANDROID_APK_URL}
+                  download="aetherx-latest.apk"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-electric-blue to-galaxy-purple px-4 py-4 text-center text-[12px] font-bold uppercase tracking-[0.16em] text-white shadow-lg shadow-electric-blue/30"
                 >
-                  {isActive && downloadState === "downloading" ? (
-                    "Aplicando..."
-                  ) : isActive && downloadState === "done" ? (
-                    <>
-                      <Check className="size-4" strokeWidth={3} />
-                      Aplicado
-                    </>
-                  ) : (
-                    <>
-                      <Icon className="size-4" />
-                      Establecer en {targetLabels[target]}
-                    </>
-                  )}
-                </button>
-              );
-            })}
+                  Descargar app Android
+                </a>
+                <p className="text-center text-[11px] leading-relaxed text-white/55">
+                  En Chrome solo se descargan vídeos. Para ponerlo en pantalla de inicio o bloqueo, instala y abre AETHERX desde el icono del móvil.
+                </p>
+              </>
+            )}
             {isDownloaded && (
               <p className="mt-1 text-center text-[10px] uppercase tracking-[0.25em] text-electric-blue/80">
                 Último aplicado
