@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Battery, Bell, Download, Globe, Music, Shield } from "lucide-react";
+import { Battery, Bell, Download, Globe, Lock, Music, Shield } from "lucide-react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 
@@ -99,6 +99,22 @@ function ProfilePage() {
           </div>
         ))}
       </section>
+
+      <Link
+        to="/admin"
+        className="mt-4 glass-card flex items-center gap-4 rounded-3xl px-5 py-4 hover:bg-white/5 transition"
+      >
+        <span className="flex size-9 items-center justify-center rounded-xl bg-electric-blue/15">
+          <Lock className="size-4 text-electric-blue" />
+        </span>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-ice-white">Panel de administración</p>
+          <p className="text-[11px] text-white/45">Ver correos de testers registrados</p>
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-electric-blue">
+          Entrar →
+        </span>
+      </Link>
 
       <p className="mt-8 text-center text-[10px] uppercase tracking-[0.25em] text-white/30">
         AetherX v1.0 · Cinematic Reality
