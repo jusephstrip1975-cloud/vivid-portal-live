@@ -29,13 +29,18 @@ const isNativeWebView = () => {
 export function LiveMedia({ src, poster, alt, className = "", preview = false }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [nativeWebView] = useState(() => isNativeWebView());
   const [active, setActive] = useState(false);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const videoSrc = resolveDownloadUrl(src);
+  const videoEnabled = preview && !nativeWebView;
 
   useEffect(() => {
-    if (!preview) return;
+    if (!videoEnabled) {
+      setActive(false);
+      return;
+    }
     const el = wrapRef.current;
     if (!el) return;
     // Márgenes reducidos: evita mantener 10+ vídeos activos fuera de pantalla en Android.
@@ -60,10 +65,10 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
       window.cancelAnimationFrame(raf);
       window.clearTimeout(timer);
     };
-  }, [preview]);
+  }, [videoEnabled]);
 
   useEffect(() => {
-    if (!preview) return;
+    if (!videoEnabled) return;
     const v = videoRef.current;
     if (!v) return;
     v.muted = true;
@@ -91,7 +96,7 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
     } else {
       v.pause();
     }
-  }, [active, failed, preview]);
+  }, [active, failed, videoEnabled]);
 
   useEffect(() => {
     setReady(false);
@@ -99,7 +104,7 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
   }, [src, poster]);
 
   useEffect(() => {
-    if (!preview) return;
+    if (!videoEnabled) return;
     const onVis = () => {
       const v = videoRef.current;
       if (!v) return;
@@ -111,7 +116,7 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [active, failed, preview]);
+  }, [active, failed, videoEnabled]);
 
   return (
     <div ref={wrapRef} className={`relative overflow-hidden ${className}`}>
@@ -122,7 +127,7 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
         decoding="async"
         className="absolute inset-0 size-full object-cover"
       />
-      {preview && active && !failed && (
+      {videoEnabled && active && !failed && (
         <video
           key={videoSrc}
           ref={videoRef}

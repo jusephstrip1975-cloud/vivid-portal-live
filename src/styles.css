@@ -90,8 +90,14 @@
     -webkit-font-smoothing: antialiased;
   }
   body {
-    overscroll-behavior-y: none;
+    overscroll-behavior-y: auto;
+    touch-action: pan-x pan-y;
   }
+}
+
+html.aetherx-native .glass-card,
+html.aetherx-native .glass-nav {
+  backdrop-filter: none;
 }
 
 /* ---- Reusable design utilities ---- */
