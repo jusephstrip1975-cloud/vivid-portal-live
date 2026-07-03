@@ -29,16 +29,12 @@ const isNativeWebView = () => {
 export function LiveMedia({ src, poster, alt, className = "", preview = false }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const nativeWebViewRef = useRef(false);
+  const [nativeWebView] = useState(() => isNativeWebView());
   const [active, setActive] = useState(false);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const videoSrc = resolveDownloadUrl(src);
-  const videoEnabled = preview && !nativeWebViewRef.current;
-
-  useEffect(() => {
-    nativeWebViewRef.current = isNativeWebView();
-  }, []);
+  const videoEnabled = preview && !nativeWebView;
 
   useEffect(() => {
     if (!videoEnabled) {
