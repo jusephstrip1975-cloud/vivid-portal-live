@@ -45,10 +45,15 @@ function HomePage() {
   const [diag, setDiag] = useState<string | null>(null);
   const [diagFields, setDiagFields] = useState<Record<string, string> | null>(null);
   const [fitMode, setFitModeState] = useState<FitMode>("cover");
+  const [visibleWallpapers, setVisibleWallpapers] = useState(18);
 
   useEffect(() => {
     getWallpaperFitMode().then(setFitModeState).catch(() => {});
   }, []);
+
+  const oddWallpapers = WALLPAPERS.filter((_, i) => i % 2 === 1).slice(0, Math.ceil(visibleWallpapers / 2));
+  const evenWallpapers = WALLPAPERS.filter((_, i) => i % 2 === 0).slice(0, Math.floor(visibleWallpapers / 2));
+  const hasMoreWallpapers = visibleWallpapers < WALLPAPERS.length;
 
   async function handleFitModeChange(mode: FitMode) {
     setFitModeState(mode);
@@ -172,7 +177,6 @@ function HomePage() {
             poster={hero.src}
             alt={hero.title}
             className="size-full object-cover transition duration-[1500ms] group-hover:scale-105"
-            preview
           />
           <div className="absolute inset-0 bg-gradient-to-t from-space-black via-space-black/30 to-transparent" />
 
@@ -377,16 +381,25 @@ function HomePage() {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-4">
-            {WALLPAPERS.filter((_, i) => i % 2 === 1).map((wp, i) => (
+            {oddWallpapers.map((wp, i) => (
               <WallpaperTile key={wp.id} wp={wp} index={i * 2 + 1} />
             ))}
           </div>
           <div className="space-y-4 pt-8">
-            {WALLPAPERS.filter((_, i) => i % 2 === 0).map((wp, i) => (
+            {evenWallpapers.map((wp, i) => (
               <WallpaperTile key={wp.id} wp={wp} index={i * 2} />
             ))}
           </div>
         </div>
+        {hasMoreWallpapers && (
+          <button
+            type="button"
+            onClick={() => setVisibleWallpapers((count) => Math.min(count + 18, WALLPAPERS.length))}
+            className="mt-6 w-full rounded-2xl border border-electric-blue/30 bg-electric-blue/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-electric-blue transition active:scale-[0.99]"
+          >
+            Ver más pantallas 3D
+          </button>
+        )}
       </section>
 
 
