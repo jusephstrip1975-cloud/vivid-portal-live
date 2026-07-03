@@ -11,8 +11,15 @@ const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest
 
 function isCapacitor(): boolean {
   if (typeof window === "undefined") return false;
-  const w = window as Window & { Capacitor?: { isNativePlatform?: () => boolean } };
-  return w.Capacitor?.isNativePlatform?.() === true;
+  const w = window as Window & {
+    Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
+  };
+  const ua = navigator.userAgent.toLowerCase();
+  return (
+    w.Capacitor?.isNativePlatform?.() === true ||
+    w.Capacitor?.getPlatform?.() === "android" ||
+    (ua.includes("android") && ua.includes("; wv"))
+  );
 }
 
 function isStandalone(): boolean {
@@ -53,6 +60,7 @@ export function DownloadAppModal() {
 
   // Lock body scroll and compensate for scrollbar width to prevent layout shift
   useEffect(() => {
+    if (isCapacitor()) return;
     if (!open) return;
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     const prevOverflow = document.body.style.overflow;
