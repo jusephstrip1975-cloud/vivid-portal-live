@@ -127,7 +127,7 @@ export function DownloadAppModal() {
 
         <div className="mt-4 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-white/50">
           <Smartphone className="h-3 w-3" />
-          APK · Android 8.0+
+          APK v{APK_VERSION} · Android 8.0+
         </div>
 
         <button
