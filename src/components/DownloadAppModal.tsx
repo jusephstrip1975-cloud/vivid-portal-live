@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { X, Download, Smartphone } from "lucide-react";
+import { X, Download, Smartphone, CheckCircle2 } from "lucide-react";
 import logoAsset from "@/assets/aetherx-logo-v2.png";
 
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
 const GITHUB_OWNER_REPO = "jusephstrip1975-cloud/vivid-portal-live";
 const APK_VERSION = "3.2.5";
-// Cache-buster ligado a la versión: evita que GitHub/CDN sirvan una copia antigua del APK.
-const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk?v=${APK_VERSION}`;
+// GitHub sirve el APK con Content-Disposition: attachment. Sin query params
+// para no romper la descarga directa; el cache-buster va como fragment (#v=...).
+const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk#v=${APK_VERSION}`;
 
 function isCapacitor(): boolean {
   if (typeof window === "undefined") return false;
@@ -25,6 +26,20 @@ function isStandalone(): boolean {
 
 export function DownloadAppModal() {
   const [open, setOpen] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
+
+  function handleDownloadClick() {
+    // Fuerza descarga directa sin cambiar de pestaña. GitHub sirve
+    // Content-Disposition: attachment, así que el navegador guarda el APK.
+    const a = document.createElement("a");
+    a.href = ANDROID_APK_URL;
+    a.download = "aetherx-latest.apk";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setDownloaded(true);
+  }
 
   useEffect(() => {
     if (isCapacitor()) return;
@@ -110,10 +125,9 @@ export function DownloadAppModal() {
           Descarga la app oficial para aplicar fondos animados 3D en tu pantalla de inicio y bloqueo.
         </p>
 
-        <a
-          href={ANDROID_APK_URL}
-          download="aetherx-latest.apk"
-          className="mt-6 flex items-center justify-center gap-2.5 rounded-full px-6 py-3.5 text-sm font-bold uppercase tracking-[0.2em] transition"
+        <button
+          onClick={handleDownloadClick}
+          className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-full px-6 py-3.5 text-sm font-bold uppercase tracking-[0.2em] transition active:scale-[0.98]"
           style={{
             background:
               "linear-gradient(135deg, #f4d160 0%, #d4af37 50%, #b8892b 100%)",
@@ -122,19 +136,40 @@ export function DownloadAppModal() {
           }}
         >
           <Download className="h-4 w-4" />
-          Descargar Android
-        </a>
+          {downloaded ? "Descargando..." : "Descargar Android"}
+        </button>
 
         <div className="mt-4 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-white/50">
           <Smartphone className="h-3 w-3" />
           APK v{APK_VERSION} · Android 8.0+
         </div>
 
+        {downloaded && (
+          <div
+            className="mt-5 rounded-2xl p-4 text-left text-[11px] leading-relaxed text-white/80"
+            style={{
+              background: "rgba(212,175,55,0.08)",
+              border: "1px solid rgba(212,175,55,0.25)",
+            }}
+          >
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#f4d160]">
+              <CheckCircle2 className="h-3 w-3" />
+              Para ver el icono en tu móvil
+            </div>
+            <ol className="ml-4 list-decimal space-y-1.5">
+              <li>Abre la notificación de descarga o el gestor de archivos.</li>
+              <li>Pulsa <b>aetherx-latest.apk</b> e <b>Instalar</b> (si pide "permitir esta fuente", acéptalo).</li>
+              <li>Si Chrome avisa "posible archivo dañino", pulsa <b>Descargar de todos modos</b> — es normal en APKs fuera de Play Store.</li>
+              <li>Tras instalar, el icono <b>AETHERX</b> aparecerá en tu pantalla de inicio.</li>
+            </ol>
+          </div>
+        )}
+
         <button
           onClick={close}
           className="mt-4 text-[10px] font-bold uppercase tracking-[0.25em] text-white/40 hover:text-white/70 transition"
         >
-          Continuar en el navegador
+          {downloaded ? "Cerrar" : "Continuar en el navegador"}
         </button>
       </div>
     </div>
