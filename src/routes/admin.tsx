@@ -25,6 +25,7 @@ function AdminPage() {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function refresh() {
     setLoading(true);
