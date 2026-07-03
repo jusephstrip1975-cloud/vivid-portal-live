@@ -6,6 +6,13 @@ interface Props {
   poster: string;
   alt: string;
   className?: string;
+  /**
+   * Si es false, renderiza SOLO el póster (JPG). Sin vídeo, sin autoplay.
+   * Úsalo para grids con muchas tarjetas — evita bloquear el hilo principal
+   * en Android al decodificar decenas de MP4s a la vez.
+   * Default: false (rendimiento). Ponlo a true solo en pantallas de detalle.
+   */
+  preview?: boolean;
 }
 
 const isNativeWebView = () => {
@@ -16,12 +23,10 @@ const isNativeWebView = () => {
 
 /**
  * Preview en tiempo real con bucle suave.
- * - Solo carga/reproduce el vídeo cuando entra en viewport.
- * - En Android WebView precalienta más margen para evitar tarjetas negras.
- * - Atributos playsInline + webkit-playsinline para reproducción embebida.
- * - Si autoplay es bloqueado, reintenta tras el primer toque del usuario.
+ * - Solo carga/reproduce el vídeo cuando entra en viewport Y preview=true.
+ * - En grids (preview=false) muestra únicamente el póster para no bloquear el WebView.
  */
-export function LiveMedia({ src, poster, alt, className = "" }: Props) {
+export function LiveMedia({ src, poster, alt, className = "", preview = false }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [active, setActive] = useState(false);
@@ -30,9 +35,11 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
   const videoSrc = resolveDownloadUrl(src);
 
   useEffect(() => {
+    if (!preview) return;
     const el = wrapRef.current;
     if (!el) return;
-    const margin = isNativeWebView() ? 700 : 300;
+    // Márgenes reducidos: evita mantener 10+ vídeos activos fuera de pantalla en Android.
+    const margin = isNativeWebView() ? 150 : 200;
     const markIfVisible = () => {
       const rect = el.getBoundingClientRect();
       const height = window.innerHeight || document.documentElement.clientHeight;
@@ -53,9 +60,10 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
       window.cancelAnimationFrame(raf);
       window.clearTimeout(timer);
     };
-  }, []);
+  }, [preview]);
 
   useEffect(() => {
+    if (!preview) return;
     const v = videoRef.current;
     if (!v) return;
     v.muted = true;
@@ -68,7 +76,6 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
       if (failed) return;
       v.load();
       v.play().catch(() => {
-        // Autoplay bloqueado: reintenta tras primera interacción del usuario.
         const retry = () => {
           v.play().catch(() => {});
           window.removeEventListener("touchstart", retry);
@@ -84,7 +91,7 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
     } else {
       v.pause();
     }
-  }, [active, failed]);
+  }, [active, failed, preview]);
 
   useEffect(() => {
     setReady(false);
@@ -92,6 +99,7 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
   }, [src, poster]);
 
   useEffect(() => {
+    if (!preview) return;
     const onVis = () => {
       const v = videoRef.current;
       if (!v) return;
@@ -103,7 +111,7 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [active, failed]);
+  }, [active, failed, preview]);
 
   return (
     <div ref={wrapRef} className={`relative overflow-hidden ${className}`}>
@@ -114,7 +122,7 @@ export function LiveMedia({ src, poster, alt, className = "" }: Props) {
         decoding="async"
         className="absolute inset-0 size-full object-cover"
       />
-      {active && !failed && (
+      {preview && active && !failed && (
         <video
           key={videoSrc}
           ref={videoRef}

@@ -172,6 +172,7 @@ function HomePage() {
             poster={hero.src}
             alt={hero.title}
             className="size-full object-cover transition duration-[1500ms] group-hover:scale-105"
+            preview
           />
           <div className="absolute inset-0 bg-gradient-to-t from-space-black via-space-black/30 to-transparent" />
 

@@ -4,7 +4,7 @@ import logoAsset from "@/assets/aetherx-logo-v2.png";
 
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
 const GITHUB_OWNER_REPO = "jusephstrip1975-cloud/vivid-portal-live";
-const APK_VERSION = "3.2.5";
+const APK_VERSION = "3.2.6";
 // GitHub sirve el APK con Content-Disposition: attachment. Sin query params
 // para no romper la descarga directa; el cache-buster va como fragment (#v=...).
 const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk#v=${APK_VERSION}`;
