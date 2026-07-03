@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { X, Download, Smartphone, CheckCircle2, Zap, Share as ShareIcon } from "lucide-react";
+import { X, Download, Smartphone, CheckCircle2, Zap, Share as ShareIcon, Mail, Users } from "lucide-react";
 import logoAsset from "@/assets/aetherx-logo-v2.png";
+import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
+const REGISTERED_KEY = "aetherx-tester-registered";
 const GITHUB_OWNER_REPO = "jusephstrip1975-cloud/vivid-portal-live";
 const APK_VERSION = "3.2.7";
 const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk#v=${APK_VERSION}`;
+const TESTERS_GOAL = 15;
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -42,6 +45,8 @@ function detectPlatform(): "android" | "ios" | "desktop" {
   return "desktop";
 }
 
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
 export function DownloadAppModal() {
   const [open, setOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -50,11 +55,34 @@ export function DownloadAppModal() {
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [platform, setPlatform] = useState<"android" | "ios" | "desktop">("desktop");
 
+  // Registro de tester
+  const [registered, setRegistered] = useState(false);
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [testerCount, setTesterCount] = useState<number | null>(null);
+
   useEffect(() => {
     setPlatform(detectPlatform());
+    try {
+      if (localStorage.getItem(REGISTERED_KEY) === "1") setRegistered(true);
+    } catch {}
   }, []);
 
-  // Capturar el prompt nativo de PWA (Chrome Android / Edge)
+  // Cargar contador de testers
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.rpc("get_tester_count");
+      if (!cancelled && typeof data === "number") setTesterCount(data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, registered]);
+
+  // Capturar el prompt nativo de PWA
   useEffect(() => {
     function onBeforeInstall(e: Event) {
       e.preventDefault();
@@ -72,6 +100,31 @@ export function DownloadAppModal() {
     };
   }, []);
 
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setErrorMsg(null);
+    const clean = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(clean)) {
+      setErrorMsg("Introduce un correo válido");
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.from("tester_emails").insert({ email: clean });
+    setSubmitting(false);
+    if (error) {
+      // Duplicado = correo ya registrado, no es un error real para el usuario
+      if (error.code === "23505") {
+        try { localStorage.setItem(REGISTERED_KEY, "1"); } catch {}
+        setRegistered(true);
+        return;
+      }
+      setErrorMsg("No se pudo registrar. Inténtalo de nuevo.");
+      return;
+    }
+    try { localStorage.setItem(REGISTERED_KEY, "1"); } catch {}
+    setRegistered(true);
+  }
+
   async function handleInstallPwa() {
     if (deferredPrompt) {
       await deferredPrompt.prompt();
@@ -80,11 +133,9 @@ export function DownloadAppModal() {
       setDeferredPrompt(null);
       return;
     }
-    // Fallback si el navegador no expone el prompt (iOS Safari, algunas versiones)
     if (platform === "ios") {
       setShowIosGuide(true);
     } else {
-      // Android sin prompt: normalmente Chrome muestra su propio banner "Añadir a inicio"
       alert(
         "Abre el menú del navegador (⋮) y pulsa \"Instalar app\" o \"Añadir a pantalla de inicio\".",
       );
@@ -136,6 +187,8 @@ export function DownloadAppModal() {
   if (!open) return null;
 
   const pwaAvailable = !!deferredPrompt || platform === "ios";
+  const count = testerCount ?? 0;
+  const progress = Math.min(100, Math.round((count / TESTERS_GOAL) * 100));
 
   return (
     <div
@@ -168,7 +221,17 @@ export function DownloadAppModal() {
           style={{ background: "linear-gradient(90deg, transparent, #d4af37, transparent)" }}
         />
 
-        {installed ? (
+        {!registered ? (
+          <RegisterStep
+            email={email}
+            setEmail={setEmail}
+            onSubmit={handleRegister}
+            submitting={submitting}
+            errorMsg={errorMsg}
+            count={count}
+            progress={progress}
+          />
+        ) : installed ? (
           <>
             <p className="mt-4 text-sm text-white/80 leading-relaxed">
               ✓ App instalada. Búscala en tu pantalla de inicio.
@@ -186,11 +249,15 @@ export function DownloadAppModal() {
           <ApkGuide onClose={close} />
         ) : (
           <>
+            <div className="mt-3 flex items-center justify-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-400/30 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-300">
+              <CheckCircle2 className="h-3 w-3" />
+              Registrado — ya puedes descargar
+            </div>
+
             <p className="mt-3 text-xs text-white/70 leading-relaxed">
-              Instala AETHERX en tu móvil y ten el icono en tu pantalla de inicio.
+              Elige cómo instalar AETHERX en tu móvil.
             </p>
 
-            {/* Opción 1 — instalación en 1 toque */}
             <button
               onClick={handleInstallPwa}
               disabled={!pwaAvailable && platform === "desktop"}
@@ -208,14 +275,12 @@ export function DownloadAppModal() {
               Recomendado · sin permisos · icono al instante
             </div>
 
-            {/* Divider */}
             <div className="my-4 flex items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-white/30">
               <div className="h-px flex-1 bg-white/10" />
               o versión con wallpaper 3D nativo
               <div className="h-px flex-1 bg-white/10" />
             </div>
 
-            {/* Opción 2 — APK Android */}
             <button
               onClick={handleDownloadApk}
               className="flex w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.15em] text-white transition hover:bg-white/10 active:scale-[0.98]"
@@ -225,7 +290,7 @@ export function DownloadAppModal() {
             </button>
             <div className="mt-1.5 flex items-center justify-center gap-1.5 text-[9px] uppercase tracking-[0.2em] text-white/40">
               <Smartphone className="h-2.5 w-2.5" />
-              APK v{APK_VERSION} · Android 8.0+ · 2 pasos
+              APK v{APK_VERSION} · Android 8.0+
             </div>
 
             <button
@@ -238,6 +303,85 @@ export function DownloadAppModal() {
         )}
       </div>
     </div>
+  );
+}
+
+function RegisterStep({
+  email,
+  setEmail,
+  onSubmit,
+  submitting,
+  errorMsg,
+  count,
+  progress,
+}: {
+  email: string;
+  setEmail: (v: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  submitting: boolean;
+  errorMsg: string | null;
+  count: number;
+  progress: number;
+}) {
+  return (
+    <>
+      <p className="mt-3 text-xs text-white/75 leading-relaxed">
+        Registra tu correo para descargar AETHERX y ayudarnos a lanzar la app en Google Play.
+      </p>
+
+      <div className="mt-4 rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/8 p-3">
+        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-[#f4d160]">
+          <span className="flex items-center gap-1.5">
+            <Users className="h-3 w-3" />
+            Testers registrados
+          </span>
+          <span className="text-white">{count} / {TESTERS_GOAL}</span>
+        </div>
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${progress}%`,
+              background: "linear-gradient(90deg, #d4af37, #f4d160)",
+            }}
+          />
+        </div>
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-4 text-left">
+        <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">
+          <Mail className="h-3 w-3" />
+          Tu correo
+        </label>
+        <input
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="tu@correo.com"
+          className="w-full rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-[#d4af37]/60 focus:bg-white/10"
+        />
+        {errorMsg && (
+          <div className="mt-2 text-[11px] text-red-300">{errorMsg}</div>
+        )}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-bold uppercase tracking-[0.15em] transition active:scale-[0.98] disabled:opacity-60"
+          style={{
+            background: "linear-gradient(135deg, #f4d160 0%, #d4af37 50%, #b8892b 100%)",
+            color: "#050d24",
+            boxShadow: "0 8px 24px rgba(212,175,55,0.35)",
+          }}
+        >
+          {submitting ? "Validando..." : "Validar y descargar"}
+        </button>
+        <p className="mt-2 text-center text-[9px] uppercase tracking-[0.15em] text-white/40">
+          Solo el correo · sin contraseñas · sin spam
+        </p>
+      </form>
+    </>
   );
 }
 
