@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { X, Download, Smartphone, CheckCircle2 } from "lucide-react";
+import { X, Download, Smartphone, CheckCircle2, Zap, Share as ShareIcon } from "lucide-react";
 import logoAsset from "@/assets/aetherx-logo-v2.png";
 
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
 const GITHUB_OWNER_REPO = "jusephstrip1975-cloud/vivid-portal-live";
 const APK_VERSION = "3.2.7";
-// GitHub sirve el APK con Content-Disposition: attachment. Sin query params
-// para no romper la descarga directa; el cache-buster va como fragment (#v=...).
 const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk#v=${APK_VERSION}`;
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
 
 function isCapacitor(): boolean {
   if (typeof window === "undefined") return false;
@@ -31,13 +34,64 @@ function isStandalone(): boolean {
   );
 }
 
+function detectPlatform(): "android" | "ios" | "desktop" {
+  if (typeof navigator === "undefined") return "desktop";
+  const ua = navigator.userAgent.toLowerCase();
+  if (/iphone|ipad|ipod/.test(ua)) return "ios";
+  if (/android/.test(ua)) return "android";
+  return "desktop";
+}
+
 export function DownloadAppModal() {
   const [open, setOpen] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
+  const [showApkGuide, setShowApkGuide] = useState(false);
+  const [showIosGuide, setShowIosGuide] = useState(false);
+  const [platform, setPlatform] = useState<"android" | "ios" | "desktop">("desktop");
 
-  function handleDownloadClick() {
-    // Fuerza descarga directa sin cambiar de pestaña. GitHub sirve
-    // Content-Disposition: attachment, así que el navegador guarda el APK.
+  useEffect(() => {
+    setPlatform(detectPlatform());
+  }, []);
+
+  // Capturar el prompt nativo de PWA (Chrome Android / Edge)
+  useEffect(() => {
+    function onBeforeInstall(e: Event) {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    }
+    function onInstalled() {
+      setInstalled(true);
+      setDeferredPrompt(null);
+    }
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  async function handleInstallPwa() {
+    if (deferredPrompt) {
+      await deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === "accepted") setInstalled(true);
+      setDeferredPrompt(null);
+      return;
+    }
+    // Fallback si el navegador no expone el prompt (iOS Safari, algunas versiones)
+    if (platform === "ios") {
+      setShowIosGuide(true);
+    } else {
+      // Android sin prompt: normalmente Chrome muestra su propio banner "Añadir a inicio"
+      alert(
+        "Abre el menú del navegador (⋮) y pulsa \"Instalar app\" o \"Añadir a pantalla de inicio\".",
+      );
+    }
+  }
+
+  function handleDownloadApk() {
     const a = document.createElement("a");
     a.href = ANDROID_APK_URL;
     a.download = "aetherx-latest.apk";
@@ -45,7 +99,7 @@ export function DownloadAppModal() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setDownloaded(true);
+    setShowApkGuide(true);
   }
 
   useEffect(() => {
@@ -58,7 +112,6 @@ export function DownloadAppModal() {
     return () => clearTimeout(t);
   }, []);
 
-  // Lock body scroll and compensate for scrollbar width to prevent layout shift
   useEffect(() => {
     if (isCapacitor()) return;
     if (!open) return;
@@ -66,9 +119,7 @@ export function DownloadAppModal() {
     const prevOverflow = document.body.style.overflow;
     const prevPaddingRight = document.body.style.paddingRight;
     document.body.style.overflow = "hidden";
-    if (scrollbarWidth > 0) {
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-    }
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
     return () => {
       document.body.style.overflow = prevOverflow;
       document.body.style.paddingRight = prevPaddingRight;
@@ -84,16 +135,17 @@ export function DownloadAppModal() {
 
   if (!open) return null;
 
+  const pwaAvailable = !!deferredPrompt || platform === "ios";
+
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md px-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md px-4 py-6 overflow-y-auto"
       onClick={close}
     >
       <div
-        className="relative w-full max-w-sm rounded-3xl p-7 text-center shadow-[0_20px_80px_rgba(212,175,55,0.25)]"
+        className="relative w-full max-w-sm rounded-3xl p-6 text-center shadow-[0_20px_80px_rgba(212,175,55,0.25)] my-auto"
         style={{
-          background:
-            "linear-gradient(160deg, #0a1a3a 0%, #050d24 55%, #0a1a3a 100%)",
+          background: "linear-gradient(160deg, #0a1a3a 0%, #050d24 55%, #0a1a3a 100%)",
           border: "1px solid rgba(212,175,55,0.35)",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -106,80 +158,137 @@ export function DownloadAppModal() {
           <X className="h-4 w-4" />
         </button>
 
-        <div className="mx-auto h-20 w-20 rounded-2xl overflow-hidden ring-1 ring-[#d4af37]/50 shadow-[0_8px_30px_rgba(212,175,55,0.35)]">
-          <img
-            src={logoAsset}
-            alt="AETHERX"
-            width={80}
-            height={80}
-            className="h-full w-full object-cover"
-          />
+        <div className="mx-auto h-16 w-16 rounded-2xl overflow-hidden ring-1 ring-[#d4af37]/50 shadow-[0_8px_30px_rgba(212,175,55,0.35)]">
+          <img src={logoAsset} alt="AETHERX" width={64} height={64} className="h-full w-full object-cover" />
         </div>
 
-        <h2
-          className="mt-5 text-xl font-bold tracking-[0.2em] text-white"
-          style={{ fontFamily: "inherit" }}
-        >
-          AETHERX
-        </h2>
+        <h2 className="mt-4 text-lg font-bold tracking-[0.2em] text-white">AETHERX</h2>
         <div
           className="mx-auto mt-1 h-px w-16"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent, #d4af37, transparent)",
-          }}
+          style={{ background: "linear-gradient(90deg, transparent, #d4af37, transparent)" }}
         />
-        <p className="mt-4 text-sm text-white/70 leading-relaxed">
-          Descarga la app oficial para aplicar fondos animados 3D en tu pantalla de inicio y bloqueo.
-        </p>
 
-        <button
-          onClick={handleDownloadClick}
-          className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-full px-6 py-3.5 text-sm font-bold uppercase tracking-[0.2em] transition active:scale-[0.98]"
-          style={{
-            background:
-              "linear-gradient(135deg, #f4d160 0%, #d4af37 50%, #b8892b 100%)",
-            color: "#050d24",
-            boxShadow: "0 8px 24px rgba(212,175,55,0.35)",
-          }}
-        >
-          <Download className="h-4 w-4" />
-          {downloaded ? "Descargando..." : "Descargar Android"}
-        </button>
+        {installed ? (
+          <>
+            <p className="mt-4 text-sm text-white/80 leading-relaxed">
+              ✓ App instalada. Búscala en tu pantalla de inicio.
+            </p>
+            <button
+              onClick={close}
+              className="mt-5 text-[11px] font-bold uppercase tracking-[0.25em] text-white/60 hover:text-white transition"
+            >
+              Cerrar
+            </button>
+          </>
+        ) : showIosGuide ? (
+          <IosInstallGuide onClose={close} />
+        ) : showApkGuide ? (
+          <ApkGuide onClose={close} />
+        ) : (
+          <>
+            <p className="mt-3 text-xs text-white/70 leading-relaxed">
+              Instala AETHERX en tu móvil y ten el icono en tu pantalla de inicio.
+            </p>
 
-        <div className="mt-4 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-white/50">
-          <Smartphone className="h-3 w-3" />
-          APK v{APK_VERSION} · Android 8.0+
-        </div>
-
-        {downloaded && (
-          <div
-            className="mt-5 rounded-2xl p-4 text-left text-[11px] leading-relaxed text-white/80"
-            style={{
-              background: "rgba(212,175,55,0.08)",
-              border: "1px solid rgba(212,175,55,0.25)",
-            }}
-          >
-            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#f4d160]">
-              <CheckCircle2 className="h-3 w-3" />
-              Para ver el icono en tu móvil
+            {/* Opción 1 — instalación en 1 toque */}
+            <button
+              onClick={handleInstallPwa}
+              disabled={!pwaAvailable && platform === "desktop"}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-bold uppercase tracking-[0.15em] transition active:scale-[0.98] disabled:opacity-50"
+              style={{
+                background: "linear-gradient(135deg, #f4d160 0%, #d4af37 50%, #b8892b 100%)",
+                color: "#050d24",
+                boxShadow: "0 8px 24px rgba(212,175,55,0.35)",
+              }}
+            >
+              <Zap className="h-4 w-4" />
+              Instalar app (1 toque)
+            </button>
+            <div className="mt-1.5 text-[9px] uppercase tracking-[0.2em] text-[#f4d160]/80">
+              Recomendado · sin permisos · icono al instante
             </div>
-            <ol className="ml-4 list-decimal space-y-1.5">
-              <li>Abre la notificación de descarga o el gestor de archivos.</li>
-              <li>Pulsa <b>aetherx-latest.apk</b> e <b>Instalar</b> (si pide "permitir esta fuente", acéptalo).</li>
-              <li>Si Chrome avisa "posible archivo dañino", pulsa <b>Descargar de todos modos</b> — es normal en APKs fuera de Play Store.</li>
-              <li>Tras instalar, el icono <b>AETHERX</b> aparecerá en tu pantalla de inicio.</li>
-            </ol>
-          </div>
-        )}
 
-        <button
-          onClick={close}
-          className="mt-4 text-[10px] font-bold uppercase tracking-[0.25em] text-white/40 hover:text-white/70 transition"
-        >
-          {downloaded ? "Cerrar" : "Continuar en el navegador"}
-        </button>
+            {/* Divider */}
+            <div className="my-4 flex items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-white/30">
+              <div className="h-px flex-1 bg-white/10" />
+              o versión con wallpaper 3D nativo
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
+            {/* Opción 2 — APK Android */}
+            <button
+              onClick={handleDownloadApk}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.15em] text-white transition hover:bg-white/10 active:scale-[0.98]"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Descargar APK Android
+            </button>
+            <div className="mt-1.5 flex items-center justify-center gap-1.5 text-[9px] uppercase tracking-[0.2em] text-white/40">
+              <Smartphone className="h-2.5 w-2.5" />
+              APK v{APK_VERSION} · Android 8.0+ · 2 pasos
+            </div>
+
+            <button
+              onClick={close}
+              className="mt-5 text-[10px] font-bold uppercase tracking-[0.25em] text-white/40 hover:text-white/70 transition"
+            >
+              Continuar en el navegador
+            </button>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function IosInstallGuide({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="mt-4 text-left">
+      <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#f4d160]">
+        <ShareIcon className="h-3 w-3" />
+        Instalar en iPhone / iPad
+      </div>
+      <ol className="ml-4 list-decimal space-y-2 text-[12px] text-white/80 leading-relaxed">
+        <li>Pulsa el botón <b>Compartir</b> abajo en Safari (icono cuadrado con flecha).</li>
+        <li>Desplázate y pulsa <b>"Añadir a pantalla de inicio"</b>.</li>
+        <li>Confirma con <b>Añadir</b>. El icono AETHERX aparecerá en tu pantalla.</li>
+      </ol>
+      <button
+        onClick={onClose}
+        className="mt-5 w-full rounded-full bg-white/10 py-2.5 text-[11px] font-bold uppercase tracking-[0.2em] text-white hover:bg-white/15 transition"
+      >
+        Entendido
+      </button>
+    </div>
+  );
+}
+
+function ApkGuide({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="mt-4 text-left">
+      <div className="mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-[#f4d160]">
+        <CheckCircle2 className="h-3 w-3" />
+        Descarga iniciada — 2 pasos rápidos
+      </div>
+      <ol className="ml-4 list-decimal space-y-2.5 text-[12px] text-white/85 leading-relaxed">
+        <li>
+          Si Chrome dice <b>"posible archivo dañino"</b>, pulsa <b>Descargar de todos modos</b>.
+          <div className="mt-0.5 text-[10px] text-white/50">Es normal — el APK no está en Play Store, pero es seguro.</div>
+        </li>
+        <li>
+          Abre la notificación de descarga y pulsa <b>Instalar</b>.
+          <div className="mt-0.5 text-[10px] text-white/50">Si pide "permitir esta fuente", acéptalo (una sola vez).</div>
+        </li>
+      </ol>
+      <div className="mt-4 rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/8 p-3 text-[11px] text-white/75 leading-relaxed">
+        ✨ Al terminar verás el icono <b>AETHERX</b> en tu pantalla de inicio.
+      </div>
+      <button
+        onClick={onClose}
+        className="mt-4 w-full rounded-full bg-white/10 py-2.5 text-[11px] font-bold uppercase tracking-[0.2em] text-white hover:bg-white/15 transition"
+      >
+        Cerrar
+      </button>
     </div>
   );
 }
