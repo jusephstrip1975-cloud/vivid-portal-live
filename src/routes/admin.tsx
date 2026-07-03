@@ -80,9 +80,12 @@ function AdminPage() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error";
-      // Ocultar mensajes de rate limit de Supabase
+      // Silenciar el rate limit de Supabase: intentar login automáticamente
       if (/security purposes|rate limit|after \d+ seconds?/i.test(msg)) {
-        setError("Espera unos segundos e inténtalo de nuevo.");
+        const { error: loginErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (loginErr && !/security purposes|rate limit|after \d+ seconds?/i.test(loginErr.message)) {
+          setError(loginErr.message);
+        }
       } else {
         setError(msg);
       }
