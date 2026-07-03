@@ -79,7 +79,13 @@ function AdminPage() {
         if (error) throw error;
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error");
+      const msg = err instanceof Error ? err.message : "Error";
+      // Ocultar mensajes de rate limit de Supabase
+      if (/security purposes|rate limit|after \d+ seconds?/i.test(msg)) {
+        setError("Espera unos segundos e inténtalo de nuevo.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setSubmitting(false);
     }
