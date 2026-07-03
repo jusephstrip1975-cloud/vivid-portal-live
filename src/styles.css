@@ -155,3 +155,9 @@ html.aetherx-native .glass-nav {
 @utility animate-drift {
   animation: drift 14s ease-in-out infinite;
 }
+
+/* Hide native browser password reveal (Edge/IE) so custom eye icon is the only toggle */
+input.no-native-reveal::-ms-reveal,
+input.no-native-reveal::-ms-clear {
+  display: none;
+}
