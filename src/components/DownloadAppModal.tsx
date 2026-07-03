@@ -26,6 +26,20 @@ function isStandalone(): boolean {
 
 export function DownloadAppModal() {
   const [open, setOpen] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
+
+  function handleDownloadClick() {
+    // Fuerza descarga directa sin cambiar de pestaña. GitHub sirve
+    // Content-Disposition: attachment, así que el navegador guarda el APK.
+    const a = document.createElement("a");
+    a.href = ANDROID_APK_URL;
+    a.download = "aetherx-latest.apk";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setDownloaded(true);
+  }
 
   useEffect(() => {
     if (isCapacitor()) return;
