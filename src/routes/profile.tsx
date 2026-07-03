@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Battery, Bell, Download, Globe, Music, Shield } from "lucide-react";
+import { Battery, Bell, Download, Globe, Lock, Music, Shield } from "lucide-react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 
