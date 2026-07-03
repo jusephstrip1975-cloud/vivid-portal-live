@@ -147,10 +147,11 @@ function AdminPage() {
               type={showPassword ? "text" : "password"}
               required
               minLength={6}
+              autoComplete="new-password"
               placeholder="Contraseña (mín. 6)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 pr-11 text-sm text-white outline-none focus:border-electric-blue"
+              className="no-native-reveal w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 pr-11 text-sm text-white outline-none focus:border-electric-blue"
             />
             <button
               type="button"
