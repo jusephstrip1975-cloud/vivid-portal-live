@@ -211,6 +211,29 @@ function HomePage() {
         </Link>
       </section>
 
+      {/* Admin access panel */}
+      <section className="px-6 pt-4">
+        <Link
+          to="/admin"
+          className="glass-card flex items-center gap-4 rounded-2xl p-4 ring-1 ring-electric-blue/40 transition active:scale-[0.99]"
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-electric-blue to-galaxy-purple">
+            <Lock className="size-5 text-white" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold text-display text-ice-white">
+              Panel de administración
+            </span>
+            <span className="mt-0.5 block text-[11px] text-white/55">
+              Ver correos de testers registrados · exportar CSV
+            </span>
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-electric-blue">
+            Entrar →
+          </span>
+        </Link>
+      </section>
+
       {/* Pick from device */}
       <section className="px-6 pt-2">
         <button
