@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, Check, FolderOpen, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, Check, FolderOpen, Lock, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
