@@ -35,9 +35,11 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
   const videoSrc = resolveDownloadUrl(src);
 
   useEffect(() => {
+    if (!preview) return;
     const el = wrapRef.current;
     if (!el) return;
-    const margin = isNativeWebView() ? 700 : 300;
+    // Márgenes reducidos: evita mantener 10+ vídeos activos fuera de pantalla en Android.
+    const margin = isNativeWebView() ? 150 : 200;
     const markIfVisible = () => {
       const rect = el.getBoundingClientRect();
       const height = window.innerHeight || document.documentElement.clientHeight;
@@ -58,9 +60,10 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
       window.cancelAnimationFrame(raf);
       window.clearTimeout(timer);
     };
-  }, []);
+  }, [preview]);
 
   useEffect(() => {
+    if (!preview) return;
     const v = videoRef.current;
     if (!v) return;
     v.muted = true;
@@ -73,7 +76,6 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
       if (failed) return;
       v.load();
       v.play().catch(() => {
-        // Autoplay bloqueado: reintenta tras primera interacción del usuario.
         const retry = () => {
           v.play().catch(() => {});
           window.removeEventListener("touchstart", retry);
@@ -89,7 +91,7 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
     } else {
       v.pause();
     }
-  }, [active, failed]);
+  }, [active, failed, preview]);
 
   useEffect(() => {
     setReady(false);
@@ -97,6 +99,7 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
   }, [src, poster]);
 
   useEffect(() => {
+    if (!preview) return;
     const onVis = () => {
       const v = videoRef.current;
       if (!v) return;
@@ -108,7 +111,7 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [active, failed]);
+  }, [active, failed, preview]);
 
   return (
     <div ref={wrapRef} className={`relative overflow-hidden ${className}`}>
@@ -119,7 +122,7 @@ export function LiveMedia({ src, poster, alt, className = "", preview = false }:
         decoding="async"
         className="absolute inset-0 size-full object-cover"
       />
-      {active && !failed && (
+      {preview && active && !failed && (
         <video
           key={videoSrc}
           ref={videoRef}
