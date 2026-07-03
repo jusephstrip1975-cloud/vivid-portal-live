@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, Check, FolderOpen, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, Check, FolderOpen, Lock, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
@@ -148,6 +148,14 @@ function HomePage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            to="/admin"
+            className="glass-card flex size-10 items-center justify-center rounded-full ring-1 ring-electric-blue/40"
+            aria-label="Panel de administración"
+            title="Panel de admin"
+          >
+            <Lock className="size-4 text-electric-blue" />
+          </Link>
           <Link
             to="/device"
             className="glass-card flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-electric-blue"
