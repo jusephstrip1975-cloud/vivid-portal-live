@@ -6,6 +6,13 @@ interface Props {
   poster: string;
   alt: string;
   className?: string;
+  /**
+   * Si es false, renderiza SOLO el póster (JPG). Sin vídeo, sin autoplay.
+   * Úsalo para grids con muchas tarjetas — evita bloquear el hilo principal
+   * en Android al decodificar decenas de MP4s a la vez.
+   * Default: false (rendimiento). Ponlo a true solo en pantallas de detalle.
+   */
+  preview?: boolean;
 }
 
 const isNativeWebView = () => {
@@ -16,12 +23,10 @@ const isNativeWebView = () => {
 
 /**
  * Preview en tiempo real con bucle suave.
- * - Solo carga/reproduce el vídeo cuando entra en viewport.
- * - En Android WebView precalienta más margen para evitar tarjetas negras.
- * - Atributos playsInline + webkit-playsinline para reproducción embebida.
- * - Si autoplay es bloqueado, reintenta tras el primer toque del usuario.
+ * - Solo carga/reproduce el vídeo cuando entra en viewport Y preview=true.
+ * - En grids (preview=false) muestra únicamente el póster para no bloquear el WebView.
  */
-export function LiveMedia({ src, poster, alt, className = "" }: Props) {
+export function LiveMedia({ src, poster, alt, className = "", preview = false }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [active, setActive] = useState(false);
