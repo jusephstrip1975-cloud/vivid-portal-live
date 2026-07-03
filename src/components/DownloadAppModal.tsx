@@ -4,7 +4,9 @@ import logoAsset from "@/assets/aetherx-logo-v2.png";
 
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
 const GITHUB_OWNER_REPO = "jusephstrip1975-cloud/vivid-portal-live";
-const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk`;
+const APK_VERSION = "3.2.5";
+// Cache-buster ligado a la versión: evita que GitHub/CDN sirvan una copia antigua del APK.
+const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk?v=${APK_VERSION}`;
 
 function isCapacitor(): boolean {
   if (typeof window === "undefined") return false;
