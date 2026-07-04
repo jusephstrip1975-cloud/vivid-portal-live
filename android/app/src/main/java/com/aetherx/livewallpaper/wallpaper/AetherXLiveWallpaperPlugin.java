@@ -188,6 +188,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
             }
             android.media.MediaMetadataRetriever mmr = null;
             android.graphics.Bitmap frame = null;
+            android.graphics.Bitmap wallpaperFrame = null;
             try {
                 mmr = new android.media.MediaMetadataRetriever();
                 mmr.setDataSource(video.getAbsolutePath());
@@ -198,7 +199,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 }
                 if (frame == null) throw new Exception("frame-null");
 
-                boolean applied = setBitmapWallpaper(getContext(), frame, flags);
+                wallpaperFrame = prepareWallpaperBitmap(getContext(), frame);
+                boolean applied = setBitmapWallpaper(getContext(), wallpaperFrame, flags);
                 int applyFlags = flags;
                 persistStep("APPLY_STATIC_OK target=" + target + " flags=" + applyFlags);
                 JSObject ret = new JSObject();
@@ -216,6 +218,7 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 persistNativeException("APPLY_STATIC_FAIL " + t.getClass().getSimpleName() + ": " + t.getMessage());
                 openLivePicker(call);
             } finally {
+                if (wallpaperFrame != null && wallpaperFrame != frame) { try { wallpaperFrame.recycle(); } catch (Throwable ignored) {} }
                 if (frame != null) { try { frame.recycle(); } catch (Throwable ignored) {} }
                 if (mmr != null)   { try { mmr.release();   } catch (Throwable ignored) {} }
             }
@@ -549,25 +552,47 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     private static void applyStaticWallpaper(Context ctx, File video, int flags, String target) throws Exception {
         android.media.MediaMetadataRetriever mmr = null;
         android.graphics.Bitmap frame = null;
+        android.graphics.Bitmap wallpaperFrame = null;
         try {
             mmr = new android.media.MediaMetadataRetriever();
             mmr.setDataSource(video.getAbsolutePath());
             frame = mmr.getFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
             if (frame == null) frame = mmr.getFrameAtTime(1_000_000, android.media.MediaMetadataRetriever.OPTION_CLOSEST);
             if (frame == null) throw new Exception("frame-null");
-            if (!setBitmapWallpaper(ctx, frame, flags)) throw new Exception("setBitmap-returned-zero");
+            wallpaperFrame = prepareWallpaperBitmap(ctx, frame);
+            if (!setBitmapWallpaper(ctx, wallpaperFrame, flags)) throw new Exception("setBitmap-returned-zero");
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putString(KEY_LAST_WALLPAPER_STEP, System.currentTimeMillis() + " DEEPLINK_APPLY_STATIC_OK target=" + target + " flags=" + flags).apply();
         } finally {
+            if (wallpaperFrame != null && wallpaperFrame != frame) { try { wallpaperFrame.recycle(); } catch (Throwable ignored) {} }
             if (frame != null) { try { frame.recycle(); } catch (Throwable ignored) {} }
             if (mmr != null) { try { mmr.release(); } catch (Throwable ignored) {} }
         }
     }
 
+    private static android.graphics.Bitmap prepareWallpaperBitmap(Context ctx, android.graphics.Bitmap source) {
+        int srcW = source.getWidth();
+        int srcH = source.getHeight();
+        android.util.DisplayMetrics dm = ctx.getResources().getDisplayMetrics();
+        int longestScreenSide = Math.max(dm.widthPixels, dm.heightPixels);
+        int maxSide = Math.min(Math.max(longestScreenSide, 1080), 2560);
+        int longestSourceSide = Math.max(srcW, srcH);
+        if (longestSourceSide <= maxSide) return source;
+        float scale = maxSide / (float) longestSourceSide;
+        int outW = Math.max(1, Math.round(srcW * scale));
+        int outH = Math.max(1, Math.round(srcH * scale));
+        return android.graphics.Bitmap.createScaledBitmap(source, outW, outH, true);
+    }
+
     private static boolean setBitmapWallpaper(Context ctx, android.graphics.Bitmap frame, int flags) throws Exception {
         WallpaperManager wm = WallpaperManager.getInstance(ctx);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            return wm.setBitmap(frame, null, true, flags) != 0;
+            boolean wantSystem = (flags & WallpaperManager.FLAG_SYSTEM) != 0;
+            boolean wantLock = (flags & WallpaperManager.FLAG_LOCK) != 0;
+            boolean ok = true;
+            if (wantSystem) ok = wm.setBitmap(frame, null, true, WallpaperManager.FLAG_SYSTEM) != 0 && ok;
+            if (wantLock) ok = wm.setBitmap(frame, null, true, WallpaperManager.FLAG_LOCK) != 0 && ok;
+            return ok;
         }
         wm.setBitmap(frame);
         return true;

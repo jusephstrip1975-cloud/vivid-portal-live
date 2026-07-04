@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-    versionCode 329
-    versionName "3.2.9-wallpaper-scheme-fix"
+    versionCode 330
+    versionName "3.3.0-wallpaper-apply-fix"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {

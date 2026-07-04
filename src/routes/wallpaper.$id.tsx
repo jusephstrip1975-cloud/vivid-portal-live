@@ -100,9 +100,16 @@ function WallpaperDetail() {
     // Visible UI marker — confirms the button click reached React.
     setToast(`▶ ${buttonTag}`);
     console.info("[AetherX]", buttonTag);
+    let watchdog: number | undefined;
     try {
       setActiveTarget(target);
       setDownloadState("downloading");
+      watchdog = window.setTimeout(() => {
+        setDownloadState("idle");
+        setActiveTarget(null);
+        setToast("No se pudo completar. Abre la app AETHERX actualizada e inténtalo otra vez.");
+        void recordFrontendStep("FRONTEND_APPLY_TIMEOUT", target);
+      }, 75_000);
 
       if (await isNative()) {
         await recordFrontendStep(frontendTag);
@@ -138,7 +145,11 @@ function WallpaperDetail() {
       } else {
         if (openInstalledAndroidAppForWallpaper(wp.video, fileName, target)) {
           setToast("Aplicando con AETHERX…");
-          setTimeout(() => setToast(null), 2400);
+          window.setTimeout(() => {
+            setDownloadState("idle");
+            setActiveTarget(null);
+            setToast(null);
+          }, 3200);
           return;
         }
         setDownloadState("idle");
@@ -163,6 +174,8 @@ function WallpaperDetail() {
       setActiveTarget(null);
       setToast(`✗ PLUGIN_JS_ERROR: ${msg.slice(0, 120)}`);
       setTimeout(() => setToast(null), 4000);
+    } finally {
+      if (watchdog) window.clearTimeout(watchdog);
     }
   }
 
