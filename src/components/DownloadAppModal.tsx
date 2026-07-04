@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 const STORAGE_KEY = "aetherx-download-prompt-dismissed";
 const REGISTERED_KEY = "aetherx-tester-registered";
 const GITHUB_OWNER_REPO = "jusephstrip1975-cloud/vivid-portal-live";
-const APK_VERSION = "3.2.8";
+const APK_VERSION = "3.2.9";
 const ANDROID_APK_URL = `https://github.com/${GITHUB_OWNER_REPO}/releases/latest/download/aetherx-latest.apk#v=${APK_VERSION}`;
 const TESTERS_GOAL = 15;
 
