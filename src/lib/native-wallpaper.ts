@@ -27,6 +27,10 @@ interface LiveWallpaperPlugin {
   getFitMode(): Promise<{ mode: FitMode }>;
 }
 
+const ANDROID_PACKAGE_ID = "com.aetherx.livewallpaper";
+const APK_VERSION = "3.2.8";
+const ANDROID_APK_URL = `https://github.com/jusephstrip1975-cloud/vivid-portal-live/releases/latest/download/aetherx-latest.apk#v=${APK_VERSION}`;
+
 export type FitMode = "cover" | "stretch" | "contain";
 
 type NativeWindow = Window & {
@@ -156,6 +160,23 @@ export async function checkWallpaperCompatibility(): Promise<CompatibilityResult
 }
 
 export type WallpaperTarget = "home" | "lock" | "both";
+
+export function openInstalledAndroidAppForWallpaper(
+  videoUrl: string,
+  fileName: string,
+  target: WallpaperTarget = "both",
+): boolean {
+  if (typeof window === "undefined" || !/android/i.test(navigator.userAgent || "")) return false;
+
+  const params = new URLSearchParams({
+    url: resolveDownloadUrl(videoUrl),
+    fileName,
+    target,
+  });
+  const fallback = encodeURIComponent(ANDROID_APK_URL);
+  window.location.href = `intent://wallpaper?${params.toString()}#Intent;scheme=aetherx;package=${ANDROID_PACKAGE_ID};action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=${fallback};end`;
+  return true;
+}
 
 export interface PickedDeviceVideo {
   path: string;

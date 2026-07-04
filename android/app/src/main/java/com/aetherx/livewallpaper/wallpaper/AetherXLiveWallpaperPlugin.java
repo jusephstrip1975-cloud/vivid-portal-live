@@ -54,6 +54,25 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     public static final String KEY_FIT_MODE = "fit_mode"; // "cover" | "stretch" | "contain"
     private static final int MAX_REDIRECTS = 5;
 
+    public static void applyWallpaperFromUrl(final Context context, final String url, final String fileName, final String target) {
+        final Context appContext = context.getApplicationContext();
+        toast(context, "Aplicando fondo AETHERX…");
+        new Thread(() -> {
+            try {
+                File outFile = ensureWallpaperFile(appContext, sanitizeFileNameStatic(fileName == null ? "wallpaper.mp4" : fileName));
+                downloadFollowingRedirectsStatic(url, outFile);
+                persistVideoPath(appContext, outFile.getAbsolutePath());
+                int flags = targetToFlags(target);
+                applyStaticWallpaper(appContext, outFile, flags, target == null ? "both" : target);
+                toast(context, "Fondo aplicado");
+            } catch (Throwable t) {
+                Log.e(TAG, "applyWallpaperFromUrl failed", t);
+                persistNativeException(appContext, "DEEPLINK_APPLY_FAIL " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                toast(context, "No se pudo aplicar el fondo");
+            }
+        }, "AetherXDeepLinkApply").start();
+    }
+
     @PluginMethod
     public void setFitMode(PluginCall call) {
         String mode = call.getString("mode", "cover");
@@ -179,16 +198,8 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
                 }
                 if (frame == null) throw new Exception("frame-null");
 
-                WallpaperManager wm = WallpaperManager.getInstance(getContext());
+                boolean applied = setBitmapWallpaper(getContext(), frame, flags);
                 int applyFlags = flags;
-                boolean applied;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    int id = wm.setBitmap(frame, null, true, applyFlags);
-                    applied = id != 0;
-                } else {
-                    wm.setBitmap(frame);
-                    applied = true;
-                }
                 persistStep("APPLY_STATIC_OK target=" + target + " flags=" + applyFlags);
                 JSObject ret = new JSObject();
                 ret.put("applied", applied);
@@ -309,6 +320,13 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
 
     private void persistNativeException(String msg) {
         persistError(KEY_LAST_NATIVE_EXCEPTION, msg);
+    }
+
+    private static void persistNativeException(Context ctx, String msg) {
+        try {
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_LAST_NATIVE_EXCEPTION, System.currentTimeMillis() + " " + msg).apply();
+        } catch (Throwable ignored) {}
     }
 
     @PluginMethod
@@ -461,7 +479,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private File ensureWallpaperFile(String fileName) {
-        File dir = new File(getContext().getFilesDir(), "wallpapers");
+        return ensureWallpaperFile(getContext(), fileName);
+    }
+
+    private static File ensureWallpaperFile(Context ctx, String fileName) {
+        File dir = new File(ctx.getFilesDir(), "wallpapers");
         if (!dir.exists()) dir.mkdirs();
         return new File(dir, fileName);
     }
@@ -488,7 +510,11 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private void persistVideoPath(String absolutePath) {
-        SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        persistVideoPath(getContext(), absolutePath);
+    }
+
+    private static void persistVideoPath(Context ctx, String absolutePath) {
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         prefs.edit().putString(KEY_VIDEO_PATH, absolutePath).commit();
     }
 
@@ -504,13 +530,62 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
     }
 
     private String sanitizeFileName(String name) {
+        return sanitizeFileNameStatic(name);
+    }
+
+    private static String sanitizeFileNameStatic(String name) {
         if (name == null || name.isEmpty()) return "wallpaper.mp4";
         String safe = name.replaceAll("[^a-zA-Z0-9._-]", "_");
         if (!safe.toLowerCase().endsWith(".mp4")) safe = safe + ".mp4";
         return safe;
     }
 
+    private static int targetToFlags(String target) {
+        if ("home".equals(target)) return WallpaperManager.FLAG_SYSTEM;
+        if ("lock".equals(target)) return WallpaperManager.FLAG_LOCK;
+        return WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK;
+    }
+
+    private static void applyStaticWallpaper(Context ctx, File video, int flags, String target) throws Exception {
+        android.media.MediaMetadataRetriever mmr = null;
+        android.graphics.Bitmap frame = null;
+        try {
+            mmr = new android.media.MediaMetadataRetriever();
+            mmr.setDataSource(video.getAbsolutePath());
+            frame = mmr.getFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+            if (frame == null) frame = mmr.getFrameAtTime(1_000_000, android.media.MediaMetadataRetriever.OPTION_CLOSEST);
+            if (frame == null) throw new Exception("frame-null");
+            if (!setBitmapWallpaper(ctx, frame, flags)) throw new Exception("setBitmap-returned-zero");
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_LAST_WALLPAPER_STEP, System.currentTimeMillis() + " DEEPLINK_APPLY_STATIC_OK target=" + target + " flags=" + flags).apply();
+        } finally {
+            if (frame != null) { try { frame.recycle(); } catch (Throwable ignored) {} }
+            if (mmr != null) { try { mmr.release(); } catch (Throwable ignored) {} }
+        }
+    }
+
+    private static boolean setBitmapWallpaper(Context ctx, android.graphics.Bitmap frame, int flags) throws Exception {
+        WallpaperManager wm = WallpaperManager.getInstance(ctx);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            return wm.setBitmap(frame, null, true, flags) != 0;
+        }
+        wm.setBitmap(frame);
+        return true;
+    }
+
+    private static void toast(Context ctx, String msg) {
+        try {
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show()
+            );
+        } catch (Throwable ignored) {}
+    }
+
     private long downloadFollowingRedirects(String urlStr, File out) throws Exception {
+        return downloadFollowingRedirectsStatic(urlStr, out);
+    }
+
+    private static long downloadFollowingRedirectsStatic(String urlStr, File out) throws Exception {
         int redirects = 0;
         String current = urlStr;
         while (true) {
