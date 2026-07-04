@@ -221,10 +221,6 @@ function WallpaperDetail() {
           <ArrowLeft className="size-4 text-white" />
         </button>
 
-          <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-electric-blue">
-            Vista previa en vivo
-          </span>
-        </div>
       </div>
 
       {/* Sheet */}
