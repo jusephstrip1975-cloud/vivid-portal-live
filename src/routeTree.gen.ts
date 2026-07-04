@@ -15,7 +15,6 @@ import { Route as GuiaRouteImport } from './routes/guia'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as DeviceRouteImport } from './routes/device'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WallpaperIdRouteImport } from './routes/wallpaper.$id'
 
@@ -49,11 +48,6 @@ const DeviceRoute = DeviceRouteImport.update({
   path: '/device',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -67,7 +61,6 @@ const WallpaperIdRoute = WallpaperIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/device': typeof DeviceRoute
   '/explore': typeof ExploreRoute
   '/favorites': typeof FavoritesRoute
@@ -78,7 +71,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/device': typeof DeviceRoute
   '/explore': typeof ExploreRoute
   '/favorites': typeof FavoritesRoute
@@ -90,7 +82,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/device': typeof DeviceRoute
   '/explore': typeof ExploreRoute
   '/favorites': typeof FavoritesRoute
@@ -103,7 +94,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/admin'
     | '/device'
     | '/explore'
     | '/favorites'
@@ -114,7 +104,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin'
     | '/device'
     | '/explore'
     | '/favorites'
@@ -125,7 +114,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/admin'
     | '/device'
     | '/explore'
     | '/favorites'
@@ -137,7 +125,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
   DeviceRoute: typeof DeviceRoute
   ExploreRoute: typeof ExploreRoute
   FavoritesRoute: typeof FavoritesRoute
@@ -191,13 +178,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeviceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -217,7 +197,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
   DeviceRoute: DeviceRoute,
   ExploreRoute: ExploreRoute,
   FavoritesRoute: FavoritesRoute,
@@ -229,3 +208,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

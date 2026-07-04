@@ -1,4 +1,4 @@
-import { startTransition } from "react";
+import { StrictMode, startTransition } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 
@@ -56,7 +56,9 @@ try {
 
   startTransition(() => {
     createRoot(rootElement).render(
-      <RouterProvider router={router} />,
+      <StrictMode>
+        <RouterProvider router={router} />
+      </StrictMode>,
     );
     document.documentElement.dataset.aetherxBooted = "true";
     bootLog("mounted", localRouteLabel());

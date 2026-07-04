@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-    versionCode 327
-    versionName "3.2.7-android-freeze-fix"
+    versionCode 324
+    versionName "3.2.4-premium-launcher-icon"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {

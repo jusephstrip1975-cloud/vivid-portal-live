@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, Check, FolderOpen, Lock, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, Check, FolderOpen, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
@@ -45,15 +45,10 @@ function HomePage() {
   const [diag, setDiag] = useState<string | null>(null);
   const [diagFields, setDiagFields] = useState<Record<string, string> | null>(null);
   const [fitMode, setFitModeState] = useState<FitMode>("cover");
-  const [visibleWallpapers, setVisibleWallpapers] = useState(18);
 
   useEffect(() => {
     getWallpaperFitMode().then(setFitModeState).catch(() => {});
   }, []);
-
-  const oddWallpapers = WALLPAPERS.filter((_, i) => i % 2 === 1).slice(0, Math.ceil(visibleWallpapers / 2));
-  const evenWallpapers = WALLPAPERS.filter((_, i) => i % 2 === 0).slice(0, Math.floor(visibleWallpapers / 2));
-  const hasMoreWallpapers = visibleWallpapers < WALLPAPERS.length;
 
   async function handleFitModeChange(mode: FitMode) {
     setFitModeState(mode);
@@ -149,14 +144,6 @@ function HomePage() {
         </div>
         <div className="flex items-center gap-2">
           <Link
-            to="/admin"
-            className="glass-card flex size-10 items-center justify-center rounded-full ring-1 ring-electric-blue/40"
-            aria-label="Panel de administración"
-            title="Panel de admin"
-          >
-            <Lock className="size-4 text-electric-blue" />
-          </Link>
-          <Link
             to="/device"
             className="glass-card flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-electric-blue"
             aria-label="Simulador de móvil"
@@ -208,29 +195,6 @@ function HomePage() {
               <ArrowUpRight className="size-5" />
             </span>
           </div>
-        </Link>
-      </section>
-
-      {/* Admin access panel */}
-      <section className="px-6 pt-4">
-        <Link
-          to="/admin"
-          className="glass-card flex items-center gap-4 rounded-2xl p-4 ring-1 ring-electric-blue/40 transition active:scale-[0.99]"
-        >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-electric-blue to-galaxy-purple">
-            <Lock className="size-5 text-white" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-bold text-display text-ice-white">
-              Panel de administración
-            </span>
-            <span className="mt-0.5 block text-[11px] text-white/55">
-              Ver correos de testers registrados · exportar CSV
-            </span>
-          </span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-electric-blue">
-            Entrar →
-          </span>
         </Link>
       </section>
 
@@ -412,25 +376,16 @@ function HomePage() {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-4">
-            {oddWallpapers.map((wp, i) => (
+            {WALLPAPERS.filter((_, i) => i % 2 === 1).map((wp, i) => (
               <WallpaperTile key={wp.id} wp={wp} index={i * 2 + 1} />
             ))}
           </div>
           <div className="space-y-4 pt-8">
-            {evenWallpapers.map((wp, i) => (
+            {WALLPAPERS.filter((_, i) => i % 2 === 0).map((wp, i) => (
               <WallpaperTile key={wp.id} wp={wp} index={i * 2} />
             ))}
           </div>
         </div>
-        {hasMoreWallpapers && (
-          <button
-            type="button"
-            onClick={() => setVisibleWallpapers((count) => Math.min(count + 18, WALLPAPERS.length))}
-            className="mt-6 w-full rounded-2xl border border-electric-blue/30 bg-electric-blue/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-electric-blue transition active:scale-[0.99]"
-          >
-            Ver más pantallas 3D
-          </button>
-        )}
       </section>
 
 

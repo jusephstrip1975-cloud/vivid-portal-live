@@ -176,7 +176,6 @@ function WallpaperDetail() {
           poster={wp.src}
           alt={wp.title}
           className="size-full object-cover"
-          preview
         />
         <div className="absolute inset-0 bg-gradient-to-b from-space-black/40 via-transparent to-space-black" />
 

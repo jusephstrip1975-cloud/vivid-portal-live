@@ -120,32 +120,28 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null) {
             call.reject("pick-video-cancelled"); return;
         }
-        final Uri uri = result.getData().getData();
+        Uri uri = result.getData().getData();
         if (uri == null) { call.reject("pick-video-no-uri"); return; }
         try {
             final int take = result.getData().getFlags()
                 & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             getContext().getContentResolver().takePersistableUriPermission(uri, take);
         } catch (Exception ignored) {}
-        new Thread(() -> {
-            try {
-                String fileName = "picked-" + System.currentTimeMillis() + ".mp4";
-                File outFile = ensureWallpaperFile(fileName);
-                ContentResolver resolver = getContext().getContentResolver();
-                try (InputStream in = resolver.openInputStream(uri);
-                     OutputStream out = new FileOutputStream(outFile)) {
-                    if (in == null) throw new Exception("open-inputstream-null");
-                    byte[] buf = new byte[64 * 1024];
-                    int n;
-                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-                }
-                persistVideoUri(uri.toString());
-                transcodeAndResolve(outFile, call, uri.toString());
-            } catch (Exception e) {
-                Log.e(TAG, "pickVideoFromDevice background copy failed", e);
-                call.reject("pick-video-failed: " + e.getMessage(), e);
+        try {
+            String fileName = "picked-" + System.currentTimeMillis() + ".mp4";
+            File outFile = ensureWallpaperFile(fileName);
+            ContentResolver resolver = getContext().getContentResolver();
+            try (InputStream in = resolver.openInputStream(uri);
+                 OutputStream out = new FileOutputStream(outFile)) {
+                byte[] buf = new byte[8192];
+                int n;
+                while (in != null && (n = in.read(buf)) > 0) out.write(buf, 0, n);
             }
-        }, "AetherXPickVideoCopy").start();
+            persistVideoUri(uri.toString());
+            transcodeAndResolve(outFile, call, uri.toString());
+        } catch (Exception e) {
+            call.reject("pick-video-failed: " + e.getMessage(), e);
+        }
     }
 
     @PluginMethod public void applyHome(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyHome"); openLivePicker(call); }

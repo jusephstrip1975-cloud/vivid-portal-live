@@ -13,11 +13,13 @@ export function AppliedHalo() {
 
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      <img
-        src={wp.src}
-        alt=""
-        loading="lazy"
-        decoding="async"
+      <video
+        src={wp.video}
+        poster={wp.src}
+        autoPlay
+        loop
+        muted
+        playsInline
         aria-hidden="true"
         className="absolute inset-0 size-full object-cover opacity-30 blur-3xl scale-110"
       />

@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import { z } from "zod";
 import { CATEGORIES, WALLPAPERS, type Category } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
@@ -32,14 +31,7 @@ export const Route = createFileRoute("/explore")({
 function ExplorePage() {
   const { cat } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const [visibleCount, setVisibleCount] = useState(24);
   const list = WALLPAPERS.filter((w) => cat === "todos" || w.category === cat);
-  const visibleList = list.slice(0, visibleCount);
-  const hasMore = visibleCount < list.length;
-
-  useEffect(() => {
-    setVisibleCount(24);
-  }, [cat]);
 
   return (
     <div className="relative">
@@ -82,22 +74,10 @@ function ExplorePage() {
       </div>
 
       <section className="grid grid-cols-2 gap-4 px-6">
-        {visibleList.map((wp, i) => (
+        {list.map((wp, i) => (
           <WallpaperTile key={wp.id} wp={wp} index={i} />
         ))}
       </section>
-
-      {hasMore && (
-        <div className="px-6 pt-6">
-          <button
-            type="button"
-            onClick={() => setVisibleCount((count) => Math.min(count + 24, list.length))}
-            className="w-full rounded-2xl border border-electric-blue/30 bg-electric-blue/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-electric-blue transition active:scale-[0.99]"
-          >
-            Ver más pantallas 3D
-          </button>
-        </div>
-      )}
 
       {list.length === 0 && (
         <div className="px-6 py-16 text-center text-sm text-white/50">
