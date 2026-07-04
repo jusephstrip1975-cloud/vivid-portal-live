@@ -9,6 +9,7 @@ import {
   hasNativeAppShell,
   isNative,
   recordFrontendStep,
+  openInstalledAndroidAppForWallpaper,
   saveWallpaperToDevice,
   type WallpaperTarget,
 } from "@/lib/native-wallpaper";
@@ -135,9 +136,14 @@ function WallpaperDetail() {
             : successMsg,
         );
       } else {
+        if (openInstalledAndroidAppForWallpaper(wp.video, fileName, target)) {
+          setToast("Aplicando con AETHERX…");
+          setTimeout(() => setToast(null), 2400);
+          return;
+        }
         setDownloadState("idle");
         setActiveTarget(null);
-          setToast("Abre AETHERX desde el icono de la app instalada para aplicarlo");
+        setToast("Instala la APK de AETHERX para aplicar fondos en Android");
         setTimeout(() => setToast(null), 4200);
         return;
       }
@@ -268,11 +274,6 @@ function WallpaperDetail() {
                 </button>
               );
             })}
-            {!nativeReady && (
-              <p className="text-center text-[11px] leading-relaxed text-white/55">
-                Abre AETHERX desde el icono instalado para que estos botones apliquen el fondo en el móvil.
-              </p>
-            )}
             {isDownloaded && (
               <p className="mt-1 text-center text-[10px] uppercase tracking-[0.25em] text-electric-blue/80">
                 Último aplicado
@@ -294,9 +295,9 @@ function WallpaperDetail() {
             Cómo ponerlo de fondo
           </p>
           <ol className="space-y-1.5 list-decimal pl-5 text-white/65">
-            <li>Abre AETHERX desde el icono de la app instalada, no desde Galería/Fotos.</li>
-            <li>Pulsa <strong className="text-white">Inicio y bloqueo</strong> para abrir el selector nativo.</li>
-            <li>El sistema abre <strong className="text-white">AetherX Live Wallpaper</strong> para aplicarlo animado.</li>
+            <li>Pulsa <strong className="text-white">Inicio y bloqueo</strong> para aplicar el fondo.</li>
+            <li>Si estás en el navegador, Android abrirá la app AETHERX instalada automáticamente.</li>
+            <li>El sistema guardará el fondo en pantalla de inicio y bloqueo.</li>
             <li>
               En Android pulsa <strong className="text-white">Aplicar</strong> y elige el destino que tu móvil muestre.
             </li>
