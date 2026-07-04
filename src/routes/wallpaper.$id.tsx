@@ -100,7 +100,7 @@ function WallpaperDetail() {
     // Visible UI marker — confirms the button click reached React.
     setToast(`▶ ${buttonTag}`);
     console.info("[AetherX]", buttonTag);
-    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    let watchdog: number | undefined;
     try {
       setActiveTarget(target);
       setDownloadState("downloading");
