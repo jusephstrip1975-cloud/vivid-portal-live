@@ -150,12 +150,11 @@ function HomePage() {
         <div className="flex items-center gap-2">
           <Link
             to="/admin"
-            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-electric-blue to-galaxy-purple px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white shadow-lg shadow-electric-blue/30 ring-1 ring-white/20"
+            className="glass-card flex size-10 items-center justify-center rounded-full ring-1 ring-electric-blue/40"
             aria-label="Panel de administración"
             title="Panel de admin"
           >
-            <Lock className="size-3.5" />
-            Admin
+            <Lock className="size-4 text-electric-blue" />
           </Link>
           <Link
             to="/device"

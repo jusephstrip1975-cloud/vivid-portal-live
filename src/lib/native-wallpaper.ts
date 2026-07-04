@@ -29,35 +29,6 @@ interface LiveWallpaperPlugin {
 
 export type FitMode = "cover" | "stretch" | "contain";
 
-type NativeWindow = Window & {
-  Capacitor?: {
-    isNativePlatform?: () => boolean;
-    getPlatform?: () => string;
-    isPluginAvailable?: (name: string) => boolean;
-    Plugins?: Record<string, unknown>;
-  };
-  androidBridge?: unknown;
-  __AETHERX_NATIVE_APP__?: boolean;
-};
-
-export function hasNativeAppShell(): boolean {
-  if (typeof window === "undefined") return false;
-  const w = window as NativeWindow;
-  try {
-    if (w.__AETHERX_NATIVE_APP__ === true) return true;
-    if (w.androidBridge) return true;
-    if (document.documentElement.classList.contains("aetherx-native")) return true;
-    if (document.documentElement.dataset.aetherxNativeApp === "true") return true;
-    if (w.Capacitor?.isNativePlatform?.()) return true;
-    const platform = w.Capacitor?.getPlatform?.();
-    if (platform === "android" || platform === "ios") return true;
-  } catch {
-    /* ignore */
-  }
-  const ua = navigator.userAgent || "";
-  return /aetherx|capacitor|wv\)/i.test(ua);
-}
-
 export async function setWallpaperFitMode(mode: FitMode): Promise<void> {
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
@@ -101,9 +72,7 @@ export async function recordFrontendStep(step: string, error?: string): Promise<
 export async function isLiveWallpaperPluginAvailable(): Promise<boolean> {
   try {
     const { Capacitor } = await import("@capacitor/core");
-    const available = Capacitor.isPluginAvailable("AetherXLiveWallpaper");
-    const platform = Capacitor.getPlatform();
-    return (Capacitor.isNativePlatform() || hasNativeAppShell()) && platform === "android" && available;
+    return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("AetherXLiveWallpaper");
   } catch {
     return false;
   }
@@ -157,49 +126,6 @@ export async function checkWallpaperCompatibility(): Promise<CompatibilityResult
 
 export type WallpaperTarget = "home" | "lock" | "both";
 
-function withTimeout<T>(promise: Promise<T>, ms: number, reason: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(reason)), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timer) clearTimeout(timer);
-  });
-}
-
-export function openInstalledAndroidAppForWallpaper(
-  videoUrl: string,
-  fileName: string,
-  target: WallpaperTarget = "both",
-): boolean {
-  if (typeof window === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  if (!/android/i.test(ua)) return false;
-
-  // Never trigger an external deep link from inside a WebView (including our own
-  // Capacitor shell). Inside the APK we must call the native plugin directly.
-  const isWebView = /\bwv\)|; wv\)|Version\/.*Chrome\/.*Mobile.*; wv/i.test(ua) || /aetherx|capacitor/i.test(ua);
-  if (isWebView) return false;
-  if (hasNativeAppShell()) return false;
-
-  const params = new URLSearchParams({
-    url: resolveDownloadUrl(videoUrl),
-    fileName,
-    target,
-  });
-  // Use the plain custom scheme instead of intent://. Chrome turns unresolved
-  // intent:// links with a package into a Play Store lookup, which is the
-  // "Elemento no encontrado" screen seen when applying the wallpaper.
-  const query = params.toString();
-  window.location.href = `aetherx://wallpaper?${query}`;
-  window.setTimeout(() => {
-    if (document.visibilityState === "visible") {
-      window.location.href = `intent://wallpaper?${query}#Intent;scheme=aetherx;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
-    }
-  }, 900);
-  return true;
-}
-
 export interface PickedDeviceVideo {
   path: string;
   bytes: number;
@@ -243,7 +169,7 @@ export async function applyPickedVideo(
 
     if (target === "lock") {
       try {
-        const res = await withTimeout(LiveWallpaper.applyLock(), 10_000, "open-wallpaper-picker-timeout");
+        const res = await LiveWallpaper.applyLock();
         if (res.applied) return { ok: true, reason: "android-lock-applied" };
         if (res.openedPicker || res.needsConfirmation) {
           return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
@@ -251,13 +177,13 @@ export async function applyPickedVideo(
       } catch (err) {
         console.warn("applyLock failed", err);
       }
-      await withTimeout(LiveWallpaper.openPicker(), 8_000, "open-wallpaper-picker-timeout");
+      await LiveWallpaper.openPicker();
       return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
     }
 
     if (target === "both") {
       try {
-        const res = await withTimeout(LiveWallpaper.applyBoth(), 10_000, "open-wallpaper-picker-timeout");
+        const res = await LiveWallpaper.applyBoth();
         if (res.applied && res.homeVerified) {
           return { ok: true, reason: "android-both-applied" };
         }
@@ -267,12 +193,12 @@ export async function applyPickedVideo(
       } catch (err) {
         console.warn("applyBoth failed; opening picker", err);
       }
-      await withTimeout(LiveWallpaper.openPicker(), 8_000, "open-wallpaper-picker-timeout");
+      await LiveWallpaper.openPicker();
       return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
     }
 
     try {
-      const applied = await withTimeout(LiveWallpaper.applyHome(), 10_000, "open-wallpaper-picker-timeout");
+      const applied = await LiveWallpaper.applyHome();
       if (applied.applied && applied.verified) {
         return { ok: true, reason: "android-home-applied" };
       }
@@ -282,7 +208,7 @@ export async function applyPickedVideo(
     } catch (err) {
       console.warn("applyHome failed; opening picker", err);
     }
-    await withTimeout(LiveWallpaper.openPicker(), 8_000, "open-wallpaper-picker-timeout");
+    await LiveWallpaper.openPicker();
     return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
   } catch (err) {
     console.error("applyPickedVideo failed", err);
@@ -305,9 +231,9 @@ const PREVIEW_ASSET_ORIGIN = "https://id-preview--86067037-aec8-403d-b7be-5af9e3
 export async function isNative(): Promise<boolean> {
   try {
     const { Capacitor } = await import("@capacitor/core");
-    return Capacitor.isNativePlatform() || hasNativeAppShell();
+    return Capacitor.isNativePlatform();
   } catch {
-    return hasNativeAppShell();
+    return false;
   }
 }
 
@@ -324,19 +250,16 @@ export async function saveWallpaperToDevice(
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
     const platform = Capacitor.getPlatform();
 
-    if (platform === "android" || hasNativeAppShell()) {
+    if (platform === "android") {
       if (!Capacitor.isPluginAvailable("AetherXLiveWallpaper")) {
-        await recordFrontendStep("PLUGIN_NOT_AVAILABLE_TRYING_DIRECT_CALL");
+        await recordFrontendStep("PLUGIN_NOT_AVAILABLE_ANDROID_NO_DOWNLOAD");
+        return { ok: false, reason: "plugin-not-available" };
       }
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
       const downloadUrl = resolveDownloadUrl(videoUrl);
       await recordFrontendStep("ANDROID_SAVE_SELECTED_VIDEO " + fileName);
-      await withTimeout(
-        LiveWallpaper.saveVideoFromUrl({ url: downloadUrl, fileName }),
-        60_000,
-        "download-wallpaper-timeout",
-      );
-      return withTimeout(applyPickedVideo(target), 12_000, "apply-wallpaper-timeout");
+      await LiveWallpaper.saveVideoFromUrl({ url: downloadUrl, fileName });
+      return applyPickedVideo(target);
     }
 
     if (platform === "ios") {

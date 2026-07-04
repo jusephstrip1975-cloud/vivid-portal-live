@@ -154,7 +154,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppStateProvider>
-        <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col overflow-x-hidden bg-space-black">
+        <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-space-black">
           <AppliedHalo />
           <main className="flex-1 pb-32">
             <Outlet />

@@ -6,13 +6,15 @@ import { getWallpaper } from "@/lib/wallpapers";
 import { LiveMedia } from "@/components/LiveMedia";
 import {
   checkWallpaperCompatibility,
-  hasNativeAppShell,
+  isLiveWallpaperPluginAvailable,
   isNative,
   recordFrontendStep,
-  openInstalledAndroidAppForWallpaper,
   saveWallpaperToDevice,
   type WallpaperTarget,
 } from "@/lib/native-wallpaper";
+
+const ANDROID_APK_URL =
+  "https://github.com/jusephstrip1975-cloud/vivid-portal-live/releases/latest/download/aetherx-latest.apk";
 
 export const Route = createFileRoute("/wallpaper/$id")({
   loader: ({ params }) => {
@@ -59,25 +61,18 @@ function WallpaperDetail() {
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
   const [activeTarget, setActiveTarget] = useState<WallpaperTarget | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  // Detección síncrona por si el APK inyecta el puente nativo antes del primer render.
-  const [nativeReady, setNativeReady] = useState<boolean>(() => hasNativeAppShell());
+  const [nativeReady, setNativeReady] = useState(false);
 
   const isDownloaded = appliedId === wp.id;
   const fav = isFavorite(wp.id);
 
   useEffect(() => {
     let alive = true;
-    const refreshNativeReady = () => {
-      if (alive && hasNativeAppShell()) setNativeReady(true);
-    };
-    refreshNativeReady();
     void isNative().then((native) => {
-      if (alive && (native || hasNativeAppShell())) setNativeReady(true);
+      if (alive) setNativeReady(native);
     });
-    const timers = [150, 600, 1400].map((delay) => window.setTimeout(refreshNativeReady, delay));
     return () => {
       alive = false;
-      timers.forEach(window.clearTimeout);
     };
   }, []);
 
@@ -100,18 +95,22 @@ function WallpaperDetail() {
     // Visible UI marker — confirms the button click reached React.
     setToast(`▶ ${buttonTag}`);
     console.info("[AetherX]", buttonTag);
-    let watchdog: number | undefined;
     try {
       setActiveTarget(target);
       setDownloadState("downloading");
-      watchdog = window.setTimeout(() => {
-        setDownloadState("idle");
-        setActiveTarget(null);
-        setToast("No se pudo completar. Abre la app AETHERX actualizada e inténtalo otra vez.");
-        void recordFrontendStep("FRONTEND_APPLY_TIMEOUT", target);
-      }, 75_000);
 
       if (await isNative()) {
+        // Confirm plugin presence before doing anything else.
+        const available = await isLiveWallpaperPluginAvailable();
+        if (!available) {
+          console.warn("[AetherX] PLUGIN_NOT_FOUND");
+          await recordFrontendStep("PLUGIN_NOT_FOUND");
+          setDownloadState("idle");
+          setActiveTarget(null);
+          setToast("⚠ PLUGIN_NOT_FOUND — el plugin nativo no está registrado");
+          setTimeout(() => setToast(null), 3600);
+          return;
+        }
         await recordFrontendStep(frontendTag);
         // Verificación previa de compatibilidad (solo bloquea si el destino requiere Live Wallpaper)
         const compat = await checkWallpaperCompatibility();
@@ -143,18 +142,9 @@ function WallpaperDetail() {
             : successMsg,
         );
       } else {
-        if (openInstalledAndroidAppForWallpaper(wp.video, fileName, target)) {
-          setToast("Aplicando con AETHERX…");
-          window.setTimeout(() => {
-            setDownloadState("idle");
-            setActiveTarget(null);
-            setToast(null);
-          }, 3200);
-          return;
-        }
         setDownloadState("idle");
         setActiveTarget(null);
-        setToast("Instala la APK de AETHERX para aplicar fondos en Android");
+        setToast("Instala y abre la app AETHERX para aplicarlo en pantalla de inicio");
         setTimeout(() => setToast(null), 4200);
         return;
       }
@@ -174,8 +164,6 @@ function WallpaperDetail() {
       setActiveTarget(null);
       setToast(`✗ PLUGIN_JS_ERROR: ${msg.slice(0, 120)}`);
       setTimeout(() => setToast(null), 4000);
-    } finally {
-      if (watchdog) window.clearTimeout(watchdog);
     }
   }
 
@@ -193,7 +181,15 @@ function WallpaperDetail() {
         <div className="absolute inset-0 bg-gradient-to-b from-space-black/40 via-transparent to-space-black" />
 
         {/* Top bar */}
-        <div className="absolute inset-x-4 top-[calc(env(safe-area-inset-top)+1.75rem)] flex items-start justify-end">
+        <div className="absolute inset-x-4 top-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => router.history.back()}
+            className="glass-card flex size-10 items-center justify-center rounded-full"
+            aria-label="Volver"
+          >
+            <ArrowLeft className="size-4 text-white" />
+          </button>
           <div className="flex gap-2">
             <button
               type="button"
@@ -216,23 +212,12 @@ function WallpaperDetail() {
         </div>
 
         {/* Live badge */}
-        <div className="absolute left-6 top-[calc(env(safe-area-inset-top)+6rem)] flex items-center gap-1.5 rounded-full bg-space-black/60 px-3 py-1 backdrop-blur-md">
+        <div className="absolute left-6 top-20 flex items-center gap-1.5 rounded-full bg-space-black/60 px-3 py-1 backdrop-blur-md">
           <span className="size-1.5 rounded-full bg-electric-blue animate-shimmer" />
           <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-electric-blue">
             Vista previa en vivo
           </span>
         </div>
-
-        {/* Back button (below live badge, respects notch/safe-area) */}
-        <button
-          type="button"
-          onClick={() => router.history.back()}
-          className="glass-card absolute left-6 top-[calc(env(safe-area-inset-top)+8.25rem)] flex size-10 items-center justify-center rounded-full"
-          aria-label="Volver"
-        >
-          <ArrowLeft className="size-4 text-white" />
-        </button>
-
       </div>
 
       {/* Sheet */}
@@ -255,38 +240,53 @@ function WallpaperDetail() {
           </dl>
 
           <div className="mt-5 grid gap-2">
-            {(["home", "lock", "both"] as WallpaperTarget[]).map((target) => {
-              const isActive = activeTarget === target;
-              const Icon = target === "home" ? Home : target === "lock" ? Lock : Layers;
-              const isPrimary = target === "both";
-              return (
-                <button
-                  key={target}
-                  type="button"
-                  onClick={() => handleApply(target)}
-                  disabled={downloadState === "downloading"}
-                  className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[12px] font-bold uppercase tracking-[0.18em] transition disabled:opacity-60 ${
-                    isPrimary
-                      ? "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
-                      : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
-                  }`}
+            {nativeReady ? (
+              (["home", "lock", "both"] as WallpaperTarget[]).map((target) => {
+                const isActive = activeTarget === target;
+                const Icon = target === "home" ? Home : target === "lock" ? Lock : Layers;
+                const isPrimary = target === "both";
+                return (
+                  <button
+                    key={target}
+                    type="button"
+                    onClick={() => handleApply(target)}
+                    disabled={downloadState === "downloading"}
+                    className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[12px] font-bold uppercase tracking-[0.18em] transition disabled:opacity-60 ${
+                      isPrimary
+                        ? "bg-gradient-to-r from-electric-blue to-galaxy-purple text-white shadow-lg shadow-electric-blue/30"
+                        : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    }`}
+                  >
+                    {isActive && downloadState === "downloading" ? (
+                      "Aplicando..."
+                    ) : isActive && downloadState === "done" ? (
+                      <>
+                        <Check className="size-4" strokeWidth={3} />
+                        Aplicado
+                      </>
+                    ) : (
+                      <>
+                        <Icon className="size-4" />
+                        Establecer en {targetLabels[target]}
+                      </>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <>
+                <a
+                  href={ANDROID_APK_URL}
+                  download="aetherx-latest.apk"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-electric-blue to-galaxy-purple px-4 py-4 text-center text-[12px] font-bold uppercase tracking-[0.16em] text-white shadow-lg shadow-electric-blue/30"
                 >
-                  {isActive && downloadState === "downloading" ? (
-                    "Aplicando..."
-                  ) : isActive && downloadState === "done" ? (
-                    <>
-                      <Check className="size-4" strokeWidth={3} />
-                      Aplicado
-                    </>
-                  ) : (
-                    <>
-                      <Icon className="size-4" />
-                      Establecer en {targetLabels[target]}
-                    </>
-                  )}
-                </button>
-              );
-            })}
+                  Descargar app Android
+                </a>
+                <p className="text-center text-[11px] leading-relaxed text-white/55">
+                  En Chrome solo se descargan vídeos. Para ponerlo en pantalla de inicio o bloqueo, instala y abre AETHERX desde el icono del móvil.
+                </p>
+              </>
+            )}
             {isDownloaded && (
               <p className="mt-1 text-center text-[10px] uppercase tracking-[0.25em] text-electric-blue/80">
                 Último aplicado
@@ -308,9 +308,9 @@ function WallpaperDetail() {
             Cómo ponerlo de fondo
           </p>
           <ol className="space-y-1.5 list-decimal pl-5 text-white/65">
-            <li>Pulsa <strong className="text-white">Inicio y bloqueo</strong> para aplicar el fondo.</li>
-            <li>Si estás en el navegador, Android abrirá la app AETHERX instalada automáticamente.</li>
-            <li>El sistema guardará el fondo en pantalla de inicio y bloqueo.</li>
+            <li>Abre AETHERX desde el icono de la app instalada, no desde Galería/Fotos.</li>
+            <li>Pulsa <strong className="text-white">Inicio y bloqueo</strong> para abrir el selector nativo.</li>
+            <li>El sistema abre <strong className="text-white">AetherX Live Wallpaper</strong> para aplicarlo animado.</li>
             <li>
               En Android pulsa <strong className="text-white">Aplicar</strong> y elige el destino que tu móvil muestre.
             </li>
