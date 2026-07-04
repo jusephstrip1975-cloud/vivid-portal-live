@@ -228,9 +228,8 @@ export function DownloadAppModal() {
             onSubmit={handleRegister}
             submitting={submitting}
             errorMsg={errorMsg}
-            count={count}
-            progress={progress}
           />
+
         ) : installed ? (
           <>
             <p className="mt-4 text-sm text-white/80 leading-relaxed">
