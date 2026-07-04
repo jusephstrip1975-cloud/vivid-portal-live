@@ -74,6 +74,9 @@
     </style>
     <script>
       (function () {
+        document.documentElement.classList.add("aetherx-native");
+        document.documentElement.dataset.aetherxNativeApp = "true";
+        window.__AETHERX_NATIVE_APP__ = true;
         function showBootError(kind, value, source, line, column) {
           var node = document.getElementById("aetherx-boot-error");
           if (!node) return;
