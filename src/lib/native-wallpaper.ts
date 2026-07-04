@@ -27,10 +27,6 @@ interface LiveWallpaperPlugin {
   getFitMode(): Promise<{ mode: FitMode }>;
 }
 
-const ANDROID_PACKAGE_ID = "com.aetherx.livewallpaper";
-const APK_VERSION = "3.2.8";
-const ANDROID_APK_URL = `https://github.com/jusephstrip1975-cloud/vivid-portal-live/releases/latest/download/aetherx-latest.apk#v=${APK_VERSION}`;
-
 export type FitMode = "cover" | "stretch" | "contain";
 
 type NativeWindow = Window & {
@@ -170,9 +166,8 @@ export function openInstalledAndroidAppForWallpaper(
   const ua = navigator.userAgent || "";
   if (!/android/i.test(ua)) return false;
 
-  // Never trigger the intent:// deep link from inside a WebView (including our own
-  // Capacitor shell). The WebView interprets the browser_fallback_url as a file to
-  // download and shows the "descargar aetherx-latest.apk" prompt.
+  // Never trigger an external deep link from inside a WebView (including our own
+  // Capacitor shell). Inside the APK we must call the native plugin directly.
   const isWebView = /\bwv\)|; wv\)|Version\/.*Chrome\/.*Mobile.*; wv/i.test(ua) || /aetherx|capacitor/i.test(ua);
   if (isWebView) return false;
   if (hasNativeAppShell()) return false;
@@ -182,10 +177,10 @@ export function openInstalledAndroidAppForWallpaper(
     fileName,
     target,
   });
-  // Intentionally omit browser_fallback_url so browsers that can't resolve the
-  // intent do NOT auto-download the APK. If the app isn't installed the UI shows
-  // an install hint instead.
-  window.location.href = `intent://wallpaper?${params.toString()}#Intent;scheme=aetherx;package=${ANDROID_PACKAGE_ID};action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
+  // Use the plain custom scheme instead of intent://. Chrome turns unresolved
+  // intent:// links with a package into a Play Store lookup, which is the
+  // "Elemento no encontrado" screen seen when applying the wallpaper.
+  window.location.href = `aetherx://wallpaper?${params.toString()}`;
   return true;
 }
 
