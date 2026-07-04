@@ -61,7 +61,23 @@ function WallpaperDetail() {
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
   const [activeTarget, setActiveTarget] = useState<WallpaperTarget | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [nativeReady, setNativeReady] = useState(false);
+  // Detección síncrona por si el APK inyecta window.Capacitor antes del primer render.
+  const [nativeReady, setNativeReady] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const w = window as Window & {
+      Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
+    };
+    try {
+      if (w.Capacitor?.isNativePlatform?.()) return true;
+      const platform = w.Capacitor?.getPlatform?.();
+      if (platform === "android" || platform === "ios") return true;
+    } catch {
+      /* ignore */
+    }
+    // Heurística de UA — WebView de Capacitor en el APK
+    const ua = navigator.userAgent || "";
+    return /aetherx|capacitor/i.test(ua);
+  });
 
   const isDownloaded = appliedId === wp.id;
   const fav = isFavorite(wp.id);
@@ -69,7 +85,7 @@ function WallpaperDetail() {
   useEffect(() => {
     let alive = true;
     void isNative().then((native) => {
-      if (alive) setNativeReady(native);
+      if (alive && native) setNativeReady(true);
     });
     return () => {
       alive = false;
