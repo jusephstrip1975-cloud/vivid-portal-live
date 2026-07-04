@@ -29,6 +29,35 @@ interface LiveWallpaperPlugin {
 
 export type FitMode = "cover" | "stretch" | "contain";
 
+type NativeWindow = Window & {
+  Capacitor?: {
+    isNativePlatform?: () => boolean;
+    getPlatform?: () => string;
+    isPluginAvailable?: (name: string) => boolean;
+    Plugins?: Record<string, unknown>;
+  };
+  androidBridge?: unknown;
+  __AETHERX_NATIVE_APP__?: boolean;
+};
+
+export function hasNativeAppShell(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as NativeWindow;
+  try {
+    if (w.__AETHERX_NATIVE_APP__ === true) return true;
+    if (w.androidBridge) return true;
+    if (document.documentElement.classList.contains("aetherx-native")) return true;
+    if (document.documentElement.dataset.aetherxNativeApp === "true") return true;
+    if (w.Capacitor?.isNativePlatform?.()) return true;
+    const platform = w.Capacitor?.getPlatform?.();
+    if (platform === "android" || platform === "ios") return true;
+  } catch {
+    /* ignore */
+  }
+  const ua = navigator.userAgent || "";
+  return /aetherx|capacitor|wv\)/i.test(ua);
+}
+
 export async function setWallpaperFitMode(mode: FitMode): Promise<void> {
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
@@ -72,7 +101,9 @@ export async function recordFrontendStep(step: string, error?: string): Promise<
 export async function isLiveWallpaperPluginAvailable(): Promise<boolean> {
   try {
     const { Capacitor } = await import("@capacitor/core");
-    return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("AetherXLiveWallpaper");
+    const available = Capacitor.isPluginAvailable("AetherXLiveWallpaper");
+    const platform = Capacitor.getPlatform();
+    return (Capacitor.isNativePlatform() || hasNativeAppShell()) && platform === "android" && available;
   } catch {
     return false;
   }
@@ -231,9 +262,9 @@ const PREVIEW_ASSET_ORIGIN = "https://id-preview--86067037-aec8-403d-b7be-5af9e3
 export async function isNative(): Promise<boolean> {
   try {
     const { Capacitor } = await import("@capacitor/core");
-    return Capacitor.isNativePlatform();
+    return Capacitor.isNativePlatform() || hasNativeAppShell();
   } catch {
-    return false;
+    return hasNativeAppShell();
   }
 }
 
@@ -250,10 +281,9 @@ export async function saveWallpaperToDevice(
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
     const platform = Capacitor.getPlatform();
 
-    if (platform === "android") {
+    if (platform === "android" || hasNativeAppShell()) {
       if (!Capacitor.isPluginAvailable("AetherXLiveWallpaper")) {
-        await recordFrontendStep("PLUGIN_NOT_AVAILABLE_ANDROID_NO_DOWNLOAD");
-        return { ok: false, reason: "plugin-not-available" };
+        await recordFrontendStep("PLUGIN_NOT_AVAILABLE_TRYING_DIRECT_CALL");
       }
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
       const downloadUrl = resolveDownloadUrl(videoUrl);
