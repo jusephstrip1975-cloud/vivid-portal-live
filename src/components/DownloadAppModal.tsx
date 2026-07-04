@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Download, Smartphone, CheckCircle2, Zap, Share as ShareIcon, Mail, Users } from "lucide-react";
+import { X, Download, Smartphone, CheckCircle2, Zap, Share as ShareIcon, Mail } from "lucide-react";
 import logoAsset from "@/assets/aetherx-logo-v2.png";
 import { supabase } from "@/integrations/supabase/client";
 
