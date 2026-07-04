@@ -157,6 +157,16 @@ export async function checkWallpaperCompatibility(): Promise<CompatibilityResult
 
 export type WallpaperTarget = "home" | "lock" | "both";
 
+function withTimeout<T>(promise: Promise<T>, ms: number, reason: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(reason)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 export function openInstalledAndroidAppForWallpaper(
   videoUrl: string,
   fileName: string,
@@ -180,7 +190,13 @@ export function openInstalledAndroidAppForWallpaper(
   // Use the plain custom scheme instead of intent://. Chrome turns unresolved
   // intent:// links with a package into a Play Store lookup, which is the
   // "Elemento no encontrado" screen seen when applying the wallpaper.
-  window.location.href = `aetherx://wallpaper?${params.toString()}`;
+  const query = params.toString();
+  window.location.href = `aetherx://wallpaper?${query}`;
+  window.setTimeout(() => {
+    if (document.visibilityState === "visible") {
+      window.location.href = `intent://wallpaper?${query}#Intent;scheme=aetherx;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
+    }
+  }, 900);
   return true;
 }
 
@@ -227,7 +243,7 @@ export async function applyPickedVideo(
 
     if (target === "lock") {
       try {
-        const res = await LiveWallpaper.applyLock();
+        const res = await withTimeout(LiveWallpaper.applyLock(), 10_000, "open-wallpaper-picker-timeout");
         if (res.applied) return { ok: true, reason: "android-lock-applied" };
         if (res.openedPicker || res.needsConfirmation) {
           return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
@@ -235,13 +251,13 @@ export async function applyPickedVideo(
       } catch (err) {
         console.warn("applyLock failed", err);
       }
-      await LiveWallpaper.openPicker();
+      await withTimeout(LiveWallpaper.openPicker(), 8_000, "open-wallpaper-picker-timeout");
       return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
     }
 
     if (target === "both") {
       try {
-        const res = await LiveWallpaper.applyBoth();
+        const res = await withTimeout(LiveWallpaper.applyBoth(), 10_000, "open-wallpaper-picker-timeout");
         if (res.applied && res.homeVerified) {
           return { ok: true, reason: "android-both-applied" };
         }
@@ -251,12 +267,12 @@ export async function applyPickedVideo(
       } catch (err) {
         console.warn("applyBoth failed; opening picker", err);
       }
-      await LiveWallpaper.openPicker();
+      await withTimeout(LiveWallpaper.openPicker(), 8_000, "open-wallpaper-picker-timeout");
       return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
     }
 
     try {
-      const applied = await LiveWallpaper.applyHome();
+      const applied = await withTimeout(LiveWallpaper.applyHome(), 10_000, "open-wallpaper-picker-timeout");
       if (applied.applied && applied.verified) {
         return { ok: true, reason: "android-home-applied" };
       }
@@ -266,7 +282,7 @@ export async function applyPickedVideo(
     } catch (err) {
       console.warn("applyHome failed; opening picker", err);
     }
-    await LiveWallpaper.openPicker();
+    await withTimeout(LiveWallpaper.openPicker(), 8_000, "open-wallpaper-picker-timeout");
     return { ok: true, reason: "android-live-picker-opened", needsPicker: true };
   } catch (err) {
     console.error("applyPickedVideo failed", err);
@@ -315,8 +331,12 @@ export async function saveWallpaperToDevice(
       const LiveWallpaper = registerPlugin<LiveWallpaperPlugin>("AetherXLiveWallpaper");
       const downloadUrl = resolveDownloadUrl(videoUrl);
       await recordFrontendStep("ANDROID_SAVE_SELECTED_VIDEO " + fileName);
-      await LiveWallpaper.saveVideoFromUrl({ url: downloadUrl, fileName });
-      return applyPickedVideo(target);
+      await withTimeout(
+        LiveWallpaper.saveVideoFromUrl({ url: downloadUrl, fileName }),
+        60_000,
+        "download-wallpaper-timeout",
+      );
+      return withTimeout(applyPickedVideo(target), 12_000, "apply-wallpaper-timeout");
     }
 
     if (platform === "ios") {
