@@ -166,15 +166,26 @@ export function openInstalledAndroidAppForWallpaper(
   fileName: string,
   target: WallpaperTarget = "both",
 ): boolean {
-  if (typeof window === "undefined" || !/android/i.test(navigator.userAgent || "")) return false;
+  if (typeof window === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (!/android/i.test(ua)) return false;
+
+  // Never trigger the intent:// deep link from inside a WebView (including our own
+  // Capacitor shell). The WebView interprets the browser_fallback_url as a file to
+  // download and shows the "descargar aetherx-latest.apk" prompt.
+  const isWebView = /\bwv\)|; wv\)|Version\/.*Chrome\/.*Mobile.*; wv/i.test(ua) || /aetherx|capacitor/i.test(ua);
+  if (isWebView) return false;
+  if (hasNativeAppShell()) return false;
 
   const params = new URLSearchParams({
     url: resolveDownloadUrl(videoUrl),
     fileName,
     target,
   });
-  const fallback = encodeURIComponent(ANDROID_APK_URL);
-  window.location.href = `intent://wallpaper?${params.toString()}#Intent;scheme=aetherx;package=${ANDROID_PACKAGE_ID};action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=${fallback};end`;
+  // Intentionally omit browser_fallback_url so browsers that can't resolve the
+  // intent do NOT auto-download the APK. If the app isn't installed the UI shows
+  // an install hint instead.
+  window.location.href = `intent://wallpaper?${params.toString()}#Intent;scheme=aetherx;package=${ANDROID_PACKAGE_ID};action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
   return true;
 }
 
