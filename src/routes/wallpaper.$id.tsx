@@ -181,7 +181,7 @@ function WallpaperDetail() {
         <div className="absolute inset-0 bg-gradient-to-b from-space-black/40 via-transparent to-space-black" />
 
         {/* Top bar */}
-        <div className="absolute inset-x-4 top-4 flex items-center justify-between">
+        <div className="absolute inset-x-4 top-[calc(env(safe-area-inset-top)+1.75rem)] flex items-center justify-between">
           <button
             type="button"
             onClick={() => router.history.back()}
@@ -212,7 +212,7 @@ function WallpaperDetail() {
         </div>
 
         {/* Live badge */}
-        <div className="absolute left-6 top-20 flex items-center gap-1.5 rounded-full bg-space-black/60 px-3 py-1 backdrop-blur-md">
+        <div className="absolute left-6 top-[calc(env(safe-area-inset-top)+6rem)] flex items-center gap-1.5 rounded-full bg-space-black/60 px-3 py-1 backdrop-blur-md">
           <span className="size-1.5 rounded-full bg-electric-blue animate-shimmer" />
           <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-electric-blue">
             Vista previa en vivo
