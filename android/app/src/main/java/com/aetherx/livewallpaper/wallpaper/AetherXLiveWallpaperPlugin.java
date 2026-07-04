@@ -148,10 +148,68 @@ public class AetherXLiveWallpaperPlugin extends Plugin {
         }, "AetherXPickVideoCopy").start();
     }
 
-    @PluginMethod public void applyHome(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyHome"); openLivePicker(call); }
-    @PluginMethod public void applyLock(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyLock"); openLivePicker(call); }
-    @PluginMethod public void applyBoth(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyBoth"); openLivePicker(call); }
+    @PluginMethod public void applyHome(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyHome"); applyStaticWallpaper(call, WallpaperManager.FLAG_SYSTEM, "home"); }
+    @PluginMethod public void applyLock(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyLock"); applyStaticWallpaper(call, WallpaperManager.FLAG_LOCK, "lock"); }
+    @PluginMethod public void applyBoth(PluginCall call)  { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED applyBoth"); applyStaticWallpaper(call, WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK, "both"); }
     @PluginMethod public void openPicker(PluginCall call) { persistKey(KEY_LAST_PLUGIN_ENTERED, "NATIVE_PLUGIN_METHOD_ENTERED openPicker"); openLivePicker(call); }
+
+    /**
+     * Auto-apply the saved wallpaper video as a STATIC image (first frame) using
+     * WallpaperManager.setBitmap(). This does NOT need a system picker on Android
+     * and works instantly (SET_WALLPAPER permission is granted at install time).
+     * Falls back to opening the live-wallpaper picker if bitmap extraction fails.
+     */
+    private void applyStaticWallpaper(final PluginCall call, final int flags, final String target) {
+        new Thread(() -> {
+            File video = getCurrentVideo();
+            if (video == null || !video.exists() || video.length() == 0) {
+                persistStep("APPLY_STATIC_NO_VIDEO");
+                openLivePicker(call);
+                return;
+            }
+            android.media.MediaMetadataRetriever mmr = null;
+            android.graphics.Bitmap frame = null;
+            try {
+                mmr = new android.media.MediaMetadataRetriever();
+                mmr.setDataSource(video.getAbsolutePath());
+                // First frame, best quality
+                frame = mmr.getFrameAtTime(0, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                if (frame == null) {
+                    frame = mmr.getFrameAtTime(1_000_000, android.media.MediaMetadataRetriever.OPTION_CLOSEST);
+                }
+                if (frame == null) throw new Exception("frame-null");
+
+                WallpaperManager wm = WallpaperManager.getInstance(getContext());
+                int applyFlags = flags;
+                boolean applied;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    int id = wm.setBitmap(frame, null, true, applyFlags);
+                    applied = id != 0;
+                } else {
+                    wm.setBitmap(frame);
+                    applied = true;
+                }
+                persistStep("APPLY_STATIC_OK target=" + target + " flags=" + applyFlags);
+                JSObject ret = new JSObject();
+                ret.put("applied", applied);
+                ret.put("verified", applied);
+                ret.put("homeVerified", applied);
+                ret.put("lockApplied", applied);
+                ret.put("openedPicker", false);
+                ret.put("needsConfirmation", false);
+                ret.put("via", "WallpaperManager.setBitmap");
+                ret.put("target", target);
+                call.resolve(ret);
+            } catch (Throwable t) {
+                Log.e(TAG, "applyStaticWallpaper failed, falling back to picker", t);
+                persistNativeException("APPLY_STATIC_FAIL " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                openLivePicker(call);
+            } finally {
+                if (frame != null) { try { frame.recycle(); } catch (Throwable ignored) {} }
+                if (mmr != null)   { try { mmr.release();   } catch (Throwable ignored) {} }
+            }
+        }, "AetherXApplyStatic").start();
+    }
 
     @PluginMethod
     public void recordFrontendStep(PluginCall call) {
