@@ -203,17 +203,6 @@ function WallpaperDetail() {
           </div>
         </div>
 
-        {/* Back button (below live badge) */}
-        <button
-          type="button"
-          onClick={() => router.history.back()}
-          className="glass-card absolute left-6 top-[calc(env(safe-area-inset-top)+8.5rem)] flex size-10 items-center justify-center rounded-full"
-          aria-label="Volver"
-        >
-          <ArrowLeft className="size-4 text-white" />
-        </button>
-
-
         {/* Live badge */}
         <div className="absolute left-6 top-[calc(env(safe-area-inset-top)+6rem)] flex items-center gap-1.5 rounded-full bg-space-black/60 px-3 py-1 backdrop-blur-md">
           <span className="size-1.5 rounded-full bg-electric-blue animate-shimmer" />
@@ -221,6 +210,17 @@ function WallpaperDetail() {
             Vista previa en vivo
           </span>
         </div>
+
+        {/* Back button (below live badge, respects notch/safe-area) */}
+        <button
+          type="button"
+          onClick={() => router.history.back()}
+          className="glass-card absolute left-6 top-[calc(env(safe-area-inset-top)+8.25rem)] flex size-10 items-center justify-center rounded-full"
+          aria-label="Volver"
+        >
+          <ArrowLeft className="size-4 text-white" />
+        </button>
+
       </div>
 
       {/* Sheet */}
