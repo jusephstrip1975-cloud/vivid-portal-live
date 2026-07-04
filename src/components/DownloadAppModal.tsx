@@ -326,27 +326,10 @@ function RegisterStep({
   return (
     <>
       <p className="mt-3 text-xs text-white/75 leading-relaxed">
-        Registra tu correo para descargar AETHERX y ayudarnos a lanzar la app en Google Play.
+        Déjanos tu correo para descargar AETHERX.
       </p>
 
-      <div className="mt-4 rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/8 p-3">
-        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-[#f4d160]">
-          <span className="flex items-center gap-1.5">
-            <Users className="h-3 w-3" />
-            Testers registrados
-          </span>
-          <span className="text-white">{count} / {TESTERS_GOAL}</span>
-        </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${progress}%`,
-              background: "linear-gradient(90deg, #d4af37, #f4d160)",
-            }}
-          />
-        </div>
-      </div>
+
 
       <form onSubmit={onSubmit} className="mt-4 text-left">
         <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">
