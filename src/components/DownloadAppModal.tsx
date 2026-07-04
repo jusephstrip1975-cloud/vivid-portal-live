@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, Download, Smartphone, CheckCircle2, Zap, Share as ShareIcon, Mail, Users } from "lucide-react";
+import { X, Download, Smartphone, CheckCircle2, Zap, Share as ShareIcon, Mail } from "lucide-react";
 import logoAsset from "@/assets/aetherx-logo-v2.png";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -228,9 +228,8 @@ export function DownloadAppModal() {
             onSubmit={handleRegister}
             submitting={submitting}
             errorMsg={errorMsg}
-            count={count}
-            progress={progress}
           />
+
         ) : installed ? (
           <>
             <p className="mt-4 text-sm text-white/80 leading-relaxed">
@@ -312,41 +311,21 @@ function RegisterStep({
   onSubmit,
   submitting,
   errorMsg,
-  count,
-  progress,
 }: {
   email: string;
   setEmail: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
   errorMsg: string | null;
-  count: number;
-  progress: number;
 }) {
+
   return (
     <>
       <p className="mt-3 text-xs text-white/75 leading-relaxed">
-        Registra tu correo para descargar AETHERX y ayudarnos a lanzar la app en Google Play.
+        Déjanos tu correo para descargar AETHERX.
       </p>
 
-      <div className="mt-4 rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/8 p-3">
-        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-[#f4d160]">
-          <span className="flex items-center gap-1.5">
-            <Users className="h-3 w-3" />
-            Testers registrados
-          </span>
-          <span className="text-white">{count} / {TESTERS_GOAL}</span>
-        </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${progress}%`,
-              background: "linear-gradient(90deg, #d4af37, #f4d160)",
-            }}
-          />
-        </div>
-      </div>
+
 
       <form onSubmit={onSubmit} className="mt-4 text-left">
         <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/70">
