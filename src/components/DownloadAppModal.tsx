@@ -311,17 +311,14 @@ function RegisterStep({
   onSubmit,
   submitting,
   errorMsg,
-  count,
-  progress,
 }: {
   email: string;
   setEmail: (v: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   submitting: boolean;
   errorMsg: string | null;
-  count: number;
-  progress: number;
 }) {
+
   return (
     <>
       <p className="mt-3 text-xs text-white/75 leading-relaxed">
