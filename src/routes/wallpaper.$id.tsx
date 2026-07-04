@@ -181,15 +181,7 @@ function WallpaperDetail() {
         <div className="absolute inset-0 bg-gradient-to-b from-space-black/40 via-transparent to-space-black" />
 
         {/* Top bar */}
-        <div className="absolute inset-x-4 top-[calc(env(safe-area-inset-top)+1.75rem)] flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => router.history.back()}
-            className="glass-card flex size-10 items-center justify-center rounded-full"
-            aria-label="Volver"
-          >
-            <ArrowLeft className="size-4 text-white" />
-          </button>
+        <div className="absolute inset-x-4 top-[calc(env(safe-area-inset-top)+1.75rem)] flex items-start justify-end">
           <div className="flex gap-2">
             <button
               type="button"
@@ -210,6 +202,17 @@ function WallpaperDetail() {
             </button>
           </div>
         </div>
+
+        {/* Back button (below live badge) */}
+        <button
+          type="button"
+          onClick={() => router.history.back()}
+          className="glass-card absolute left-6 top-[calc(env(safe-area-inset-top)+8.5rem)] flex size-10 items-center justify-center rounded-full"
+          aria-label="Volver"
+        >
+          <ArrowLeft className="size-4 text-white" />
+        </button>
+
 
         {/* Live badge */}
         <div className="absolute left-6 top-[calc(env(safe-area-inset-top)+6rem)] flex items-center gap-1.5 rounded-full bg-space-black/60 px-3 py-1 backdrop-blur-md">
