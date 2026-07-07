@@ -88,9 +88,21 @@
     color: var(--color-ice-white);
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
+  }
+  html {
+    overscroll-behavior-x: none;
   }
   body {
     overscroll-behavior-y: none;
+    overscroll-behavior-x: none;
+    position: relative;
+  }
+  #root {
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 }
 
