@@ -90,27 +90,42 @@
     -webkit-font-smoothing: antialiased;
     width: 100%;
     max-width: 100%;
+    height: 100%;
+    margin: 0;
   }
   html {
-    /* `clip` avoids turning html into a scroll container, which breaks
-       touch scrolling inside Android/iOS WebViews (Capacitor). */
-    overflow-x: clip;
-    overflow-y: auto;
-    height: auto;
+    overflow: hidden;
     overscroll-behavior-x: none;
-    -webkit-overflow-scrolling: touch;
   }
   body {
-    overflow-x: clip;
-    overflow-y: visible;
-    height: auto;
-    min-height: 100%;
+    overflow: hidden;
     overscroll-behavior-x: none;
     position: relative;
   }
   #root {
-    overflow-x: clip;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
     max-width: 100%;
+  }
+
+  /* A dedicated scroll surface is more reliable than document scrolling in
+     Samsung/Capacitor WebViews. `pan-y` keeps vertical gestures native while
+     preventing the whole interface from drifting sideways. */
+  .aetherx-app-shell {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  .aetherx-scroll {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
   }
 
 }

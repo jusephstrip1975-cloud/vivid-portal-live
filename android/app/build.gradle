@@ -9,8 +9,8 @@ android {
         setProperty("archivesBaseName", "AetherX-release-signed")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-    versionCode 325
-    versionName "3.2.5-scroll-fix"
+    versionCode 326
+    versionName "3.2.6-native-scroll"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
