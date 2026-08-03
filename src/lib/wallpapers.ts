@@ -305,6 +305,12 @@ import milkyMountainVid from "@/assets/wp-milky-mountain.mp4.asset.json";
 import liquidGoldVid from "@/assets/wp-liquid-gold.mp4.asset.json";
 import fractalInfiniteVid from "@/assets/wp-fractal-infinite.mp4.asset.json";
 import neonPlasmaVid from "@/assets/wp-neon-plasma.mp4.asset.json";
+import moneyRain from "@/assets/wp-money-rain.jpg";
+import moneyGold from "@/assets/wp-money-gold.jpg";
+import moneyVault from "@/assets/wp-money-vault.jpg";
+import moneyRainVid from "@/assets/wp-money-rain.mp4.asset.json";
+import moneyGoldVid from "@/assets/wp-money-gold.mp4.asset.json";
+import moneyVaultVid from "@/assets/wp-money-vault.mp4.asset.json";
 
 export type Category =
   | "universo"
@@ -623,6 +629,9 @@ WALLPAPERS.push(
 
   { id: "liquid-gold", title: "Oro Líquido", subtitle: "Metal fundido fluyendo en cámara lenta", category: "3d-liquido", src: liquidGold, video: liquidGoldVid.url, resolution: "4K", sizeMb: 13.8, fps: 60, premium: true, sound: false, accent: GOLD },
   { id: "fractal-infinite", title: "Fractal Infinito", subtitle: "Mandelbrot zoom hipnótico cian y rosa", category: "3d-fractal", src: fractalInfinite, video: fractalInfiniteVid.url, resolution: "4K", sizeMb: 14.0, fps: 60, premium: true, sound: false, accent: PINK },
+  { id: "money-rain", title: "Lluvia de Dólares", subtitle: "Billetes de 100 cayendo en cámara lenta", category: "3d-particulas", src: moneyRain, video: moneyRainVid.url, resolution: "4K", sizeMb: 12.4, fps: 60, premium: true, sound: false, accent: GOLD },
+  { id: "money-gold", title: "Dólares de Oro", subtitle: "Billetes dorados metálicos en caída libre", category: "3d-particulas", src: moneyGold, video: moneyGoldVid.url, resolution: "4K", sizeMb: 12.9, fps: 60, premium: true, sound: false, accent: GOLD },
+  { id: "money-vault", title: "Cámara del Dinero", subtitle: "Tormenta de billetes en la bóveda", category: "3d-particulas", src: moneyVault, video: moneyVaultVid.url, resolution: "4K", sizeMb: 13.2, fps: 60, premium: true, sound: false, accent: GOLD },
   { id: "neon-plasma-ball", title: "Plasma Neón", subtitle: "Esfera eléctrica con arcos violeta", category: "3d-abstracto", src: neonPlasma, video: neonPlasmaVid.url, resolution: "4K", sizeMb: 13.5, fps: 60, premium: true, sound: true, accent: PURPLE },
 );
 
