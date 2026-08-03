@@ -154,9 +154,9 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppStateProvider>
-        <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-space-black">
+        <div className="aetherx-app-shell relative mx-auto flex max-w-md flex-col bg-space-black">
           <AppliedHalo />
-          <main className="flex-1 pb-32">
+          <main className="aetherx-scroll flex-1 pb-32">
             <Outlet />
           </main>
           <BottomNav />
