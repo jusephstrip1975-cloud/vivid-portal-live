@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, Check, FolderOpen, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, Check, FolderOpen, RefreshCw, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
+import { useCatalog } from "@/lib/catalog-client";
+import { Button } from "@/components/ui/button";
 import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
 import aetherxLogo from "@/assets/aetherx-logo-v2.png";
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
+  const { wallpapers: WALLPAPERS, categories: CATEGORIES, updating, message, refresh } = useCatalog();
   const hero = WALLPAPERS[0];
 
   const [pickState, setPickState] = useState<"idle" | "loading" | "applying">("idle");
@@ -145,9 +147,13 @@ function HomePage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => void refresh()} disabled={updating} aria-label="Actualizar fondos" title="Actualizar fondos" className="text-electric-blue">
+            <RefreshCw className={updating ? "animate-spin motion-reduce:animate-none" : ""} />
+            Actualizar
+          </Button>
           <Link
             to="/device"
-            className="glass-card flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-electric-blue"
+            className="glass-card hidden items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-electric-blue sm:flex"
             aria-label="Simulador de móvil"
           >
             S25 Ultra
@@ -161,6 +167,7 @@ function HomePage() {
           </Link>
         </div>
       </header>
+      {message && <p role="status" className="px-6 py-2 text-xs text-muted-foreground">{message}</p>}
 
       {/* Hero Spotlight */}
       <section className="px-6 py-4">

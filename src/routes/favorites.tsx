@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Heart } from "lucide-react";
 import { useAppState } from "@/lib/app-state";
-import { WALLPAPERS } from "@/lib/wallpapers";
+import { useCatalog } from "@/lib/catalog-client";
 import { WallpaperTile } from "@/components/WallpaperTile";
 
 export const Route = createFileRoute("/favorites")({
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/favorites")({
 });
 
 function FavoritesPage() {
+  const { wallpapers: WALLPAPERS } = useCatalog();
   const { favorites } = useAppState();
   const list = WALLPAPERS.filter((w) => favorites.includes(w.id));
 

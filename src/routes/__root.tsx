@@ -16,6 +16,7 @@ import { AppStateProvider } from "@/lib/app-state";
 import { BottomNav } from "@/components/BottomNav";
 import { AppliedHalo } from "@/components/AppliedHalo";
 import { DownloadAppModal } from "@/components/DownloadAppModal";
+import { CatalogProvider } from "@/lib/catalog-client";
 
 function NotFoundComponent() {
   return (
@@ -153,6 +154,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppStateProvider>
+        <CatalogProvider>
         <div className="aetherx-app-shell relative mx-auto flex max-w-md flex-col bg-space-black">
           <AppliedHalo />
           <main className="aetherx-scroll flex-1 pb-32">
@@ -161,6 +163,7 @@ function RootComponent() {
           <BottomNav />
           <DownloadAppModal />
         </div>
+        </CatalogProvider>
       </AppStateProvider>
     </QueryClientProvider>
   );

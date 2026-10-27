@@ -1,5 +1,5 @@
 import { useAppState } from "@/lib/app-state";
-import { getWallpaper } from "@/lib/wallpapers";
+import { useCatalog } from "@/lib/catalog-client";
 
 /**
  * Subtle ambient halo that reflects the currently "applied" wallpaper
@@ -7,8 +7,9 @@ import { getWallpaper } from "@/lib/wallpapers";
  * wallpaper (or uninstalls / clears the app data).
  */
 export function AppliedHalo() {
+  const { wallpapers } = useCatalog();
   const { appliedId } = useAppState();
-  const wp = appliedId ? getWallpaper(appliedId) : null;
+  const wp = wallpapers.find((item) => item.id === appliedId);
   if (!wp) return null;
 
   return (

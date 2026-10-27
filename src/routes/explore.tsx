@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { CATEGORIES, WALLPAPERS, type Category } from "@/lib/wallpapers";
+import { useCatalog } from "@/lib/catalog-client";
 import { WallpaperTile } from "@/components/WallpaperTile";
 
 const search = z.object({
@@ -8,7 +9,7 @@ const search = z.object({
     .custom<Category | "todos">(
       (value) =>
         typeof value === "string" &&
-        CATEGORIES.some((category) => category.id === value),
+        /^[a-z0-9-]{1,80}$/.test(value),
     )
     .catch("todos"),
 });
@@ -33,6 +34,7 @@ export const Route = createFileRoute("/explore")({
 });
 
 function ExplorePage() {
+  const { wallpapers: WALLPAPERS, categories: CATEGORIES } = useCatalog();
   const { cat } = Route.useSearch();
   const navigate = Route.useNavigate();
   const list = WALLPAPERS.filter((w) => cat === "todos" || w.category === cat);
