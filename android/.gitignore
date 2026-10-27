@@ -97,3 +97,7 @@ capacitor-cordova-android-plugins
 !app/libs/
 !app/libs/*.jar
 app/libs/*.aar
+
+# Signing keys
+*.keystore
+*.jks

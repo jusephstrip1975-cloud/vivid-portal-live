@@ -7,8 +7,8 @@ const config: CapacitorConfig = {
   backgroundColor: "#000000",
   android: {
     backgroundColor: "#000000",
-    allowMixedContent: true,
-    webContentsDebuggingEnabled: true,
+    allowMixedContent: false,
+    webContentsDebuggingEnabled: false,
   },
   ios: {
     backgroundColor: "#000000",

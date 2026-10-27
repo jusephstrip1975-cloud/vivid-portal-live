@@ -41,17 +41,24 @@ android {
         }
     }
 
-    // Stable release signing config — committed keystore ensures the signature
-    // never changes between builds, which is what Play Protect uses to learn
-    // the developer identity over time.
+    // Release signing comes only from environment variables (CI secrets).
+    // When any is missing the release build is left unsigned instead of failing.
+    def ksPath = System.getenv('AETHERX_KEYSTORE_PATH')
+    def ksPass = System.getenv('AETHERX_KEYSTORE_PASSWORD')
+    def kAlias = System.getenv('AETHERX_KEY_ALIAS')
+    def kPass = System.getenv('AETHERX_KEY_PASSWORD')
+    def hasReleaseSigning = [ksPath, ksPass, kAlias, kPass].every { it != null && !it.trim().isEmpty() } && file(ksPath).exists()
+
     signingConfigs {
-        release {
-            storeFile file('aetherx-release.keystore')
-            storePassword 'aetherx2026'
-            keyAlias 'aetherx'
-            keyPassword 'aetherx2026'
-            v1SigningEnabled true
-            v2SigningEnabled true
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(ksPath)
+                storePassword ksPass
+                keyAlias kAlias
+                keyPassword kPass
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
         }
     }
 
@@ -59,13 +66,12 @@ android {
         debug {
             debuggable true
             minifyEnabled false
-            // Sign debug builds with the release key as well so installing a
-            // debug build doesn't clash with a release build on the same device.
-            signingConfig signingConfigs.release
         }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -130,10 +136,6 @@ tasks.register('verifyAetherXLiveWallpaperSetup') {
         }
         if (!manifest.contains('android.service.wallpaper.WallpaperService')) {
             throw new GradleException('Live wallpaper service must declare WallpaperService intent-filter')
-        }
-        def keystore = file("$projectDir/aetherx-release.keystore")
-        if (!keystore.exists()) {
-            throw new GradleException('Missing aetherx-release.keystore — release signature would not be stable')
         }
     }
 }
