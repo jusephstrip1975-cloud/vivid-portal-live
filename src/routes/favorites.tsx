@@ -7,6 +7,10 @@ import { WallpaperTile } from "@/components/WallpaperTile";
 export const Route = createFileRoute("/favorites")({
   head: () => ({
     meta: [
+      { property: "og:title", content: "Mis favoritos · AetherX" },
+      { property: "og:description", content: "Tus fondos animados guardados, listos para aplicar al instante." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Mis favoritos · AetherX" },
       {
         name: "description",

@@ -19,6 +19,10 @@ import { getWallpaper, WALLPAPERS } from "@/lib/wallpapers";
 export const Route = createFileRoute("/device")({
   head: () => ({
     meta: [
+      { property: "og:title", content: "Simulador Samsung Galaxy S25 Ultra · AetherX" },
+      { property: "og:description", content: "Previsualiza AetherX dentro de un Samsung Galaxy S25 Ultra simulado. Navega por Ajustes y prueba los fondos animados como en un móvil real." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Simulador Samsung Galaxy S25 Ultra · AetherX" },
       {
         name: "description",

@@ -4,6 +4,10 @@ import { Check, Sparkles, Zap, Gem } from "lucide-react";
 export const Route = createFileRoute("/premium")({
   head: () => ({
     meta: [
+      { property: "og:title", content: "AetherX Pro · Plan Premium 4K/8K Live" },
+      { property: "og:description", content: "Acceso completo a biblioteca 4K/8K, fondos exclusivos Parallax 3D, sin anuncios. Compra fondos individuales por 0,90 €." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "AetherX Pro · Plan Premium 4K/8K Live" },
       {
         name: "description",

@@ -17,6 +17,10 @@ export const Route = createFileRoute("/explore")({
   validateSearch: search,
   head: () => ({
     meta: [
+      { property: "og:title", content: "Explorar fondos animados · AetherX" },
+      { property: "og:description", content: "Explora más de 1,400 fondos animados 4K por categoría: universo, océano, cyberpunk, zen, naturaleza y clima." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Explorar fondos animados · AetherX" },
       {
         name: "description",

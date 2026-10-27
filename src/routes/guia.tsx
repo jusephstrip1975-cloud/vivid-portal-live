@@ -16,6 +16,10 @@ import guiaVideo from "../../public/videos/guia-github-apk.mp4.asset.json";
 export const Route = createFileRoute("/guia")({
   head: () => ({
     meta: [
+      { property: "og:title", content: "Guía de instalación — AetherX" },
+      { property: "og:description", content: "Paso a paso para conectar AetherX a GitHub y descargar el APK en Android." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Guía de instalación — AetherX" },
       {
         name: "description",
