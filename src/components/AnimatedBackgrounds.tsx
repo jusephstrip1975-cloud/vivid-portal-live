@@ -132,7 +132,7 @@ function BackgroundPreview({ background, onClose }: { background: AnimatedBackgr
         {background.video && !error && <Button variant="secondary" size="icon" className="absolute bottom-3 right-4" onClick={() => { setRequested(!playing); if (!playing) setReduced(false); }} aria-label={playing ? "Pausar animación" : "Reproducir animación"}>{playing ? <Pause /> : <Play />}</Button>}
       </div>
       <footer className="shrink-0 space-y-3 border-t border-border px-5 pb-6 pt-4">
-        {!background.video && <p className="text-sm text-muted-foreground">Imagen original. La generación del movimiento fitness fue bloqueada; no hay vídeo de sentadilla disponible.</p>}
+        {!background.video && <p className="text-sm text-muted-foreground">Imagen sin animación disponible.</p>}
         {error && <p role="alert" className="text-sm text-destructive">Vídeo no disponible.</p>}
         {platform === "android" && hasPlugin && background.video && <div className="flex flex-wrap items-center gap-3">
           <select aria-label="Destino del fondo" value={target} onChange={(event) => setTarget(event.target.value as WallpaperTarget)} className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
