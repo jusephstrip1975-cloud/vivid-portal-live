@@ -1,8 +1,8 @@
 import orbitImage from "@/assets/premium-orbit-original.png.asset.json";
 import robotImage from "@/assets/premium-robot-original.png.asset.json";
 import fitnessImage from "@/assets/premium-fitness-original.png.asset.json";
-import orbitVideo from "@/assets/premium-orbit.mp4.asset.json";
-import robotVideo from "@/assets/premium-robot.mp4.asset.json";
+import orbitVideo from "@/assets/premium-orbit-android.mp4.asset.json";
+import robotVideo from "@/assets/premium-robot-android.mp4.asset.json";
 
 export interface AnimatedBackground {
   id: string;
