@@ -1,4 +1,4 @@
-import { ANIMATED_BACKGROUNDS, type AnimatedBackground } from "@/lib/animated-backgrounds";
+import { ANIMATED_BACKGROUNDS } from "@/lib/animated-backgrounds";
 import blackhole from "@/assets/wp-blackhole.jpg";
 import jellyfish from "@/assets/wp-jellyfish.jpg";
 import cyberpunk from "@/assets/wp-cyberpunk.jpg";
@@ -336,7 +336,9 @@ export type Category =
   | "3d-geometrico"
   | "3d-liquido"
   | "3d-fractal"
-  | "3d-particulas";
+  | "3d-particulas"
+  | "ia"
+  | "fitness";
 
 export interface Wallpaper {
   id: string;
@@ -378,6 +380,8 @@ export const CATEGORIES: { id: Category | "todos"; label: string }[] = [
   { id: "3d-liquido", label: "3D Líquido" },
   { id: "3d-fractal", label: "3D Fractal" },
   { id: "3d-particulas", label: "3D Partículas" },
+  { id: "ia", label: "IA" },
+  { id: "fitness", label: "Fitness" },
 ];
 
 
@@ -655,16 +659,18 @@ WALLPAPERS.push(...generate3DWallpapers());
 // Catálogo limpio: cada wallpaper usa un asset único (sin remix duplicado).
 
 
-// Reference-based animated backgrounds live in their own catalog but open the
-// same detail page (and native Android wallpaper flow) as every other wallpaper.
-function animatedToWallpaper(b: AnimatedBackground): Wallpaper | undefined {
-  if (!b.video) return undefined;
-  return { id: b.id, title: b.title, subtitle: "Fondo 3D animado premium", category: "3d-abstracto", src: b.image, video: b.video, resolution: "4K", sizeMb: 8, fps: 30, premium: true, sound: false, accent: GOLD };
+// Los 3 fondos premium nuevos forman parte del catálogo normal.
+const PREMIUM_META: Record<string, { subtitle: string; category: Category }> = {
+  "premium-orbit": { subtitle: "La Tierra y la galaxia desde una estación de lujo", category: "universo" },
+  "premium-robot": { subtitle: "Robot humanoide en ciudad holográfica", category: "ia" },
+  "premium-fitness": { subtitle: "Sentadilla con barra en movimiento", category: "fitness" },
+};
+for (const b of ANIMATED_BACKGROUNDS) {
+  const meta = PREMIUM_META[b.id];
+  if (!b.video || !meta) continue;
+  WALLPAPERS.unshift({ id: b.id, title: b.title, subtitle: meta.subtitle, category: meta.category, src: b.image, video: b.video, resolution: "4K", sizeMb: 8, fps: 30, premium: true, sound: false, accent: GOLD });
 }
 
 export function getWallpaper(id: string): Wallpaper | undefined {
-  const found = WALLPAPERS.find((w) => w.id === id);
-  if (found) return found;
-  const animated = ANIMATED_BACKGROUNDS.find((b) => b.id === id);
-  return animated ? animatedToWallpaper(animated) : undefined;
+  return WALLPAPERS.find((w) => w.id === id);
 }
