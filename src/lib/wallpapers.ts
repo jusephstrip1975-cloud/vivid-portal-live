@@ -1,3 +1,4 @@
+import { ANIMATED_BACKGROUNDS, type AnimatedBackground } from "@/lib/animated-backgrounds";
 import blackhole from "@/assets/wp-blackhole.jpg";
 import jellyfish from "@/assets/wp-jellyfish.jpg";
 import cyberpunk from "@/assets/wp-cyberpunk.jpg";
@@ -654,6 +655,16 @@ WALLPAPERS.push(...generate3DWallpapers());
 // Catálogo limpio: cada wallpaper usa un asset único (sin remix duplicado).
 
 
+// Reference-based animated backgrounds live in their own catalog but open the
+// same detail page (and native Android wallpaper flow) as every other wallpaper.
+function animatedToWallpaper(b: AnimatedBackground): Wallpaper | undefined {
+  if (!b.video) return undefined;
+  return { id: b.id, title: b.title, subtitle: "Fondo 3D animado premium", category: "3d-abstracto", src: b.image, video: b.video, resolution: "4K", sizeMb: 8, fps: 30, premium: true, sound: false, accent: GOLD };
+}
+
 export function getWallpaper(id: string): Wallpaper | undefined {
-  return WALLPAPERS.find((w) => w.id === id);
+  const found = WALLPAPERS.find((w) => w.id === id);
+  if (found) return found;
+  const animated = ANIMATED_BACKGROUNDS.find((b) => b.id === id);
+  return animated ? animatedToWallpaper(animated) : undefined;
 }
