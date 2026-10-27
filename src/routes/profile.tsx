@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Battery, Bell, Download, Globe, Music, Shield } from "lucide-react";
 import { useAppState } from "@/lib/app-state";
-import { getWallpaper } from "@/lib/wallpapers";
+import { useCatalog } from "@/lib/catalog-client";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -30,8 +30,9 @@ const settings = [
 ];
 
 function ProfilePage() {
+  const { wallpapers } = useCatalog();
   const { favorites, appliedId, unapply } = useAppState();
-  const applied = appliedId ? getWallpaper(appliedId) : null;
+  const applied = wallpapers.find((wp) => wp.id === appliedId);
 
   return (
     <div className="relative px-6 pt-6">

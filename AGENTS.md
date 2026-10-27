@@ -9,5 +9,6 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- Keep reference-based animated backgrounds in a dedicated catalog and gallery, reusing the existing Android wallpaper bridge; this isolates new media from unrelated catalog and native behavior.
+- Keep reference-based animated backgrounds in a dedicated source catalog, merging entries into the shared gallery and reusing the existing Android wallpaper bridge; this isolates media definitions without creating a separate application flow.
 - Gate background actions through a pure capability policy, and distinguish picker opening from system application; this prevents unsupported-platform success claims.
+- Publish the public wallpaper catalog through /api/public/catalog with absolute media URLs; installed Capacitor apps refresh it at startup, resume and on demand, retaining a validated offline cache so new media does not require repackaging the APK.

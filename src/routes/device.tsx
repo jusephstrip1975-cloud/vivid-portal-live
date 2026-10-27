@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LiveMedia } from "@/components/LiveMedia";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper, WALLPAPERS } from "@/lib/wallpapers";
+import { useCatalog } from "@/lib/catalog-client";
 
 export const Route = createFileRoute("/device")({
   head: () => ({
@@ -43,6 +44,7 @@ type Screen =
   | { kind: "wallpaper-gallery" };
 
 function DeviceSimulator() {
+  const { wallpapers: WALLPAPERS } = useCatalog();
   const [screen, setScreen] = useState<Screen>({ kind: "lock" });
   const [time, setTime] = useState(() => new Date());
   const { appliedId, apply } = useAppState();
@@ -53,8 +55,8 @@ function DeviceSimulator() {
   }, []);
 
   const wp = useMemo(
-    () => (appliedId ? getWallpaper(appliedId) : null) ?? WALLPAPERS[0],
-    [appliedId],
+    () => WALLPAPERS.find((item) => item.id === appliedId) ?? WALLPAPERS[0],
+    [appliedId, WALLPAPERS],
   );
 
   const hh = time.getHours().toString().padStart(2, "0");
@@ -604,6 +606,7 @@ function WallpaperGalleryScreen({
   onBack: () => void;
   onPick: (id: string) => void;
 }) {
+  const { wallpapers: WALLPAPERS } = useCatalog();
   return (
     <div className="absolute inset-0 overflow-y-auto bg-[#0b0b0b] text-white">
       <StatusBar time="" />

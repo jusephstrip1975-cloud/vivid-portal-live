@@ -17,6 +17,7 @@ import { Route as GuiaRouteImport } from './routes/guia'
 import { Route as PremiumRouteImport } from './routes/premium'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as WallpaperIdRouteImport } from './routes/wallpaper.$id'
+import { Route as ApiPublicCatalogRouteImport } from './routes/api/public/catalog'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -58,6 +59,11 @@ const WallpaperIdRoute = WallpaperIdRouteImport.update({
   path: '/wallpaper/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCatalogRoute = ApiPublicCatalogRouteImport.update({
+  id: '/api/public/catalog',
+  path: '/api/public/catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/premium': typeof PremiumRoute
   '/profile': typeof ProfileRoute
   '/wallpaper/$id': typeof WallpaperIdRoute
+  '/api/public/catalog': typeof ApiPublicCatalogRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByTo {
   '/premium': typeof PremiumRoute
   '/profile': typeof ProfileRoute
   '/wallpaper/$id': typeof WallpaperIdRoute
+  '/api/public/catalog': typeof ApiPublicCatalogRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,6 +97,7 @@ export interface FileRoutesById {
   '/premium': typeof PremiumRoute
   '/profile': typeof ProfileRoute
   '/wallpaper/$id': typeof WallpaperIdRoute
+  '/api/public/catalog': typeof ApiPublicCatalogRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/premium'
     | '/profile'
     | '/wallpaper/$id'
+    | '/api/public/catalog'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/premium'
     | '/profile'
     | '/wallpaper/$id'
+    | '/api/public/catalog'
   id:
     | '__root__'
     | '/'
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | '/premium'
     | '/profile'
     | '/wallpaper/$id'
+    | '/api/public/catalog'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,6 +144,7 @@ export interface RootRouteChildren {
   PremiumRoute: typeof PremiumRoute
   ProfileRoute: typeof ProfileRoute
   WallpaperIdRoute: typeof WallpaperIdRoute
+  ApiPublicCatalogRoute: typeof ApiPublicCatalogRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WallpaperIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/catalog': {
+      id: '/api/public/catalog'
+      path: '/api/public/catalog'
+      fullPath: '/api/public/catalog'
+      preLoaderRoute: typeof ApiPublicCatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -204,6 +224,7 @@ const rootRouteChildren: RootRouteChildren = {
   PremiumRoute: PremiumRoute,
   ProfileRoute: ProfileRoute,
   WallpaperIdRoute: WallpaperIdRoute,
+  ApiPublicCatalogRoute: ApiPublicCatalogRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

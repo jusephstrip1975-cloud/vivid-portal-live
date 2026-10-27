@@ -1,4 +1,6 @@
 # Tasks
+- [x] Add public catalog synchronization, automatic refresh and an Actualizar button, with offline fallback and the shared Android picker.
+- [x] Verify automatic/manual refresh and new-background navigation in the browser; prepare Android version 330 (3.3.0-actualizacion-fondos). Publication and installation of this APK are still required for existing phones to get synchronization.
 - [x] Integrate original references and two generated 1080 × 1920 clips (8.04 seconds) in FONDOS 3D ANIMADOS; optimize as silent baseline H.264 MP4 with faststart.
 - [x] Verify three original-image previews and mobile layout, plus automated capability/reduced-motion/background-pause rules.
 - [ ] End-to-end video playback/export and native Android picker: browser test environment could not decode/play MP4; no physical Android available. Video files download and decode with FFmpeg, and error fallback is verified.

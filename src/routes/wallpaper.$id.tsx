@@ -3,6 +3,8 @@ import { ArrowLeft, Check, Heart, Home, Layers, Lock, Share2, Volume2 } from "lu
 import { useEffect, useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
+import { fetchPublishedCatalog, useCatalog } from "@/lib/catalog-client";
+import { catalogSchema, CATALOG_CACHE_KEY } from "@/lib/catalog-policy";
 import { LiveMedia } from "@/components/LiveMedia";
 import {
   checkWallpaperCompatibility,
@@ -17,8 +19,20 @@ const ANDROID_APK_URL =
   "https://github.com/jusephstrip1975-cloud/vivid-portal-live/releases/latest/download/aetherx-latest.apk";
 
 export const Route = createFileRoute("/wallpaper/$id")({
-  loader: ({ params }) => {
-    const wp = getWallpaper(params.id);
+  loader: async ({ params }) => {
+    let wp = getWallpaper(params.id);
+    if (!wp && typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(CATALOG_CACHE_KEY);
+        if (cached) wp = catalogSchema.parse(JSON.parse(cached)).wallpapers.find((item) => item.id === params.id) as typeof wp;
+      } catch { /* Ignore invalid offline data. */ }
+    }
+    if (!wp) {
+      try {
+        const catalog = await fetchPublishedCatalog();
+        wp = catalog.wallpapers.find((item) => item.id === params.id) as typeof wp;
+      } catch { /* A missing remote entry is not a valid wallpaper. */ }
+    }
     if (!wp) throw notFound();
     return wp;
   },
@@ -59,7 +73,9 @@ export const Route = createFileRoute("/wallpaper/$id")({
 });
 
 function WallpaperDetail() {
-  const wp = Route.useLoaderData();
+  const initialWallpaper = Route.useLoaderData();
+  const { wallpapers } = useCatalog();
+  const wp = wallpapers.find((item) => item.id === initialWallpaper.id) ?? initialWallpaper;
   const router = useRouter();
   const { isFavorite, toggleFavorite, apply, appliedId } = useAppState();
   const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "done">("idle");
