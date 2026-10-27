@@ -53,61 +53,82 @@ jobs:
 
       # FFmpegKit removed — RAW wallpaper plays directly via MediaPlayer, no transcode.
 
-      # ----- DEBUG APK (idéntico al que funciona por USB, firmado con la misma keystore estable) -----
-      - name: Build signed debug APK (full diagnostics)
+      - name: Decode release keystore (outside repo)
+        id: signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          AETHERX_KEYSTORE_PASSWORD: ${{ secrets.AETHERX_KEYSTORE_PASSWORD }}
+          AETHERX_KEY_ALIAS: ${{ secrets.AETHERX_KEY_ALIAS }}
+          AETHERX_KEY_PASSWORD: ${{ secrets.AETHERX_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$AETHERX_KEYSTORE_PASSWORD" ] && [ -n "$AETHERX_KEY_ALIAS" ] && [ -n "$AETHERX_KEY_PASSWORD" ]; then
+            KS="$RUNNER_TEMP/aetherx-release.keystore"
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KS"
+            {
+              echo "AETHERX_KEYSTORE_PATH=$KS"
+              echo "AETHERX_KEYSTORE_PASSWORD=$AETHERX_KEYSTORE_PASSWORD"
+              echo "AETHERX_KEY_ALIAS=$AETHERX_KEY_ALIAS"
+              echo "AETHERX_KEY_PASSWORD=$AETHERX_KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Signing secrets missing: release will be unsigned and not published."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release AAB + APK
         working-directory: android
         shell: bash
         run: |
-          set -x
-          rm -rf .gradle app/build
-          ./gradlew clean assembleDebug \
-            --no-daemon \
-            --stacktrace \
-            --info \
-            --warning-mode all 2>&1 | tee /tmp/gradle-debug.log
-          STATUS=${PIPESTATUS[0]}
-          echo "===== GRADLE EXIT STATUS: $STATUS ====="
-          exit $STATUS
+          ./gradlew clean bundleRelease assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-release.log
+          exit ${PIPESTATUS[0]}
 
-      - name: Print build failure report (always)
-        if: always()
+      - name: Print build failure report
+        if: failure()
+        run: |
+          grep -nE "FAILURE:|What went wrong|Caused by|Execution failed|error:" /tmp/gradle-release.log | head -200 || true
+          tail -n 200 /tmp/gradle-release.log || true
+
+      - name: Locate release outputs
+        id: outputs
         shell: bash
         run: |
-          echo "===== KEY FAILURE LINES ====="
-          grep -nE "FAILURE:|What went wrong|Caused by|Execution failed|error:|\.java:[0-9]+:" /tmp/gradle-debug.log | head -200 || true
-          echo "===== last 200 lines of gradle log ====="
-          tail -n 200 /tmp/gradle-debug.log || true
+          APK=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
+          AAB=$(ls android/app/build/outputs/bundle/release/*.aab | head -1)
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          echo "aab=$AAB" >> "$GITHUB_OUTPUT"
+          ls -la android/app/build/outputs/apk/release/ android/app/build/outputs/bundle/release/
 
-      - name: Upload full gradle log
-        if: always()
+      - name: Upload release AAB + APK (artifacts)
         uses: actions/upload-artifact@v4
         with:
-          name: gradle-debug-log
-          path: /tmp/gradle-debug.log
-          if-no-files-found: warn
-
-      - name: List debug APK output
-        if: success()
-        run: ls -la android/app/build/outputs/apk/debug/
-
-      - name: Verify native libs inside APK
-        run: |
-          APK=android/app/build/outputs/apk/debug/AetherX-release-signed-debug.apk
-          unzip -l "$APK" | grep -E "lib/(arm64-v8a|armeabi-v7a|x86|x86_64)/" | head -40 || echo "WARNING: no native libs found"
-
-      - name: Upload signed debug APK (artifact)
-        uses: actions/upload-artifact@v4
-        with:
-          name: AetherX-debug-signed
-          path: android/app/build/outputs/apk/debug/AetherX-release-signed-debug.apk
+          name: AetherX-release
+          path: |
+            ${{ steps.outputs.outputs.apk }}
+            ${{ steps.outputs.outputs.aab }}
           if-no-files-found: error
 
+      - name: Verify APK signature
+        id: verify
+        if: steps.signing.outputs.available == 'true'
+        shell: bash
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          if "$APKSIGNER" verify --print-certs "${{ steps.outputs.outputs.apk }}"; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Prepare APK for public release
+        if: steps.verify.outputs.signed == 'true'
         run: |
           mkdir -p dist-apk
-          cp android/app/build/outputs/apk/debug/AetherX-release-signed-debug.apk dist-apk/aetherx-latest.apk
+          cp "${{ steps.outputs.outputs.apk }}" dist-apk/aetherx-latest.apk
 
       - name: Publish / update "latest" GitHub Release
+        if: steps.verify.outputs.signed == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
