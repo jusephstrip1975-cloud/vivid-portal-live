@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAppState } from "@/lib/app-state";
 import { getWallpaper } from "@/lib/wallpapers";
 import { fetchPublishedCatalog, useCatalog } from "@/lib/catalog-client";
+import { catalogSchema, CATALOG_CACHE_KEY } from "@/lib/catalog-policy";
 import { LiveMedia } from "@/components/LiveMedia";
 import {
   checkWallpaperCompatibility,
@@ -20,6 +21,12 @@ const ANDROID_APK_URL =
 export const Route = createFileRoute("/wallpaper/$id")({
   loader: async ({ params }) => {
     let wp = getWallpaper(params.id);
+    if (!wp && typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(CATALOG_CACHE_KEY);
+        if (cached) wp = catalogSchema.parse(JSON.parse(cached)).wallpapers.find((item) => item.id === params.id) as typeof wp;
+      } catch { /* Ignore invalid offline data. */ }
+    }
     if (!wp) {
       try {
         const catalog = await fetchPublishedCatalog();

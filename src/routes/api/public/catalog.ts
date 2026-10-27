@@ -14,7 +14,9 @@ export const Route = createFileRoute("/api/public/catalog")({
       OPTIONS: () => new Response(null, { status: 204, headers }),
       GET: ({ request }) => {
         // This endpoint exposes only the public media catalog, never user data.
-        const origin = new URL(request.url).origin;
+        const requestUrl = new URL(request.url);
+        const origin = requestUrl.hostname === "localhost" || requestUrl.hostname === "127.0.0.1"
+          ? "https://aetherx.org" : requestUrl.origin;
         const absolute = (url: string) => new URL(url, `${origin}/`).href;
         return Response.json({
           schemaVersion: 1,
