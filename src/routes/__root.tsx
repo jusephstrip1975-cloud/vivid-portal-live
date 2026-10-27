@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -40,7 +41,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -107,8 +108,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "AETHERX — Fondos animados premium en 4K/8K" },
       { name: "twitter:description", content: "Fondos animados ultra realistas en 4K/8K. Universo, océano, cyberpunk y más. Descarga gratuita, solo pagas por fondos 3D exclusivos." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ac492e86-ad5b-4c95-9360-54ee34149006/id-preview-94602ddc--86067037-aec8-403d-b7be-5af9e39ce44c.lovable.app-1781900710226.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ac492e86-ad5b-4c95-9360-54ee34149006/id-preview-94602ddc--86067037-aec8-403d-b7be-5af9e39ce44c.lovable.app-1781900710226.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

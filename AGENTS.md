@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Keep reference-based animated backgrounds in a dedicated catalog and gallery, reusing the existing Android wallpaper bridge; this isolates new media from unrelated catalog and native behavior.
+- Gate background actions through a pure capability policy, and distinguish picker opening from system application; this prevents unsupported-platform success claims.

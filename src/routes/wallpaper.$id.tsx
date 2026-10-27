@@ -29,8 +29,12 @@ export const Route = createFileRoute("/wallpaper/$id")({
           { name: "description", content: loaderData.subtitle },
           { property: "og:title", content: `${loaderData.title} · AetherX` },
           { property: "og:description", content: loaderData.subtitle },
-          { property: "og:image", content: loaderData.src },
-          { name: "twitter:image", content: loaderData.src },
+          { property: "og:type", content: "website" },
+          { name: "twitter:card", content: "summary_large_image" },
+          ...(loaderData.src.startsWith("https://") ? [
+            { property: "og:image", content: loaderData.src },
+            { name: "twitter:image", content: loaderData.src },
+          ] : []),
         ]
       : [],
   }),

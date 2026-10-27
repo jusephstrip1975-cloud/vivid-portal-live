@@ -6,6 +6,10 @@ import { getWallpaper } from "@/lib/wallpapers";
 export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
+      { property: "og:title", content: "Perfil · AetherX" },
+      { property: "og:description", content: "Tu cuenta, ajustes y fondo activo en AetherX." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Perfil · AetherX" },
       {
         name: "description",
