@@ -14,7 +14,7 @@ function toCatalog(data: RemoteCatalog): Catalog {
 }
 
 export async function fetchPublishedCatalog(): Promise<RemoteCatalog> {
-  const origin = Capacitor.isNativePlatform() ? "https://aetherx.org" : "";
+  const origin = typeof window === "undefined" || Capacitor.isNativePlatform() ? "https://aetherx.org" : "";
   const response = await fetch(`${origin}/api/public/catalog?refresh=${Date.now()}`, {
     cache: "no-store", credentials: "omit", signal: AbortSignal.timeout(15000),
   });

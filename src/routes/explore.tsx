@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { CATEGORIES, WALLPAPERS, type Category } from "@/lib/wallpapers";
+import { type Category } from "@/lib/wallpapers";
 import { useCatalog } from "@/lib/catalog-client";
 import { WallpaperTile } from "@/components/WallpaperTile";
 
