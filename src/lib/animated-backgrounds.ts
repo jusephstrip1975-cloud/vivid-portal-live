@@ -13,7 +13,7 @@ export interface AnimatedBackground {
 }
 
 export const ANIMATED_BACKGROUNDS: AnimatedBackground[] = [
-  { id: "premium-orbit", title: "Estación espacial", image: orbitImage.url, video: orbitVideo.url, status: "Animado" },
-  { id: "premium-robot", title: "Inteligencia artificial", image: robotImage.url, video: robotVideo.url, status: "Animado" },
-  { id: "premium-fitness", title: "Fuerza y equilibrio", image: fitnessImage.url, status: "Imagen · animación no disponible" },
+  { id: "premium-orbit", title: "Estación espacial", image: `https://aetherx.org${orbitImage.url}`, video: `https://aetherx.org${orbitVideo.url}`, status: "Animado" },
+  { id: "premium-robot", title: "Inteligencia artificial", image: `https://aetherx.org${robotImage.url}`, video: `https://aetherx.org${robotVideo.url}`, status: "Animado" },
+  { id: "premium-fitness", title: "Fuerza y equilibrio", image: `https://aetherx.org${fitnessImage.url}`, status: "Imagen · animación no disponible" },
 ];
