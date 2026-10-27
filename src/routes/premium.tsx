@@ -1,18 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, Sparkles, Zap, Gem } from "lucide-react";
+import { SALES_ENABLED } from "@/lib/feature-flags";
+
+const PREMIUM_DESCRIPTION = SALES_ENABLED
+  ? "Acceso completo a biblioteca 4K/8K, fondos exclusivos Parallax 3D, sin anuncios. Compra fondos individuales por 0,90 €."
+  : "Acceso completo a biblioteca 4K/8K, fondos exclusivos Parallax 3D y sin anuncios. Plan Premium próximamente.";
 
 export const Route = createFileRoute("/premium")({
   head: () => ({
     meta: [
       { property: "og:title", content: "AetherX Pro · Plan Premium 4K/8K Live" },
-      { property: "og:description", content: "Acceso completo a biblioteca 4K/8K, fondos exclusivos Parallax 3D, sin anuncios. Compra fondos individuales por 0,90 €." },
+      { property: "og:description", content: PREMIUM_DESCRIPTION },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { title: "AetherX Pro · Plan Premium 4K/8K Live" },
       {
         name: "description",
         content:
-          "Acceso completo a biblioteca 4K/8K, fondos exclusivos Parallax 3D, sin anuncios. Compra fondos individuales por 0,90 €.",
+          PREMIUM_DESCRIPTION,
       },
     ],
   }),
@@ -103,7 +108,32 @@ function PremiumPage() {
         </ul>
       </section>
 
+      {!SALES_ENABLED && (
+        <section className="relative mt-6 glass-card rounded-2xl p-5 text-center">
+          <span className="inline-flex rounded-full border border-electric-blue/40 bg-electric-blue/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-electric-blue">
+            Próximamente
+          </span>
+          <p className="mt-2 text-sm text-white/70">El plan Premium estará disponible muy pronto.</p>
+        </section>
+      )}
+
+      {/* Plans (hidden until sales are enabled) */}
+      {SALES_ENABLED && (
+        <section className="relative mt-6 space-y-3">
+          {PLANS.map((p) => (
+            <div key={p.id} className="glass-card flex items-center justify-between rounded-2xl p-5">
+              <div>
+                <p className="text-sm font-bold">{p.label}</p>
+                <p className="text-xs text-white/50">{p.note}</p>
+              </div>
+              <p className="text-lg font-bold text-electric-blue">{p.price}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* Individual purchase option */}
+      {SALES_ENABLED && (
       <section className="relative mt-6 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-5">
         <div className="flex items-center gap-2">
           <Zap className="size-4 text-orange-400" />
@@ -119,6 +149,7 @@ function PremiumPage() {
           Descarga gratuita · solo pagas por imagen 3D exclusiva
         </p>
       </section>
+      )}
 
     </div>
   );

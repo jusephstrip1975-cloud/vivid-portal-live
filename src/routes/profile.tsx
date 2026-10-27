@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SALES_ENABLED } from "@/lib/feature-flags";
 import { Battery, Bell, Download, Globe, Music, Shield } from "lucide-react";
 import { useAppState } from "@/lib/app-state";
 import { useCatalog } from "@/lib/catalog-client";
@@ -51,12 +52,18 @@ function ProfilePage() {
           <p className="text-base font-bold text-display">Explorador estelar</p>
           <p className="text-xs text-white/50">Plan Free · {favorites.length} favoritos</p>
         </div>
+        {SALES_ENABLED ? (
         <Link
           to="/premium"
           className="rounded-full bg-electric-blue px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-space-black"
         >
           Subir a Pro
         </Link>
+        ) : (
+          <span className="rounded-full border border-electric-blue/40 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-electric-blue">
+            Próximamente
+          </span>
+        )}
       </section>
 
       {applied && (
