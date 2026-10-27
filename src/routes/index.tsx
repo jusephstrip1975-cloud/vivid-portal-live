@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { CATEGORIES, WALLPAPERS } from "@/lib/wallpapers";
 import { WallpaperTile } from "@/components/WallpaperTile";
 import { LiveMedia } from "@/components/LiveMedia";
-import { AnimatedBackgrounds } from "@/components/AnimatedBackgrounds";
 import aetherxLogo from "@/assets/aetherx-logo-v2.png";
 import {
   applyPickedVideo,
@@ -203,7 +202,6 @@ function HomePage() {
       </section>
 
       {/* Pick from device */}
-      <AnimatedBackgrounds />
       <section className="px-6 pt-2">
         <button
           type="button"
